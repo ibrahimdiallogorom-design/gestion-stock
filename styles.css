@@ -841,9 +841,98 @@ body {
 }
 
 /* RESPONSIVE LAYOUTS */
-@media (max-width: 1024px) {
+@media screen and (max-width: 1024px) {
     .pos-layout {
         grid-template-columns: 1fr;
         height: auto;
+    }
+    .dashboard-details {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .app-layout {
+        flex-direction: column;
+    }
+    .sidebar {
+        position: relative;
+        width: 100%;
+        height: auto;
+        flex-direction: row;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+        overflow-x: auto;
+        padding-bottom: 0;
+    }
+    .sidebar-brand {
+        padding: 16px;
+        border-bottom: none;
+        border-right: 1px solid var(--border-color);
+    }
+    .sidebar-menu {
+        flex-direction: row;
+        padding: 8px;
+        overflow-x: auto;
+        align-items: center;
+    }
+    .menu-item {
+        padding: 8px 12px;
+        white-space: nowrap;
+    }
+    .menu-item.active {
+        border-left: none;
+        border-bottom: 3px solid var(--primary);
+        border-radius: var(--radius-md) var(--radius-md) 0 0;
+    }
+    .sidebar-footer {
+        padding: 8px;
+        border-top: none;
+        border-left: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+    }
+    .btn-logout {
+        padding: 8px 12px;
+    }
+    .main-content {
+        margin-left: 0;
+        padding: 20px 16px;
+    }
+    .content-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    .stats-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+    .pos-products-panel {
+        max-height: 60vh;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    .table-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+    .table-actions input {
+        width: 100%;
+    }
+    .modal-content {
+        width: 95%;
+        margin: 10px;
+    }
+    .pos-search-bar {
+        flex-direction: column;
     }
 }
