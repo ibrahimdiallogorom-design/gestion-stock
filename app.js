@@ -983,10 +983,15 @@ function setupSettings() {
         const passwordVal = document.getElementById('usr-password').value.trim();
 
         if (editId) {
-            await db.collection('users').doc(editId).update({
-                username: usernameVal, fullName: fullnameVal, role: roleVal
-            });
-            closeModal('modal-user');
+            try {
+                await db.collection('users').doc(editId).update({
+                    username: usernameVal, fullName: fullnameVal, role: roleVal
+                });
+                alert("Utilisateur mis à jour avec succès !");
+                closeModal('modal-user');
+            } catch (err) {
+                alert("Erreur lors de la mise à jour : " + err.message);
+            }
         } else {
             const email = usernameVal + '@boutiquevisiontech.bf';
             try {
@@ -995,9 +1000,14 @@ function setupSettings() {
                     username: usernameVal, role: roleVal, fullName: fullnameVal, storeId: currentUser.storeId
                 });
                 await secondaryApp.auth().signOut();
+                alert("Nouvel utilisateur créé avec succès ! Il apparaîtra dans la liste d'ici quelques secondes.");
                 closeModal('modal-user');
             } catch (err) {
-                alert("Erreur lors de la création du compte: " + err.message);
+                let msg = err.message;
+                if (err.code === 'auth/weak-password') msg = "Le mot de passe doit contenir au moins 6 caractères.";
+                if (err.code === 'auth/email-already-in-use') msg = "Ce nom d'utilisateur est déjà utilisé par un autre caissier.";
+                if (err.code === 'auth/network-request-failed') msg = "Problème de connexion internet.";
+                alert("Erreur lors de la création du compte : " + msg);
             }
         }
     });
