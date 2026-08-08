@@ -180,7 +180,7 @@ function setupLogin() {
         
         let email = username;
         if (!email.includes('@')) {
-            email = username + '@stockflow.local';
+            email = username + '@boutiquevisiontech.bf';
         }
         
         loginError.textContent = "Connexion en cours...";
@@ -961,7 +961,7 @@ function setupSettings() {
             });
             closeModal('modal-user');
         } else {
-            const email = usernameVal + '@stockflow.local';
+            const email = usernameVal + '@boutiquevisiontech.bf';
             try {
                 const res = await secondaryApp.auth().createUserWithEmailAndPassword(email, passwordVal);
                 await db.collection('users').doc(res.user.uid).set({
