@@ -975,7 +975,6 @@ function setupSettings() {
     document.getElementById('btn-add-user').addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        alert("Bouton cliqué !");
         openUserModal();
     });
 
@@ -1057,35 +1056,31 @@ function renderUsersTable() {
 }
 
 window.openUserModal = (id = null) => {
-    try {
-        if (typeof id !== 'string') id = null;
-        const modal = document.getElementById('modal-user');
-        const form = document.getElementById('user-form');
-        const passInput = document.getElementById('usr-password');
-        form.reset();
+    if (typeof id !== 'string') id = null;
+    const modal = document.getElementById('modal-user');
+    const form = document.getElementById('user-form');
+    const passInput = document.getElementById('usr-password');
+    form.reset();
 
-        if (id) {
-            document.getElementById('user-modal-title').textContent = "Modifier l'Utilisateur";
-            document.getElementById('user-edit-id').value = id;
-            passInput.parentElement.style.display = 'none';
-            passInput.required = false;
+    if (id) {
+        document.getElementById('user-modal-title').textContent = "Modifier l'Utilisateur";
+        document.getElementById('user-edit-id').value = id;
+        passInput.parentElement.style.display = 'none';
+        passInput.required = false;
 
-            const u = DB.get('users').find(user => user.uid === id);
-            if (u) {
-                document.getElementById('usr-username').value = u.username;
-                document.getElementById('usr-fullname').value = u.fullName;
-                document.getElementById('usr-role').value = u.role;
-            }
-        } else {
-            document.getElementById('user-modal-title').textContent = "Créer un Utilisateur";
-            document.getElementById('user-edit-id').value = '';
-            passInput.parentElement.style.display = 'block';
-            passInput.required = true;
+        const u = DB.get('users').find(user => user.uid === id);
+        if (u) {
+            document.getElementById('usr-username').value = u.username;
+            document.getElementById('usr-fullname').value = u.fullName;
+            document.getElementById('usr-role').value = u.role;
         }
-        modal.classList.add('active');
-    } catch (err) {
-        alert("Erreur Javascript : " + err.message);
+    } else {
+        document.getElementById('user-modal-title').textContent = "Créer un Utilisateur";
+        document.getElementById('user-edit-id').value = '';
+        passInput.parentElement.style.display = 'block';
+        passInput.required = true;
     }
+    modal.classList.add('active');
 };
 
 window.deleteUser = async (id) => {
