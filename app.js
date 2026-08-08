@@ -57,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupStockEntries();
     setupSuppliers();
     setupReports();
+    setupMobileMenu();
     setupSettings();
     setupModals();
     
@@ -924,6 +925,32 @@ function openModal(modalId) { document.getElementById(modalId).classList.add('ac
 function closeModal(modalId) { document.getElementById(modalId).classList.remove('active'); }
 
 // SETTINGS
+
+function setupMobileMenu() {
+    const btn = document.getElementById('mobile-menu-btn');
+    const sidebar = document.querySelector('.sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    
+    if (btn && sidebar && backdrop) {
+        btn.addEventListener('click', () => {
+            sidebar.classList.add('open');
+            backdrop.classList.add('open');
+        });
+        backdrop.addEventListener('click', () => {
+            sidebar.classList.remove('open');
+            backdrop.classList.remove('open');
+        });
+        
+        // Also close menu when a menu item is clicked
+        document.querySelectorAll('.menu-item').forEach(item => {
+            item.addEventListener('click', () => {
+                sidebar.classList.remove('open');
+                backdrop.classList.remove('open');
+            });
+        });
+    }
+}
+
 function setupSettings() {
     document.getElementById('profile-form').addEventListener('submit', async (e) => {
         e.preventDefault();

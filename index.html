@@ -115,11 +115,17 @@
             </div>
         </aside>
 
+        <!-- Mobile Sidebar Backdrop -->
+        <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
         <!-- Main Content Area -->
         <main class="main-content">
             <!-- Header bar -->
             <header class="content-header">
-                <h1 id="view-title">Tableau de bord</h1>
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <button id="mobile-menu-btn" class="btn-gray mobile-menu-btn" style="display: none; padding: 8px 12px;"><i class="fa fa-bars"></i></button>
+                    <h1 id="view-title">Tableau de bord</h1>
+                </div>
                 <div class="header-profile">
                     <span id="header-username">Administrateur</span>
                     <div class="profile-avatar"><i class="fa-solid fa-circle-user"></i></div>

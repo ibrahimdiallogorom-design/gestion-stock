@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">Gestion Stock</string>
+    <string name="login">Se connecter</string>
+    <string name="username">Nom d\'utilisateur</string>
+    <string name="password">Mot de passe</string>
+    <string name="dashboard">Tableau de bord</string>
+    <string name="products">Produits</string>
+    <string name="categories">Catégories</string>
+    <string name="suppliers">Fournisseurs</string>
+    <string name="sales">Ventes</string>
+    <string name="reports">Rapports</string>
+    <string name="settings">Paramètres</string>
+    <string name="users">Utilisateurs</string>
+    <string name="stock_entries">Approvisionnements</string>
+</resources>
