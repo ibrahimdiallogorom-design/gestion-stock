@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion de Stock & Vente</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- jsPDF CDN for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dark-mode">
+
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen" class="screen-overlay active">
+        <div class="login-card" style="max-width: 450px;">
+            <div class="login-header">
+                <h2>GESTION STOCK</h2>
+                <p>Votre plateforme Cloud de gestion multi-boutiques</p>
+            </div>
+            
+            <div class="auth-tabs" style="display: flex; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px;">
+                <button id="tab-login" class="auth-tab active" style="flex: 1; padding: 10px; background: none; border: none; border-bottom: 2px solid #0ea5e9; color: #0ea5e9; font-weight: bold; cursor: pointer;">Se connecter</button>
+                <button id="tab-register" class="auth-tab" style="flex: 1; padding: 10px; background: none; border: none; border-bottom: 2px solid transparent; color: #64748b; font-weight: bold; cursor: pointer;">Créer une boutique</button>
+            </div>
+
+            <!-- LOGIN FORM -->
+            <form id="login-form">
+                <div class="input-group">
+                    <label for="username"><i class="fa fa-user"></i> Identifiant ou E-mail</label>
+                    <input type="text" id="username" placeholder="ex: mon_identifiant ou mail@.com" required>
+                </div>
+                <div class="input-group">
+                    <label for="password"><i class="fa fa-lock"></i> Mot de passe</label>
+                    <input type="password" id="password" placeholder="••••••••" required>
+                </div>
+                <div class="error-msg" id="login-error"></div>
+                <button type="submit" class="btn-primary btn-block">Se connecter</button>
+            </form>
+
+            <!-- REGISTER FORM -->
+            <form id="register-form" style="display: none;">
+                <div class="input-group">
+                    <label for="reg-store-name"><i class="fa fa-store"></i> Nom de votre Boutique</label>
+                    <input type="text" id="reg-store-name" placeholder="ex: Alimentation Z" required>
+                </div>
+                <div class="input-group">
+                    <label for="reg-fullname"><i class="fa fa-user"></i> Votre Nom (Gérant)</label>
+                    <input type="text" id="reg-fullname" placeholder="ex: Jean Dupont" required>
+                </div>
+                <div class="input-group">
+                    <label for="reg-email"><i class="fa fa-envelope"></i> E-mail (Gérant)</label>
+                    <input type="email" id="reg-email" placeholder="votre@email.com" required>
+                </div>
+                <div class="input-group">
+                    <label for="reg-password"><i class="fa fa-lock"></i> Mot de passe</label>
+                    <input type="password" id="reg-password" placeholder="Min 6 caractères" required>
+                </div>
+                <div class="error-msg" id="register-error"></div>
+                <button type="submit" class="btn-primary btn-block">Ouvrir ma boutique</button>
+            </form>
+
+            <div class="login-footer">
+                <p>Accès Sécurisé Cloud</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP WRAPPER -->
+    <div id="app-container" class="app-layout">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <i class="fa-solid fa-boxes-stacked brand-icon"></i>
+                <div>
+                    <h3>STOCKFLOW</h3>
+                    <span id="user-badge" class="badge">Administrateur</span>
+                </div>
+            </div>
+            <nav class="sidebar-menu">
+                <a href="#" class="menu-item active" data-target="view-dashboard" id="menu-dashboard">
+                    <i class="fa-solid fa-chart-pie"></i> Tableau de bord
+                </a>
+                <a href="#" class="menu-item" data-target="view-pos" id="menu-pos">
+                    <i class="fa-solid fa-cash-register"></i> Caisse (POS)
+                </a>
+                <a href="#" class="menu-item" data-target="view-products" id="menu-products">
+                    <i class="fa-solid fa-box"></i> Produits
+                </a>
+                <a href="#" class="menu-item" data-target="view-categories" id="menu-categories">
+                    <i class="fa-solid fa-tags"></i> Catégories
+                </a>
+                <a href="#" class="menu-item" data-target="view-stock-entries" id="menu-stock-entries">
+                    <i class="fa-solid fa-truck-loading"></i> Approvisionnements
+                </a>
+                <a href="#" class="menu-item" data-target="view-suppliers" id="menu-suppliers">
+                    <i class="fa-solid fa-address-book"></i> Fournisseurs
+                </a>
+                <a href="#" class="menu-item" data-target="view-reports" id="menu-reports">
+                    <i class="fa-solid fa-file-invoice-dollar"></i> Rapports PDF
+                </a>
+                <a href="#" class="menu-item" data-target="view-settings" id="menu-settings">
+                    <i class="fa-solid fa-gears"></i> Paramètres
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="btn-logout" class="btn-logout">
+                    <i class="fa-solid fa-right-from-bracket"></i> Déconnexion
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Header bar -->
+            <header class="content-header">
+                <h1 id="view-title">Tableau de bord</h1>
+                <div class="header-profile">
+                    <span id="header-username">Administrateur</span>
+                    <div class="profile-avatar"><i class="fa-solid fa-circle-user"></i></div>
+                </div>
+            </header>
+
+            <!-- VIEW: DASHBOARD -->
+            <section id="view-dashboard" class="app-view active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <span class="stat-label">Ventes du jour</span>
+                            <h2 id="stat-sales-today">0,00 FCFA</h2>
+                            <span class="stat-sub" id="stat-sales-count">0 transaction(s)</span>
+                        </div>
+                        <div class="stat-icon bg-success"><i class="fa-solid fa-wallet"></i></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <span class="stat-label">Valeur de l'inventaire</span>
+                            <h2 id="stat-stock-value">0,00 FCFA</h2>
+                            <span class="stat-sub">Prix d'achat total</span>
+                        </div>
+                        <div class="stat-icon bg-info"><i class="fa-solid fa-boxes-stacked"></i></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <span class="stat-label">Alertes de Stock</span>
+                            <h2 id="stat-stock-alerts" class="text-danger">0</h2>
+                            <span class="stat-sub">Produits critiques</span>
+                        </div>
+                        <div class="stat-icon bg-danger"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    </div>
+                </div>
+
+                <div class="dashboard-details">
+                    <!-- Custom Sales Chart Card -->
+                    <div class="card chart-card">
+                        <h3>Activité Commerciale (7 derniers jours)</h3>
+                        <div class="chart-container">
+                            <canvas id="sales-canvas-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Low Stock Warnings -->
+                    <div class="card alert-list-card">
+                        <h3>Stocks Critiques</h3>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Produit</th>
+                                        <th>Stock</th>
+                                        <th>Seuil Alerte</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dashboard-alerts-tbody">
+                                    <!-- Dynamic -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: POS (POINT OF SALE) -->
+            <section id="view-pos" class="app-view">
+                <div class="pos-layout">
+                    <!-- Left: Product List -->
+                    <div class="pos-products-panel">
+                        <div class="pos-search-bar">
+                            <input type="text" id="pos-search" placeholder="Rechercher par nom ou référence...">
+                            <select id="pos-category-filter">
+                                <option value="">Toutes les catégories</option>
+                            </select>
+                        </div>
+                        <div class="pos-products-grid" id="pos-products-container">
+                            <!-- Dynamic Products List -->
+                        </div>
+                    </div>
+
+                    <!-- Right: Cart panel -->
+                    <div class="pos-cart-panel">
+                        <h3>Panier de Vente</h3>
+                        <div class="cart-items-list" id="cart-items-container">
+                            <!-- Dynamic Cart Items -->
+                        </div>
+                        <div class="cart-totals">
+                            <div class="total-row">
+                                <span>Sous-total</span>
+                                <span id="pos-subtotal">0,00 FCFA</span>
+                            </div>
+                            <div class="total-row">
+                                <span>Remise (FCFA)</span>
+                                <input type="number" id="pos-discount" value="0" min="0">
+                            </div>
+                            <div class="total-row">
+                                <span>TVA (%)</span>
+                                <input type="number" id="pos-tax" value="19" min="0" max="100">
+                            </div>
+                            <hr class="divider">
+                            <div class="total-row grand-total">
+                                <span>TOTAL</span>
+                                <span id="pos-total">0,00 FCFA</span>
+                            </div>
+                            
+                            <div class="payment-method-selector">
+                                <label>Mode de paiement :</label>
+                                <div class="methods-group">
+                                    <label class="method-btn active">
+                                        <input type="radio" name="payment-method" value="CASH" checked> Espèces
+                                    </label>
+                                    <label class="method-btn">
+                                        <input type="radio" name="payment-method" value="CARD"> Carte
+                                    </label>
+                                    <label class="method-btn">
+                                        <input type="radio" name="payment-method" value="TRANSFER"> Virement
+                                    </label>
+                                </div>
+                            </div>
+
+                            <button id="btn-checkout" class="btn-success btn-block btn-lg">Valider & Encaisser</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: PRODUCTS (INVENTORY) -->
+            <section id="view-products" class="app-view">
+                <div class="card">
+                    <div class="table-actions">
+                        <input type="text" id="product-search" placeholder="Rechercher un produit...">
+                        <button id="btn-add-product" class="btn-primary"><i class="fa fa-plus"></i> Nouveau Produit</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Référence</th>
+                                    <th>Nom</th>
+                                    <th>Catégorie</th>
+                                    <th>Prix Achat</th>
+                                    <th>Prix Vente</th>
+                                    <th>Stock</th>
+                                    <th>Unité</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="products-tbody">
+                                <!-- Dynamic -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: CATEGORIES -->
+            <section id="view-categories" class="app-view">
+                <div class="card">
+                    <div class="table-actions">
+                        <div class="spacer"></div>
+                        <button id="btn-add-category" class="btn-primary"><i class="fa fa-plus"></i> Nouvelle Catégorie</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Couleur</th>
+                                    <th>Nom</th>
+                                    <th>Description</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="categories-tbody">
+                                <!-- Dynamic -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: STOCK ENTRIES -->
+            <section id="view-stock-entries" class="app-view">
+                <div class="card">
+                    <div class="table-actions">
+                        <div class="spacer"></div>
+                        <button id="btn-add-entry" class="btn-primary"><i class="fa fa-plus"></i> Enregistrer Entrée</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Produit</th>
+                                    <th>Fournisseur</th>
+                                    <th>Quantité</th>
+                                    <th>Coût Unitaire</th>
+                                    <th>Coût Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="entries-tbody">
+                                <!-- Dynamic -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: SUPPLIERS -->
+            <section id="view-suppliers" class="app-view">
+                <div class="card">
+                    <div class="table-actions">
+                        <div class="spacer"></div>
+                        <button id="btn-add-supplier" class="btn-primary"><i class="fa fa-plus"></i> Nouveau Fournisseur</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Nom</th>
+                                    <th>Téléphone</th>
+                                    <th>E-mail</th>
+                                    <th>Adresse</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="suppliers-tbody">
+                                <!-- Dynamic -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: REPORTS -->
+            <section id="view-reports" class="app-view">
+                <div class="card report-selector-card">
+                    <h3>Générateur de Rapport Mensuel</h3>
+                    <p>Sélectionnez la période pour générer le bilan PDF complet d'activité de l'entreprise.</p>
+                    <div class="report-form-group">
+                        <div class="input-group">
+                            <label for="report-month">Sélectionner le mois</label>
+                            <input type="month" id="report-month">
+                        </div>
+                        <div class="input-group">
+                            <label for="report-enterprise">Nom de l'entreprise</label>
+                            <input type="text" id="report-enterprise" value="Mon Entreprise E-Stock">
+                        </div>
+                        <button id="btn-generate-report" class="btn-success"><i class="fa fa-file-pdf"></i> Générer le Rapport PDF</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: SETTINGS -->
+            <section id="view-settings" class="app-view">
+                <div class="settings-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                    <!-- Left: My Profile / Change Password -->
+                    <div class="card">
+                        <h3>Mon Profil</h3>
+                        <p class="text-muted" style="margin-bottom: 20px;">Mettez à jour vos identifiants d'accès personnels.</p>
+                        <form id="profile-form">
+                            <div class="input-group">
+                                <label>Identifiant de connexion *</label>
+                                <input type="text" id="prof-username" required>
+                            </div>
+                            <div class="input-group">
+                                <label>Nom Complet *</label>
+                                <input type="text" id="prof-fullname" required>
+                            </div>
+                            <div class="input-group">
+                                <label>Nouveau Mot de Passe (laisser vide pour ne pas changer)</label>
+                                <input type="password" id="prof-password" placeholder="••••••••">
+                            </div>
+                            <button type="submit" class="btn-primary">Mettre à jour mon profil</button>
+                        </form>
+                    </div>
+
+                    <!-- System parameters and database reset (ADMIN only) -->
+                    <div class="card" id="system-reset-card" style="margin-top: 24px; grid-column: 1;">
+                        <h3>Paramètres Système</h3>
+                        <p class="text-muted" style="margin-bottom: 20px;">Actions globales d'administration.</p>
+                        <button id="btn-reset-db" class="btn-danger"><i class="fa fa-trash-can"></i> Réinitialiser toutes les données</button>
+                    </div>
+                </div>
+
+                <div class="settings-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px;">
+
+                    <!-- Right: Manage Other Users (ADMIN only) -->
+                    <div class="card" id="admin-users-card">
+                        <div class="table-actions" style="margin-bottom: 16px;">
+                            <h3>Gestion des Utilisateurs</h3>
+                            <button id="btn-add-user" class="btn-primary btn-sm" style="padding: 8px 16px; font-size: 0.85rem;"><i class="fa fa-plus"></i> Nouvel Utilisateur</button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Identifiant</th>
+                                        <th>Nom</th>
+                                        <th>Rôle</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-tbody">
+                                    <!-- Dynamic -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- MODAL: ADD/EDIT PRODUCT -->
+    <div id="modal-product" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="product-modal-title">Nouveau Produit</h3>
+                <span class="close-modal" data-target="modal-product">&times;</span>
+            </div>
+            <form id="product-form">
+                <input type="hidden" id="product-id">
+                <div class="form-row">
+                    <div class="input-group">
+                        <label>Nom du produit *</label>
+                        <input type="text" id="prod-name" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Référence *</label>
+                        <input type="text" id="prod-ref" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="input-group">
+                        <label>Catégorie *</label>
+                        <select id="prod-category" required></select>
+                    </div>
+                    <div class="input-group">
+                        <label>Unité de mesure</label>
+                        <input type="text" id="prod-unit" value="pcs">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="input-group">
+                        <label>Prix d'achat (FCFA) *</label>
+                        <input type="number" id="prod-price-purchase" step="0.01" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Prix de vente (FCFA) *</label>
+                        <input type="number" id="prod-price-sale" step="0.01" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="input-group">
+                        <label>Stock Initial</label>
+                        <input type="number" id="prod-stock" value="0">
+                    </div>
+                    <div class="input-group">
+                        <label>Alerte Seuil Minimal *</label>
+                        <input type="number" id="prod-min-stock" value="5" required>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>Description</label>
+                    <textarea id="prod-desc" rows="3"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-gray close-modal" data-target="modal-product">Annuler</button>
+                    <button type="submit" class="btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD/EDIT CATEGORY -->
+    <div id="modal-category" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Nouvelle Catégorie</h3>
+                <span class="close-modal" data-target="modal-category">&times;</span>
+            </div>
+            <form id="category-form">
+                <div class="input-group">
+                    <label>Nom de la catégorie *</label>
+                    <input type="text" id="cat-name" required>
+                </div>
+                <div class="input-group">
+                    <label>Couleur représentative (Hex) *</label>
+                    <input type="color" id="cat-color" value="#2196F3" required>
+                </div>
+                <div class="input-group">
+                    <label>Description</label>
+                    <textarea id="cat-desc" rows="3"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-gray close-modal" data-target="modal-category">Annuler</button>
+                    <button type="submit" class="btn-primary">Ajouter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD/EDIT SUPPLIER -->
+    <div id="modal-supplier" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Nouveau Fournisseur</h3>
+                <span class="close-modal" data-target="modal-supplier">&times;</span>
+            </div>
+            <form id="supplier-form">
+                <div class="input-group">
+                    <label>Nom complet du fournisseur *</label>
+                    <input type="text" id="sup-name" required>
+                </div>
+                <div class="input-group">
+                    <label>Numéro de téléphone</label>
+                    <input type="text" id="sup-phone">
+                </div>
+                <div class="input-group">
+                    <label>E-mail</label>
+                    <input type="email" id="sup-email">
+                </div>
+                <div class="input-group">
+                    <label>Adresse</label>
+                    <textarea id="sup-address" rows="2"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-gray close-modal" data-target="modal-supplier">Annuler</button>
+                    <button type="submit" class="btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD STOCK ENTRY -->
+    <div id="modal-stock-entry" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Enregistrer un Approvisionnement</h3>
+                <span class="close-modal" data-target="modal-stock-entry">&times;</span>
+            </div>
+            <form id="stock-entry-form">
+                <div class="input-group">
+                    <label>Sélectionner le produit *</label>
+                    <select id="entry-product" required></select>
+                </div>
+                <div class="input-group">
+                    <label>Sélectionner le fournisseur</label>
+                    <select id="entry-supplier"></select>
+                </div>
+                <div class="form-row">
+                    <div class="input-group">
+                        <label>Quantité reçue *</label>
+                        <input type="number" id="entry-qty" min="1" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Coût unitaire d'achat (FCFA) *</label>
+                        <input type="number" id="entry-cost" step="0.01" required>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-gray close-modal" data-target="modal-stock-entry">Annuler</button>
+                    <button type="submit" class="btn-primary">Valider l'entrée</button>
+                </div>
+            </form>
+    </div>
+
+    <!-- MODAL: ADD/EDIT USER -->
+    <div id="modal-user" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="user-modal-title">Créer un Utilisateur</h3>
+                <span class="close-modal" data-target="modal-user">&times;</span>
+            </div>
+            <form id="user-form">
+                <input type="hidden" id="user-edit-id">
+                <div class="input-group">
+                    <label>Identifiant (username) *</label>
+                    <input type="text" id="usr-username" required>
+                </div>
+                <div class="input-group">
+                    <label>Nom complet *</label>
+                    <input type="text" id="usr-fullname" required>
+                </div>
+                <div class="input-group">
+                    <label>Rôle *</label>
+                    <select id="usr-role" required>
+                        <option value="CAISSIER">Caissier</option>
+                        <option value="ADMIN">Administrateur</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Mot de passe *</label>
+                    <input type="password" id="usr-password" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-gray close-modal" data-target="modal-user">Annuler</button>
+                    <button type="submit" class="btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Firebase Compat Libraries -->
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+
+    <!-- Application Script -->
+    <script src="app.js"></script>
+</body>
+</html>
