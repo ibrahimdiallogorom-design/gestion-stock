@@ -972,7 +972,11 @@ function setupSettings() {
         }
     });
 
-    document.getElementById('btn-add-user').addEventListener('click', () => openUserModal());
+    document.getElementById('btn-add-user').addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openUserModal();
+    });
 
     document.getElementById('user-form').addEventListener('submit', async (e) => {
         e.preventDefault();
