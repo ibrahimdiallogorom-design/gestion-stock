@@ -1,10 +1,10 @@
-const CACHE_NAME = 'vision-tech-stock-v1';
+const CACHE_NAME = 'vision-tech-stock-v2';
 const urlsToCache = [
   '/',
   '/index.html',
   '/styles.css',
   '/app.js',
-  '/icon.svg',
+  '/icon.png',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css'
 ];
 
