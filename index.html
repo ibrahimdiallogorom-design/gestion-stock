@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestion de Stock & Vente</title>
+    <!-- PWA Settings -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#10b981">
+    <link rel="apple-touch-icon" href="icon.svg">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -666,6 +670,17 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Script -->
-    <script src="app.js?v=7"></script>
+    <script src="app.js?v=8"></script>
+    
+    <!-- PWA Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js')
+            .then(reg => console.log('Service Worker enregistré avec succès.', reg.scope))
+            .catch(err => console.log('Erreur lors de l\'enregistrement du Service Worker:', err));
+        });
+      }
+    </script>
 </body>
 </html>
