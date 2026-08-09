@@ -59,6 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupReports();
     setupMobileMenu();
     setupSettings();
+    setupAllocation();
     setupModals();
     
     auth.onAuthStateChanged(async (user) => {
@@ -428,7 +429,8 @@ function renderPOSProducts() {
     const filtered = products.filter(p => {
         const matchesSearch = p.name.toLowerCase().includes(searchVal) || p.reference.toLowerCase().includes(searchVal);
         const matchesCategory = selectedCat === "" || p.categoryId == selectedCat;
-        return matchesSearch && matchesCategory && p.stockQuantity > 0;
+        const availableStock = currentUser.role === 'ADMIN' ? p.stockQuantity : ((p.cashierStocks && p.cashierStocks[currentUser.uid]) || 0);
+        return matchesSearch && matchesCategory && availableStock > 0;
     });
 
     if (filtered.length === 0) {
@@ -437,13 +439,14 @@ function renderPOSProducts() {
     }
 
     filtered.forEach(p => {
+        const availableStock = currentUser.role === 'ADMIN' ? p.stockQuantity : ((p.cashierStocks && p.cashierStocks[currentUser.uid]) || 0);
         const card = document.createElement('div');
-        const isLow = p.stockQuantity <= p.minStockAlert;
+        const isLow = availableStock <= p.minStockAlert;
         card.className = `pos-product-card ${isLow ? 'low-stock' : ''}`;
         card.innerHTML = `
             <div>
                 <h4>${p.name}</h4>
-                <span class="stock">Stock: ${p.stockQuantity} ${p.unit}</span>
+                <span class="stock">Stock: ${availableStock} ${p.unit}</span>
             </div>
             <div class="price">${p.salePrice.toLocaleString('fr-FR')} FCFA</div>
         `;
@@ -453,12 +456,13 @@ function renderPOSProducts() {
 }
 
 function addToCart(product) {
+    const availableStock = currentUser.role === 'ADMIN' ? product.stockQuantity : ((product.cashierStocks && product.cashierStocks[currentUser.uid]) || 0);
     const existing = cart.find(item => item.product.id === product.id);
     if (existing) {
-        if (existing.quantity < product.stockQuantity) {
+        if (existing.quantity < availableStock) {
             existing.quantity++;
         } else {
-            alert(`Impossible de vendre plus de ${product.stockQuantity} unités.`);
+            alert(`Impossible de vendre plus de ${availableStock} unités.`);
         }
     } else {
         cart.push({ product, quantity: 1 });
@@ -491,11 +495,13 @@ function renderCart() {
 
 window.updateCartQty = (index, delta) => {
     const item = cart[index];
+    const availableStock = currentUser.role === 'ADMIN' ? item.product.stockQuantity : ((item.product.cashierStocks && item.product.cashierStocks[currentUser.uid]) || 0);
+    
     item.quantity += delta;
     if (item.quantity <= 0) {
         cart.splice(index, 1);
-    } else if (item.quantity > item.product.stockQuantity) {
-        item.quantity = item.product.stockQuantity;
+    } else if (item.quantity > availableStock) {
+        item.quantity = availableStock;
         alert("Stock insuffisant.");
     }
     renderCart();
@@ -543,7 +549,12 @@ function handlePOSCheckout() {
 
     cart.forEach(item => {
         const prod = products.find(p => p.id === item.product.id);
-        if (prod) prod.stockQuantity = Math.max(0, prod.stockQuantity - item.quantity);
+        if (prod) {
+            prod.stockQuantity = Math.max(0, prod.stockQuantity - item.quantity);
+            if (currentUser.role !== 'ADMIN' && prod.cashierStocks && prod.cashierStocks[currentUser.uid] !== undefined) {
+                prod.cashierStocks[currentUser.uid] = Math.max(0, prod.cashierStocks[currentUser.uid] - item.quantity);
+            }
+        }
     });
 
     sales.push(newSale);
@@ -587,7 +598,7 @@ function setupProducts() {
                 id: Date.now().toString(),
                 name: name, reference: ref, categoryId: cat, purchasePrice: purchaseVal,
                 salePrice: saleVal, stockQuantity: initStockVal, minStockAlert: alertStock,
-                unit: unit, description: desc
+                unit: unit, description: desc, cashierStocks: {}
             });
         }
 
@@ -611,6 +622,12 @@ function renderProductsTable() {
         const catName = categories.find(c => c.id == p.categoryId)?.name || 'Non classé';
         const isLow = p.stockQuantity <= p.minStockAlert;
         
+        let allocTotal = 0;
+        if (p.cashierStocks) {
+            allocTotal = Object.values(p.cashierStocks).reduce((sum, val) => sum + val, 0);
+        }
+        const allocStr = allocTotal > 0 ? `<br><small class="text-muted">Alloué: ${allocTotal}</small>` : '';
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td><strong>${p.reference}</strong></td>
@@ -618,16 +635,96 @@ function renderProductsTable() {
             <td>${catName}</td>
             <td>${p.purchasePrice.toLocaleString('fr-FR')} FCFA</td>
             <td>${p.salePrice.toLocaleString('fr-FR')} FCFA</td>
-            <td><span class="${isLow ? 'badge badge-danger' : ''}">${p.stockQuantity}</span></td>
+            <td><span class="${isLow ? 'badge badge-danger' : ''}">${p.stockQuantity}</span>${allocStr}</td>
             <td>${p.unit}</td>
             <td>
                 <div class="action-icons">
+                    <button class="btn-success" onclick="openAllocateModal('${p.id}')" title="Allouer du stock"><i class="fa fa-box-open"></i></button>
                     <button class="btn-edit" onclick="openProductModal('${p.id}')"><i class="fa fa-pen"></i></button>
                     <button class="btn-delete" onclick="deleteProduct('${p.id}')"><i class="fa fa-trash"></i></button>
                 </div>
             </td>
         `;
         tbody.appendChild(tr);
+    });
+}
+
+window.openAllocateModal = (productId) => {
+    const products = DB.get('products');
+    const users = DB.get('users');
+    
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    // Calculer le maximum qu'on peut allouer
+    let allocTotal = 0;
+    if (product.cashierStocks) {
+        allocTotal = Object.values(product.cashierStocks).reduce((sum, val) => sum + val, 0);
+    }
+    const maxAllocable = product.stockQuantity - allocTotal;
+
+    document.getElementById('alloc-product-id').value = product.id;
+    document.getElementById('alloc-product-name').value = product.name;
+    document.getElementById('alloc-max-stock').textContent = maxAllocable;
+    
+    // Only allow maxAllocable
+    const qtyInput = document.getElementById('alloc-qty');
+    qtyInput.max = maxAllocable;
+    qtyInput.value = '';
+
+    const cashierSelect = document.getElementById('alloc-cashier-id');
+    cashierSelect.innerHTML = '';
+    const cashiers = users.filter(u => u.role === 'CAISSIER');
+    if (cashiers.length === 0) {
+        cashierSelect.innerHTML = '<option value="">Aucun caissier trouvé</option>';
+    } else {
+        cashiers.forEach(c => {
+            const currentAlloc = (product.cashierStocks && product.cashierStocks[c.uid]) ? product.cashierStocks[c.uid] : 0;
+            const opt = document.createElement('option');
+            opt.value = c.uid;
+            opt.textContent = `${c.fullName || c.username} (Déjà: ${currentAlloc})`;
+            cashierSelect.appendChild(opt);
+        });
+    }
+
+    document.getElementById('modal-allocate-stock').classList.add('active');
+};
+
+function setupAllocation() {
+    document.getElementById('allocate-stock-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const prodId = document.getElementById('alloc-product-id').value;
+        const cashierId = document.getElementById('alloc-cashier-id').value;
+        const qty = parseInt(document.getElementById('alloc-qty').value);
+
+        if (!cashierId) {
+            alert("Veuillez sélectionner un caissier.");
+            return;
+        }
+
+        const products = DB.get('products');
+        const prodIndex = products.findIndex(p => p.id === prodId);
+        
+        if (prodIndex > -1) {
+            const p = products[prodIndex];
+            if (!p.cashierStocks) p.cashierStocks = {};
+            
+            let currentTotal = Object.values(p.cashierStocks).reduce((sum, val) => sum + val, 0);
+            const remaining = p.stockQuantity - currentTotal;
+            
+            if (qty > remaining) {
+                alert("Quantité supérieure au stock disponible en boutique !");
+                return;
+            }
+
+            if (!p.cashierStocks[cashierId]) p.cashierStocks[cashierId] = 0;
+            p.cashierStocks[cashierId] += qty;
+            
+            DB.set('products', products);
+            renderProductsTable();
+            closeModal('modal-allocate-stock');
+            alert("Stock alloué avec succès !");
+        }
     });
 }
 

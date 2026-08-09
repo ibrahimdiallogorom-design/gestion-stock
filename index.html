@@ -593,7 +593,38 @@
                 </div>
             </form>
         </div>
-    </div>    <!-- MODAL: ADD/EDIT USER -->
+    </div>
+
+    <!-- MODAL: ALLOCATE STOCK TO CASHIER -->
+    <div id="modal-allocate-stock" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Allouer du Stock</h3>
+                <span class="close-modal" data-target="modal-allocate-stock">&times;</span>
+            </div>
+            <form id="allocate-stock-form">
+                <input type="hidden" id="alloc-product-id">
+                <div class="input-group">
+                    <label>Produit</label>
+                    <input type="text" id="alloc-product-name" readonly style="background-color: var(--bg-body);">
+                </div>
+                <div class="input-group">
+                    <label>Sélectionner le caissier *</label>
+                    <select id="alloc-cashier-id" required></select>
+                </div>
+                <div class="input-group">
+                    <label>Quantité à allouer (Total en boutique: <span id="alloc-max-stock">0</span>) *</label>
+                    <input type="number" id="alloc-qty" min="1" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-gray close-modal" data-target="modal-allocate-stock">Annuler</button>
+                    <button type="submit" class="btn-primary">Allouer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD/EDIT USER -->
     <div id="modal-user" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -635,6 +666,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Script -->
-    <script src="app.js?v=6"></script>
+    <script src="app.js?v=7"></script>
 </body>
 </html>
