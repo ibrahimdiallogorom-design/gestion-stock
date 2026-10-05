@@ -16,6 +16,7 @@ const auth = firebase.auth();
 let currentUser = null; // { uid, username, role, fullName, storeId }
 let cart = [];
 let storeUnsubscribe = null;
+let isRegistering = false;
 
 let localData = {
     users: [], categories: [], products: [], suppliers: [], sales: [], stock_entries: []
@@ -60,16 +61,29 @@ document.addEventListener('DOMContentLoaded', () => {
     setupMobileMenu();
     setupSettings();
     setupAllocation();
+    setupCredits();
     setupModals();
     
     auth.onAuthStateChanged(async (user) => {
+        if (isRegistering) {
+            return;
+        }
         if (user) {
-            const doc = await db.collection('users').doc(user.uid).get();
-            if (doc.exists) {
-                currentUser = { uid: user.uid, ...doc.data() };
-                loadStoreData();
-            } else {
-                auth.signOut();
+            try {
+                const doc = await db.collection('users').doc(user.uid).get();
+                if (doc.exists) {
+                    currentUser = { uid: user.uid, ...doc.data() };
+                    loadStoreData();
+                } else {
+                    console.warn("Utilisateur non trouvé dans Firestore.");
+                    auth.signOut();
+                }
+            } catch (err) {
+                console.error("Erreur d'accès aux données utilisateur :", err);
+                const loginError = document.getElementById('login-error');
+                if (loginError) {
+                    loginError.textContent = "Erreur de connexion aux données : " + (err.message || err);
+                }
             }
         } else {
             showLoginScreen();
@@ -115,6 +129,7 @@ function loadStoreData() {
         // Apply role-based navigation restrictions
         const isCashier = currentUser.role !== 'ADMIN';
         document.getElementById('menu-dashboard').style.display = isCashier ? 'none' : 'flex';
+        document.getElementById('menu-credits').style.display = 'flex';
         document.getElementById('menu-products').style.display = isCashier ? 'none' : 'flex';
         document.getElementById('menu-categories').style.display = isCashier ? 'none' : 'flex';
         document.getElementById('menu-stock-entries').style.display = isCashier ? 'none' : 'flex';
@@ -124,7 +139,7 @@ function loadStoreData() {
         const activeItem = document.querySelector('.menu-item.active');
         let activeView = activeItem ? activeItem.getAttribute('data-target') : 'view-pos';
         
-        if (isCashier && activeView !== 'view-pos' && activeView !== 'view-settings') {
+        if (isCashier && activeView !== 'view-pos' && activeView !== 'view-credits' && activeView !== 'view-settings') {
             switchView('view-pos', 'Caisse (POS)');
             document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('active'));
             document.getElementById('menu-pos').classList.add('active');
@@ -190,7 +205,14 @@ function setupLogin() {
             await auth.signInWithEmailAndPassword(email, password);
             loginError.textContent = "";
         } catch (err) {
-            loginError.textContent = "Identifiant ou mot de passe incorrect";
+            console.error("Erreur de connexion :", err);
+            let msg = "Identifiant ou mot de passe incorrect";
+            if (err.code === 'auth/network-request-failed') {
+                msg = "Problème de connexion internet. Vérifiez votre réseau.";
+            } else if (err.code === 'auth/too-many-requests') {
+                msg = "Trop de tentatives échouées. Veuillez patienter avant de réessayer.";
+            }
+            loginError.textContent = msg;
         }
     });
 
@@ -203,6 +225,7 @@ function setupLogin() {
             const password = document.getElementById('reg-password').value.trim();
 
             registerError.textContent = "Création de la boutique...";
+            isRegistering = true;
             try {
                 const res = await auth.createUserWithEmailAndPassword(email, password);
                 
@@ -214,12 +237,31 @@ function setupLogin() {
                 });
 
                 await db.collection('stores').doc(res.user.uid).set({
-                    storeName: storeName
+                    storeName: storeName,
+                    categories: [],
+                    products: [],
+                    suppliers: [],
+                    sales: [],
+                    stock_entries: []
                 });
 
                 registerError.textContent = "";
+                currentUser = {
+                    uid: res.user.uid,
+                    username: email,
+                    role: 'ADMIN',
+                    fullName: fullName,
+                    storeId: res.user.uid
+                };
+                isRegistering = false;
+                loadStoreData();
             } catch (err) {
-                registerError.textContent = "Erreur: L'adresse e-mail est peut-être déjà utilisée.";
+                isRegistering = false;
+                console.error("Erreur création boutique :", err);
+                let msg = err.message;
+                if (err.code === 'auth/email-already-in-use') msg = "Cette adresse e-mail est déjà utilisée.";
+                if (err.code === 'auth/weak-password') msg = "Le mot de passe doit comporter au moins 6 caractères.";
+                registerError.textContent = "Erreur: " + msg;
             }
         });
     }
@@ -253,6 +295,7 @@ function switchView(viewId, title) {
     
     if (viewId === 'view-dashboard') renderDashboard();
     else if (viewId === 'view-pos') renderPOSProducts();
+    else if (viewId === 'view-credits') renderCreditsTable();
     else if (viewId === 'view-products') renderProductsTable();
     else if (viewId === 'view-categories') renderCategoriesTable();
     else if (viewId === 'view-stock-entries') renderStockEntriesTable();
@@ -270,13 +313,48 @@ function renderDashboard() {
     now.setHours(0, 0, 0, 0);
     const startOfDay = now.getTime();
     
-    const todaySales = sales.filter(s => s.createdAt >= startOfDay && s.status === 'COMPLETED');
-    const totalTodayAmount = todaySales.reduce((acc, s) => acc + s.totalAmount, 0);
-    document.getElementById('stat-sales-today').textContent = `${totalTodayAmount.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} FCFA`;
-    document.getElementById('stat-sales-count').textContent = `${todaySales.length} transaction(s)`;
+    // Total actually collected today (comptant + acomptes versés aujourd'hui)
+    let todayCollected = 0;
+    let todayCount = 0;
+    sales.forEach(s => {
+        if (s.payments && Array.isArray(s.payments)) {
+            s.payments.forEach(p => {
+                if (p.date >= startOfDay) {
+                    todayCollected += p.amount;
+                    todayCount++;
+                }
+            });
+        } else if (s.createdAt >= startOfDay && s.status === 'COMPLETED') {
+            todayCollected += (s.amountPaid !== undefined ? s.amountPaid : s.totalAmount);
+            todayCount++;
+        }
+    });
+
+    document.getElementById('stat-sales-today').textContent = `${todayCollected.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} FCFA`;
+    document.getElementById('stat-sales-count').textContent = `${todayCount} encaissement(s)`;
     
-    const stockValue = products.reduce((acc, p) => acc + (p.stockQuantity * p.purchasePrice), 0);
-    document.getElementById('stat-stock-value').textContent = `${stockValue.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} FCFA`;
+    // Stock value & Profit
+    const stockPurchaseVal = products.reduce((acc, p) => acc + (p.stockQuantity * p.purchasePrice), 0);
+    const stockSaleVal = products.reduce((acc, p) => acc + (p.stockQuantity * p.salePrice), 0);
+    const stockProfitVal = stockSaleVal - stockPurchaseVal;
+    
+    document.getElementById('stat-stock-value').textContent = `${stockPurchaseVal.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} FCFA`;
+    const statStockProfit = document.getElementById('stat-stock-profit');
+    if (statStockProfit) {
+        statStockProfit.textContent = `Bénéfice estimé : +${stockProfitVal.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} FCFA`;
+    }
+
+    // Credits / Acomptes
+    const pendingSales = sales.filter(s => (s.remainingAmount || 0) > 0);
+    const totalRemaining = pendingSales.reduce((acc, s) => acc + s.remainingAmount, 0);
+    const statCreditDue = document.getElementById('stat-credit-due');
+    const statCreditCount = document.getElementById('stat-credit-count');
+    if (statCreditDue) {
+        statCreditDue.textContent = `${totalRemaining.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} FCFA`;
+    }
+    if (statCreditCount) {
+        statCreditCount.textContent = `${pendingSales.length} solde(s) en attente`;
+    }
     
     const alertProducts = products.filter(p => p.stockQuantity <= p.minStockAlert);
     document.getElementById('stat-stock-alerts').textContent = alertProducts.length;
@@ -399,12 +477,70 @@ function setupPOS() {
     const discountInput = document.getElementById('pos-discount');
     const taxInput = document.getElementById('pos-tax');
     const btnCheckout = document.getElementById('btn-checkout');
+    const acompteInput = document.getElementById('pos-acompte-amount');
 
     searchInput.addEventListener('input', renderPOSProducts);
     filterCat.addEventListener('change', renderPOSProducts);
     discountInput.addEventListener('input', updateCartTotals);
     taxInput.addEventListener('input', updateCartTotals);
+    if (acompteInput) acompteInput.addEventListener('input', updateCartTotals);
     btnCheckout.addEventListener('click', handlePOSCheckout);
+
+    // Payment Type Toggle (FULL vs PARTIAL)
+    const typeComptantLabel = document.getElementById('type-comptant-label');
+    const typeAcompteLabel = document.getElementById('type-acompte-label');
+    const acompteBox = document.getElementById('pos-acompte-box');
+    const paymentMethodLabel = document.getElementById('pos-payment-method-label');
+    const saleTypeRadios = document.querySelectorAll('input[name="sale-type"]');
+
+    saleTypeRadios.forEach(radio => {
+        radio.addEventListener('change', () => {
+            if (radio.value === 'PARTIAL') {
+                if (typeComptantLabel) {
+                    typeComptantLabel.classList.remove('active');
+                    typeComptantLabel.style.borderColor = 'var(--border-color)';
+                    typeComptantLabel.style.background = 'var(--bg-surface-light)';
+                    typeComptantLabel.style.color = 'var(--text-muted)';
+                }
+                if (typeAcompteLabel) {
+                    typeAcompteLabel.classList.add('active');
+                    typeAcompteLabel.style.borderColor = '#f59e0b';
+                    typeAcompteLabel.style.background = 'rgba(245, 158, 11, 0.15)';
+                    typeAcompteLabel.style.color = '#f59e0b';
+                }
+                if (acompteBox) acompteBox.style.display = 'block';
+                if (paymentMethodLabel) paymentMethodLabel.textContent = "Mode de paiement de l'acompte :";
+                btnCheckout.textContent = "Valider Vente & Acompte";
+                btnCheckout.className = "btn-warning btn-block btn-lg";
+            } else {
+                if (typeAcompteLabel) {
+                    typeAcompteLabel.classList.remove('active');
+                    typeAcompteLabel.style.borderColor = 'var(--border-color)';
+                    typeAcompteLabel.style.background = 'var(--bg-surface-light)';
+                    typeAcompteLabel.style.color = 'var(--text-muted)';
+                }
+                if (typeComptantLabel) {
+                    typeComptantLabel.classList.add('active');
+                    typeComptantLabel.style.borderColor = 'var(--primary)';
+                    typeComptantLabel.style.background = 'rgba(16, 185, 129, 0.15)';
+                    typeComptantLabel.style.color = 'var(--primary)';
+                }
+                if (acompteBox) acompteBox.style.display = 'none';
+                if (paymentMethodLabel) paymentMethodLabel.textContent = "Mode de paiement du versement :";
+                btnCheckout.textContent = "Valider & Encaisser";
+                btnCheckout.className = "btn-success btn-block btn-lg";
+            }
+            updateCartTotals();
+        });
+    });
+
+    // Payment Method selection style toggle
+    document.querySelectorAll('input[name="payment-method"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            document.querySelectorAll('.methods-group .method-btn').forEach(btn => btn.classList.remove('active'));
+            radio.closest('.method-btn')?.classList.add('active');
+        });
+    });
 }
 
 function renderPOSProducts() {
@@ -513,10 +649,18 @@ function updateCartTotals() {
     const taxRate = (parseFloat(document.getElementById('pos-tax').value) || 0) / 100;
     
     const taxAmount = (subtotal - discount) * taxRate;
-    const total = (subtotal - discount) + taxAmount;
+    const total = Math.max(0, (subtotal - discount) + taxAmount);
 
     document.getElementById('pos-subtotal').textContent = `${subtotal.toLocaleString('fr-FR')} FCFA`;
-    document.getElementById('pos-total').textContent = `${Math.max(0, total).toLocaleString('fr-FR')} FCFA`;
+    document.getElementById('pos-total').textContent = `${total.toLocaleString('fr-FR')} FCFA`;
+
+    // Acompte remaining calculation
+    const acompte = parseFloat(document.getElementById('pos-acompte-amount')?.value) || 0;
+    const remaining = Math.max(0, total - acompte);
+    const remainingEl = document.getElementById('pos-acompte-remaining');
+    if (remainingEl) {
+        remainingEl.textContent = `${remaining.toLocaleString('fr-FR')} FCFA`;
+    }
 }
 
 function handlePOSCheckout() {
@@ -533,6 +677,46 @@ function handlePOSCheckout() {
     const taxRate = (parseFloat(document.getElementById('pos-tax').value) || 0) / 100;
     const total = Math.max(0, (subtotal - discount) + ((subtotal - discount) * taxRate));
     const paymentMethod = document.querySelector('input[name="payment-method"]:checked').value;
+    const saleType = document.querySelector('input[name="sale-type"]:checked')?.value || 'FULL';
+
+    let isPartial = (saleType === 'PARTIAL');
+    let customerName = 'Comptant';
+    let customerPhone = '';
+    let acompteAmount = total;
+    let remainingAmount = 0;
+    let saleStatus = 'COMPLETED';
+
+    if (isPartial) {
+        customerName = document.getElementById('pos-customer-name').value.trim();
+        customerPhone = document.getElementById('pos-customer-phone').value.trim();
+        acompteAmount = parseFloat(document.getElementById('pos-acompte-amount').value) || 0;
+
+        if (!customerName) {
+            alert("Veuillez saisir le nom du client pour enregistrer une vente avec acompte.");
+            document.getElementById('pos-customer-name').focus();
+            return;
+        }
+
+        if (acompteAmount < 0) {
+            alert("Le montant de l'acompte ne peut pas être négatif.");
+            return;
+        }
+
+        if (acompteAmount > total) {
+            alert("Le montant de l'acompte ne peut pas dépasser le montant total de la vente.");
+            return;
+        }
+
+        remainingAmount = total - acompteAmount;
+        if (remainingAmount <= 0) {
+            isPartial = false;
+            saleStatus = 'COMPLETED';
+            remainingAmount = 0;
+            acompteAmount = total;
+        } else {
+            saleStatus = 'PARTIAL';
+        }
+    }
 
     const newSale = {
         id: Date.now().toString(),
@@ -542,11 +726,35 @@ function handlePOSCheckout() {
         discountAmount: discount,
         taxRate: taxRate,
         paymentMethod: paymentMethod,
-        notes: '',
-        status: 'COMPLETED',
+        paymentType: isPartial ? 'PARTIAL' : 'FULL',
+        customerName: isPartial ? customerName : 'Vente directe',
+        customerPhone: customerPhone,
+        amountPaid: acompteAmount,
+        remainingAmount: remainingAmount,
+        notes: isPartial ? `Vente avec acompte de ${acompteAmount.toLocaleString('fr-FR')} FCFA` : '',
+        status: saleStatus,
+        items: cart.map(item => ({
+            id: item.product.id,
+            name: item.product.name,
+            reference: item.product.reference,
+            salePrice: item.product.salePrice,
+            purchasePrice: item.product.purchasePrice,
+            quantity: item.quantity,
+            unit: item.product.unit
+        })),
+        payments: [
+            {
+                date: Date.now(),
+                amount: acompteAmount,
+                method: paymentMethod,
+                receivedBy: currentUser.fullName,
+                note: isPartial ? 'Acompte initial' : 'Paiement comptant'
+            }
+        ],
         createdAt: Date.now()
     };
 
+    // Stock deduction
     cart.forEach(item => {
         const prod = products.find(p => p.id === item.product.id);
         if (prod) {
@@ -561,9 +769,26 @@ function handlePOSCheckout() {
     DB.set('products', products); // virtual DB handles syncing
     DB.set('sales', sales);
 
-    alert("Vente validée et enregistrée avec succès !");
+    if (isPartial) {
+        alert(`Vente avec acompte enregistrée avec succès !\n\nClient : ${customerName}\nAcompte reçu : ${acompteAmount.toLocaleString('fr-FR')} FCFA\nReste à payer : ${remainingAmount.toLocaleString('fr-FR')} FCFA\n\nVous pouvez suivre ce dossier dans l'onglet "Acomptes & Crédits".`);
+    } else {
+        alert("Vente validée et encaissée avec succès !");
+    }
+
+    // Reset POS form
     cart = [];
     document.getElementById('pos-discount').value = 0;
+    if (document.getElementById('pos-customer-name')) document.getElementById('pos-customer-name').value = '';
+    if (document.getElementById('pos-customer-phone')) document.getElementById('pos-customer-phone').value = '';
+    if (document.getElementById('pos-acompte-amount')) document.getElementById('pos-acompte-amount').value = 0;
+    
+    // Reset to FULL payment
+    const fullRadio = document.querySelector('input[name="sale-type"][value="FULL"]');
+    if (fullRadio) {
+        fullRadio.checked = true;
+        fullRadio.dispatchEvent(new Event('change'));
+    }
+
     renderCart();
 }
 
@@ -592,6 +817,7 @@ function setupProducts() {
                 prod.name = name; prod.reference = ref; prod.categoryId = cat;
                 prod.unit = unit; prod.purchasePrice = purchaseVal; prod.salePrice = saleVal;
                 prod.minStockAlert = alertStock; prod.description = desc;
+                prod.stockQuantity = initStockVal; // Permet de modifier et corriger le stock
             }
         } else {
             products.push({
@@ -604,6 +830,10 @@ function setupProducts() {
 
         DB.set('products', products);
         closeModal('modal-product');
+        renderProductsTable();
+        if (document.getElementById('view-dashboard').classList.contains('active')) {
+            renderDashboard();
+        }
     });
     document.getElementById('product-search').addEventListener('input', renderProductsTable);
 }
@@ -613,6 +843,30 @@ function renderProductsTable() {
     const categories = DB.get('categories');
     const searchVal = document.getElementById('product-search').value.toLowerCase();
     
+    // Calcul de la synthèse financière de l'inventaire
+    const totalPurchaseCost = products.reduce((sum, p) => sum + (p.stockQuantity * p.purchasePrice), 0);
+    const totalSaleValue = products.reduce((sum, p) => sum + (p.stockQuantity * p.salePrice), 0);
+    const totalProfit = totalSaleValue - totalPurchaseCost;
+    const profitMargin = totalPurchaseCost > 0 ? ((totalProfit / totalPurchaseCost) * 100).toFixed(1) : 0;
+    const totalUnits = products.reduce((sum, p) => sum + p.stockQuantity, 0);
+
+    const invTotalPurchase = document.getElementById('inv-total-purchase');
+    const invTotalSale = document.getElementById('inv-total-sale');
+    const invTotalProfit = document.getElementById('inv-total-profit');
+    const invProfitMargin = document.getElementById('inv-profit-margin');
+    const invTotalQuantity = document.getElementById('inv-total-quantity');
+    const invTotalProducts = document.getElementById('inv-total-products');
+
+    if (invTotalPurchase) invTotalPurchase.textContent = `${totalPurchaseCost.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} FCFA`;
+    if (invTotalSale) invTotalSale.textContent = `${totalSaleValue.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} FCFA`;
+    if (invTotalProfit) {
+        invTotalProfit.textContent = `${totalProfit >= 0 ? '+' : ''}${totalProfit.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} FCFA`;
+        invTotalProfit.className = totalProfit >= 0 ? 'text-success' : 'text-danger';
+    }
+    if (invProfitMargin) invProfitMargin.textContent = `Marge estimée : ${profitMargin}%`;
+    if (invTotalQuantity) invTotalQuantity.textContent = `${totalUnits} unité(s)`;
+    if (invTotalProducts) invTotalProducts.textContent = `${products.length} référence(s)`;
+
     const tbody = document.getElementById('products-tbody');
     tbody.innerHTML = '';
 
@@ -628,6 +882,12 @@ function renderProductsTable() {
         }
         const allocStr = allocTotal > 0 ? `<br><small class="text-muted">Alloué: ${allocTotal}</small>` : '';
 
+        // Bénéfice unitaire et bénéfice total du stock
+        const unitProfit = p.salePrice - p.purchasePrice;
+        const totalStockProfit = unitProfit * p.stockQuantity;
+        const unitProfitClass = unitProfit > 0 ? 'profit-positive' : (unitProfit < 0 ? 'profit-negative' : 'profit-neutral');
+        const stockProfitClass = totalStockProfit > 0 ? 'profit-positive' : (totalStockProfit < 0 ? 'profit-negative' : 'profit-neutral');
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td><strong>${p.reference}</strong></td>
@@ -635,19 +895,44 @@ function renderProductsTable() {
             <td>${catName}</td>
             <td>${p.purchasePrice.toLocaleString('fr-FR')} FCFA</td>
             <td>${p.salePrice.toLocaleString('fr-FR')} FCFA</td>
-            <td><span class="${isLow ? 'badge badge-danger' : ''}">${p.stockQuantity}</span>${allocStr}</td>
+            <td class="${unitProfitClass}">${unitProfit >= 0 ? '+' : ''}${unitProfit.toLocaleString('fr-FR')} FCFA</td>
+            <td>
+                <span class="${isLow ? 'badge badge-danger' : ''}">${p.stockQuantity}</span>
+                <button class="btn-quick-stock" onclick="quickAdjustStock('${p.id}')" title="Corriger la quantité en stock"><i class="fa-solid fa-pen-to-square"></i></button>
+                ${allocStr}
+            </td>
+            <td class="${stockProfitClass}">${totalStockProfit >= 0 ? '+' : ''}${totalStockProfit.toLocaleString('fr-FR')} FCFA</td>
             <td>${p.unit}</td>
             <td>
                 <div class="action-icons">
                     <button class="btn-success" onclick="openAllocateModal('${p.id}')" title="Allouer du stock"><i class="fa fa-box-open"></i></button>
-                    <button class="btn-edit" onclick="openProductModal('${p.id}')"><i class="fa fa-pen"></i></button>
-                    <button class="btn-delete" onclick="deleteProduct('${p.id}')"><i class="fa fa-trash"></i></button>
+                    <button class="btn-edit" onclick="openProductModal('${p.id}')" title="Modifier produit / Corriger stock"><i class="fa fa-pen"></i></button>
+                    <button class="btn-delete" onclick="deleteProduct('${p.id}')" title="Supprimer"><i class="fa fa-trash"></i></button>
                 </div>
             </td>
         `;
         tbody.appendChild(tr);
     });
 }
+
+window.quickAdjustStock = (productId) => {
+    const products = DB.get('products');
+    const prod = products.find(p => p.id === productId);
+    if (!prod) return;
+    const res = prompt(`Correction directe de la quantité en stock :\nProduit : ${prod.name} (${prod.reference})\n\nQuantité actuelle enregistrée : ${prod.stockQuantity} ${prod.unit}\nEntrez la nouvelle quantité réelle :`, prod.stockQuantity);
+    if (res === null) return;
+    const newQty = parseInt(res.trim());
+    if (isNaN(newQty) || newQty < 0) {
+        alert("Veuillez saisir un nombre valide supérieur ou égal à 0.");
+        return;
+    }
+    prod.stockQuantity = newQty;
+    DB.set('products', products);
+    renderProductsTable();
+    if (document.getElementById('view-dashboard').classList.contains('active')) {
+        renderDashboard();
+    }
+};
 
 window.openAllocateModal = (productId) => {
     const products = DB.get('products');
@@ -741,12 +1026,18 @@ window.openProductModal = (id = null) => {
     const modal = document.getElementById('modal-product');
     const form = document.getElementById('product-form');
     const initStockInput = document.getElementById('prod-stock');
+    const stockLabel = document.getElementById('prod-stock-label');
+    const stockHelp = document.getElementById('prod-stock-help');
     form.reset();
 
     if (id) {
         document.getElementById('product-modal-title').textContent = "Modifier le Produit";
         document.getElementById('product-id').value = id;
-        initStockInput.parentElement.style.display = 'none';
+        
+        // Le champ stock est rendu visible et modifiable
+        initStockInput.parentElement.style.display = 'flex';
+        if (stockLabel) stockLabel.textContent = "Quantité en Stock (Correction)";
+        if (stockHelp) stockHelp.style.display = 'block';
 
         const p = DB.get('products').find(prod => prod.id == id);
         if (p) {
@@ -756,13 +1047,17 @@ window.openProductModal = (id = null) => {
             document.getElementById('prod-unit').value = p.unit;
             document.getElementById('prod-price-purchase').value = p.purchasePrice;
             document.getElementById('prod-price-sale').value = p.salePrice;
+            document.getElementById('prod-stock').value = p.stockQuantity ?? 0;
             document.getElementById('prod-min-stock').value = p.minStockAlert;
-            document.getElementById('prod-desc').value = p.description;
+            document.getElementById('prod-desc').value = p.description || '';
         }
     } else {
         document.getElementById('product-modal-title').textContent = "Nouveau Produit";
         document.getElementById('product-id').value = '';
         initStockInput.parentElement.style.display = 'flex';
+        if (stockLabel) stockLabel.textContent = "Stock Initial";
+        if (stockHelp) stockHelp.style.display = 'none';
+        document.getElementById('prod-stock').value = '0';
     }
     modal.classList.add('active');
 };
@@ -936,6 +1231,244 @@ window.deleteSupplier = (id) => {
     }
 };
 
+// ACOMPTES & CRÉDITS MANAGEMENT
+function setupCredits() {
+    const searchInput = document.getElementById('credits-search');
+    const filterSelect = document.getElementById('credits-filter-status');
+    if (searchInput) searchInput.addEventListener('input', renderCreditsTable);
+    if (filterSelect) filterSelect.addEventListener('change', renderCreditsTable);
+
+    // Formulaire d'encaissement d'un nouveau versement
+    const addPaymentForm = document.getElementById('add-payment-form');
+    if (addPaymentForm) {
+        addPaymentForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const saleId = document.getElementById('pay-sale-id').value;
+            const amount = parseFloat(document.getElementById('pay-amount').value) || 0;
+            const method = document.getElementById('pay-method').value;
+            const note = document.getElementById('pay-note').value.trim();
+
+            const sales = DB.get('sales');
+            const sale = sales.find(s => s.id === saleId);
+            if (!sale) {
+                alert("Dossier de vente introuvable.");
+                return;
+            }
+
+            const currentRemaining = sale.remainingAmount !== undefined ? sale.remainingAmount : (sale.totalAmount - (sale.amountPaid || 0));
+            if (amount <= 0) {
+                alert("Le montant du versement doit être supérieur à 0.");
+                return;
+            }
+            if (amount > currentRemaining) {
+                alert(`Le versement (${amount.toLocaleString('fr-FR')} FCFA) ne peut pas dépasser le solde restant dû (${currentRemaining.toLocaleString('fr-FR')} FCFA).`);
+                return;
+            }
+
+            if (!sale.payments) {
+                sale.payments = [
+                    {
+                        date: sale.createdAt || Date.now(),
+                        amount: sale.amountPaid || (sale.totalAmount - currentRemaining),
+                        method: sale.paymentMethod || 'CASH',
+                        receivedBy: sale.cashierName || 'Admin',
+                        note: 'Versement initial'
+                    }
+                ];
+            }
+
+            sale.payments.push({
+                date: Date.now(),
+                amount: amount,
+                method: method,
+                receivedBy: currentUser ? currentUser.fullName : 'Admin',
+                note: note || 'Versement complémentaire'
+            });
+
+            sale.amountPaid = (sale.amountPaid || 0) + amount;
+            sale.remainingAmount = Math.max(0, currentRemaining - amount);
+
+            if (sale.remainingAmount <= 0) {
+                sale.status = 'COMPLETED';
+                sale.remainingAmount = 0;
+            }
+
+            DB.set('sales', sales);
+            closeModal('modal-add-payment');
+            renderCreditsTable();
+            if (document.getElementById('view-dashboard').classList.contains('active')) {
+                renderDashboard();
+            }
+            alert(`Versement de ${amount.toLocaleString('fr-FR')} FCFA enregistré avec succès !${sale.remainingAmount === 0 ? ' Dossier soldé à 100% !' : ''}`);
+        });
+    }
+}
+
+function renderCreditsTable() {
+    const sales = DB.get('sales');
+    const searchVal = (document.getElementById('credits-search')?.value || '').toLowerCase();
+    const filterStatus = document.getElementById('credits-filter-status')?.value || 'PENDING';
+
+    // Tous les dossiers qui sont des ventes avec acompte ou ayant un solde restant
+    const creditSales = sales.filter(s => {
+        return s.paymentType === 'PARTIAL' || (s.remainingAmount !== undefined && s.remainingAmount > 0) || (s.customerName && s.amountPaid !== undefined && s.amountPaid < s.totalAmount);
+    });
+
+    // Statistiques globales
+    const totalRemaining = creditSales.reduce((acc, s) => acc + (s.remainingAmount || 0), 0);
+    const totalCollected = creditSales.reduce((acc, s) => acc + (s.amountPaid || 0), 0);
+    const pendingCount = creditSales.filter(s => (s.remainingAmount || 0) > 0).length;
+
+    const statRemEl = document.getElementById('stat-credit-remaining');
+    const statCollEl = document.getElementById('stat-credit-collected');
+    const statPendEl = document.getElementById('stat-credit-pending-count');
+
+    if (statRemEl) statRemEl.textContent = `${totalRemaining.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} FCFA`;
+    if (statCollEl) statCollEl.textContent = `${totalCollected.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} FCFA`;
+    if (statPendEl) statPendEl.textContent = `${pendingCount}`;
+
+    // Filtrage
+    const filtered = creditSales.filter(s => {
+        const clientMatches = (s.customerName || '').toLowerCase().includes(searchVal) || (s.customerPhone || '').includes(searchVal);
+        const isPending = (s.remainingAmount || 0) > 0;
+        
+        let statusMatches = true;
+        if (filterStatus === 'PENDING') statusMatches = isPending;
+        else if (filterStatus === 'COMPLETED') statusMatches = !isPending;
+
+        return clientMatches && statusMatches;
+    });
+
+    const tbody = document.getElementById('credits-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted" style="padding: 24px;">Aucun dossier d\'acompte trouvé.</td></tr>';
+        return;
+    }
+
+    filtered.forEach(s => {
+        const remaining = s.remainingAmount !== undefined ? s.remainingAmount : Math.max(0, s.totalAmount - (s.amountPaid || 0));
+        const paid = s.amountPaid !== undefined ? s.amountPaid : (s.totalAmount - remaining);
+        const isSolded = remaining <= 0;
+        const dateStr = new Date(s.createdAt).toLocaleDateString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+        let itemsSummary = '<span class="text-muted">-</span>';
+        if (s.items && Array.isArray(s.items) && s.items.length > 0) {
+            itemsSummary = s.items.map(it => `${it.quantity}x ${it.name}`).join(', ');
+            if (itemsSummary.length > 35) {
+                itemsSummary = `<span title="${itemsSummary}">${itemsSummary.substring(0, 32)}...</span>`;
+            }
+        }
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${dateStr}</td>
+            <td><strong>${s.customerName || 'Client'}</strong></td>
+            <td>${s.customerPhone || '<span class="text-muted">-</span>'}</td>
+            <td>${itemsSummary}</td>
+            <td><strong>${s.totalAmount.toLocaleString('fr-FR')} FCFA</strong></td>
+            <td class="text-success">${paid.toLocaleString('fr-FR')} FCFA</td>
+            <td class="text-danger" style="font-weight: 800;">${remaining.toLocaleString('fr-FR')} FCFA</td>
+            <td>
+                <span class="${isSolded ? 'credit-badge-completed' : 'credit-badge-pending'}">
+                    ${isSolded ? 'SOLDÉ' : 'RESTE DÛ'}
+                </span>
+            </td>
+            <td>
+                <div class="action-icons">
+                    ${!isSolded ? `<button class="btn-success" onclick="openAddPaymentModal('${s.id}')" title="Encaisser un versement"><i class="fa-solid fa-money-bill-transfer"></i></button>` : ''}
+                    <button class="btn-edit" onclick="openPaymentHistoryModal('${s.id}')" title="Historique des versements"><i class="fa-solid fa-receipt"></i></button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+window.openAddPaymentModal = (saleId) => {
+    const sales = DB.get('sales');
+    const sale = sales.find(s => s.id === saleId);
+    if (!sale) return;
+
+    const remaining = sale.remainingAmount !== undefined ? sale.remainingAmount : Math.max(0, sale.totalAmount - (sale.amountPaid || 0));
+    const paid = sale.amountPaid !== undefined ? sale.amountPaid : (sale.totalAmount - remaining);
+
+    document.getElementById('pay-sale-id').value = sale.id;
+    document.getElementById('pay-customer-name').textContent = `Client : ${sale.customerName || 'Inconnu'}`;
+    document.getElementById('pay-total-amount').textContent = `${sale.totalAmount.toLocaleString('fr-FR')} FCFA`;
+    document.getElementById('pay-already-paid').textContent = `${paid.toLocaleString('fr-FR')} FCFA`;
+    document.getElementById('pay-remaining-amount').textContent = `${remaining.toLocaleString('fr-FR')} FCFA`;
+    
+    const payInput = document.getElementById('pay-amount');
+    payInput.value = remaining;
+    payInput.max = remaining;
+    document.getElementById('pay-note').value = '';
+
+    openModal('modal-add-payment');
+};
+
+window.openPaymentHistoryModal = (saleId) => {
+    const sales = DB.get('sales');
+    const sale = sales.find(s => s.id === saleId);
+    if (!sale) return;
+
+    const remaining = sale.remainingAmount !== undefined ? sale.remainingAmount : Math.max(0, sale.totalAmount - (sale.amountPaid || 0));
+    const paid = sale.amountPaid !== undefined ? sale.amountPaid : (sale.totalAmount - remaining);
+
+    const summaryEl = document.getElementById('history-sale-summary');
+    let itemsStr = '';
+    if (sale.items && sale.items.length > 0) {
+        itemsStr = `<div style="margin-top: 8px; font-size: 0.85rem;" class="text-muted"><strong>Articles pris :</strong> ${sale.items.map(it => `${it.quantity}x ${it.name}`).join(', ')}</div>`;
+    }
+
+    summaryEl.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h4 style="font-size: 1.1rem; color: var(--text-main);">${sale.customerName || 'Client'} ${sale.customerPhone ? `(${sale.customerPhone})` : ''}</h4>
+            <span class="${remaining <= 0 ? 'badge badge-success' : 'badge badge-danger'}">${remaining <= 0 ? 'SOLDÉ' : 'RESTE DÛ'}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 0.9rem;">
+            <span>Total : <strong>${sale.totalAmount.toLocaleString('fr-FR')} FCFA</strong></span>
+            <span>Total versé : <strong class="text-success">${paid.toLocaleString('fr-FR')} FCFA</strong></span>
+            <span>Reste à payer : <strong class="text-danger">${remaining.toLocaleString('fr-FR')} FCFA</strong></span>
+        </div>
+        ${itemsStr}
+    `;
+
+    const tbody = document.getElementById('history-payments-tbody');
+    tbody.innerHTML = '';
+
+    let payments = sale.payments;
+    if (!payments || payments.length === 0) {
+        payments = [
+            {
+                date: sale.createdAt,
+                amount: paid,
+                method: sale.paymentMethod || 'CASH',
+                receivedBy: sale.cashierName || 'Vendeur',
+                note: 'Versement initial'
+            }
+        ];
+    }
+
+    payments.forEach(p => {
+        const methodMap = { 'CASH': 'Espèces', 'CARD': 'Carte', 'TRANSFER': 'Virement / Mobile' };
+        const dateStr = new Date(p.date).toLocaleDateString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${dateStr}</td>
+            <td class="text-success font-weight-bold">+${p.amount.toLocaleString('fr-FR')} FCFA</td>
+            <td>${methodMap[p.method] || p.method}</td>
+            <td>${p.receivedBy || '-'}</td>
+            <td>${p.note || '-'}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    openModal('modal-payment-history');
+};
+
 // REPORTS
 function setupReports() {
     const monthInput = document.getElementById('report-month');
@@ -956,11 +1489,12 @@ function generatePDFReport(yearMonth, enterprise) {
 
     const monthSales = DB.get('sales').filter(s => {
         const d = new Date(s.createdAt);
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` === yearMonth && s.status === 'COMPLETED';
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` === yearMonth;
     });
 
-    const totalRev = monthSales.reduce((acc, s) => acc + s.totalAmount, 0);
-    const netRev = totalRev - monthSales.reduce((acc, s) => acc + s.discountAmount, 0);
+    const totalFacture = monthSales.reduce((acc, s) => acc + s.totalAmount, 0);
+    const totalCollected = monthSales.reduce((acc, s) => acc + (s.amountPaid !== undefined ? s.amountPaid : s.totalAmount), 0);
+    const totalRemainingCredit = monthSales.reduce((acc, s) => acc + (s.remainingAmount || 0), 0);
 
     doc.setFillColor(15, 23, 42); doc.rect(0, 0, 210, 40, 'F');
     doc.setFont("helvetica", "bold"); doc.setFontSize(22); doc.setTextColor(255, 255, 255);
@@ -972,35 +1506,44 @@ function generatePDFReport(yearMonth, enterprise) {
     doc.text(`BILAN MENSUEL - ${yearMonth}`, 15, 55);
     doc.setDrawColor(14, 165, 233); doc.setLineWidth(1.5); doc.line(15, 58, 195, 58);
 
-    doc.setFillColor(248, 250, 252); doc.rect(15, 68, 85, 45, 'F'); doc.rect(110, 68, 85, 45, 'F');
-    doc.setFontSize(11); doc.setTextColor(100, 116, 139); doc.text("RÉSUMÉ FINANCIER", 20, 78); doc.text("VALEUR DU STOCK ACTUEL", 115, 78);
+    doc.setFillColor(248, 250, 252); doc.rect(15, 68, 85, 52, 'F'); doc.rect(110, 68, 85, 52, 'F');
+    doc.setFontSize(11); doc.setTextColor(100, 116, 139); doc.text("RÉSUMÉ COMMERCIAL & RECOUVREMENT", 20, 78); doc.text("VALEUR DU STOCK ACTUEL", 115, 78);
 
     doc.setFontSize(10); doc.setTextColor(15, 23, 42);
-    doc.text(`CA Mensuel Brut: ${totalRev.toLocaleString('fr-FR')} FCFA`, 20, 90);
-    doc.text(`CA Mensuel Net: ${netRev.toLocaleString('fr-FR')} FCFA`, 20, 98);
-    doc.text(`Transactions: ${monthSales.length}`, 20, 106);
+    doc.text(`Total Facturé: ${totalFacture.toLocaleString('fr-FR')} FCFA`, 20, 88);
+    doc.text(`Total Encaissé (Acomptes): ${totalCollected.toLocaleString('fr-FR')} FCFA`, 20, 96);
+    doc.text(`Reste à recouvrer: ${totalRemainingCredit.toLocaleString('fr-FR')} FCFA`, 20, 104);
+    doc.text(`Transactions: ${monthSales.length}`, 20, 112);
 
     const products = DB.get('products');
     const stockVal = products.reduce((acc, p) => acc + (p.stockQuantity * p.purchasePrice), 0);
     const stockSaleVal = products.reduce((acc, p) => acc + (p.stockQuantity * p.salePrice), 0);
-    doc.text(`Valeur d'achat: ${stockVal.toLocaleString('fr-FR')} FCFA`, 115, 90);
-    doc.text(`Marge estimée: ${(stockSaleVal - stockVal).toLocaleString('fr-FR')} FCFA`, 115, 98);
+    const profitEstime = stockSaleVal - stockVal;
+    doc.text(`Valeur d'achat (Coût stock): ${stockVal.toLocaleString('fr-FR')} FCFA`, 115, 88);
+    doc.text(`Valeur vente estimée: ${stockSaleVal.toLocaleString('fr-FR')} FCFA`, 115, 96);
+    doc.text(`Bénéfice estimé: +${profitEstime.toLocaleString('fr-FR')} FCFA`, 115, 104);
+    const margePct = stockVal > 0 ? ((profitEstime / stockVal) * 100).toFixed(1) : 0;
+    doc.text(`Taux de marge estimé: ${margePct}%`, 115, 112);
 
     doc.setFontSize(13); doc.setFont("helvetica", "bold");
-    doc.text("DÉTAIL DES DERNIÈRES VENTES DU MOIS", 15, 130);
+    doc.text("DÉTAIL DES VENTES DU MOIS", 15, 135);
     
-    doc.setFillColor(15, 23, 42); doc.rect(15, 136, 180, 10, 'F');
-    doc.setFontSize(10); doc.setTextColor(255, 255, 255);
-    doc.text("Caissier", 20, 142); doc.text("Date", 60, 142); doc.text("Paiement", 110, 142); doc.text("Montant Net", 150, 142);
+    doc.setFillColor(15, 23, 42); doc.rect(15, 141, 180, 10, 'F');
+    doc.setFontSize(9); doc.setTextColor(255, 255, 255);
+    doc.text("Client / Caissier", 20, 147); doc.text("Date", 70, 147); doc.text("Total", 105, 147); doc.text("Versé", 135, 147); doc.text("Solde dû", 165, 147);
 
-    let y = 153; doc.setFont("helvetica", "normal"); doc.setTextColor(15, 23, 42);
-    monthSales.slice(0, 15).forEach(s => {
-        doc.text(`${s.cashierName || 'Admin'}`, 20, y);
-        doc.text(new Date(s.createdAt).toLocaleDateString('fr-FR'), 60, y);
-        doc.text(s.paymentMethod, 110, y);
-        doc.text(`${s.totalAmount.toLocaleString('fr-FR')} FCFA`, 150, y);
+    let y = 158; doc.setFont("helvetica", "normal"); doc.setTextColor(15, 23, 42);
+    monthSales.slice(0, 14).forEach(s => {
+        const clientName = s.customerName ? `${s.customerName.substring(0, 18)}` : (s.cashierName || 'Vente');
+        const remaining = s.remainingAmount || 0;
+        const paid = s.amountPaid !== undefined ? s.amountPaid : s.totalAmount;
+        doc.text(clientName, 20, y);
+        doc.text(new Date(s.createdAt).toLocaleDateString('fr-FR'), 70, y);
+        doc.text(`${s.totalAmount.toLocaleString('fr-FR')}`, 105, y);
+        doc.text(`${paid.toLocaleString('fr-FR')}`, 135, y);
+        doc.text(remaining > 0 ? `${remaining.toLocaleString('fr-FR')} FCFA` : 'Soldé', 165, y);
         doc.setDrawColor(241, 245, 249); doc.setLineWidth(0.5); doc.line(15, y + 3, 195, y + 3);
-        y += 10;
+        y += 9;
     });
 
     if (monthSales.length === 0) {

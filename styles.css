@@ -80,6 +80,9 @@ body {
 .badge-admin { background-color: rgba(14, 165, 233, 0.2); color: var(--primary); }
 .badge-cashier { background-color: rgba(245, 158, 11, 0.2); color: var(--warning); }
 .badge-danger { background-color: rgba(239, 68, 68, 0.2); color: var(--danger); }
+.badge-success { background-color: rgba(16, 185, 129, 0.2); color: var(--success); }
+.badge-warning { background-color: rgba(245, 158, 11, 0.2); color: var(--warning); }
+.badge-info { background-color: rgba(6, 182, 212, 0.2); color: var(--info); }
 
 /* SCREEN OVERLAY (LOGIN) */
 .screen-overlay {
@@ -958,4 +961,68 @@ body {
     .pos-search-bar {
         flex-direction: column;
     }
+}
+
+/* INVENTORY SUMMARY & CREDITS STYLES */
+.inventory-stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.payment-type-btn {
+    transition: var(--transition-fast);
+}
+
+.payment-type-btn.active {
+    border-color: var(--primary) !important;
+    background: rgba(16, 185, 129, 0.15) !important;
+    color: var(--primary) !important;
+}
+
+.profit-positive {
+    color: #34d399;
+    font-weight: 700;
+}
+
+.profit-negative {
+    color: #ef4444;
+    font-weight: 700;
+}
+
+.profit-neutral {
+    color: #94a3b8;
+    font-weight: 600;
+}
+
+.btn-quick-stock {
+    background: none;
+    border: none;
+    color: var(--info);
+    cursor: pointer;
+    font-size: 1rem;
+    transition: var(--transition-fast);
+}
+
+.btn-quick-stock:hover {
+    color: #38bdf8;
+    transform: scale(1.15);
+}
+
+.credit-badge-pending {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: var(--danger);
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    border-radius: 9999px;
+    font-weight: 700;
+}
+
+.credit-badge-completed {
+    background-color: rgba(16, 185, 129, 0.2);
+    color: var(--success);
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    border-radius: 9999px;
+    font-weight: 700;
 }

@@ -16,7 +16,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- jsPDF CDN for PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <link rel="stylesheet" href="styles.css?v=3">
+    <link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body class="dark-mode">
 
@@ -93,6 +93,9 @@
                 <a href="#" class="menu-item" data-target="view-pos" id="menu-pos">
                     <i class="fa-solid fa-cash-register"></i> Caisse (POS)
                 </a>
+                <a href="#" class="menu-item" data-target="view-credits" id="menu-credits">
+                    <i class="fa-solid fa-hand-holding-dollar"></i> Acomptes & Crédits
+                </a>
                 <a href="#" class="menu-item" data-target="view-products" id="menu-products">
                     <i class="fa-solid fa-box"></i> Produits
                 </a>
@@ -149,11 +152,19 @@
                     </div>
                     <div class="stat-card">
                         <div class="stat-info">
-                            <span class="stat-label">Valeur de l'inventaire</span>
+                            <span class="stat-label">Valeur & Bénéfice Stock</span>
                             <h2 id="stat-stock-value">0,00 FCFA</h2>
-                            <span class="stat-sub">Prix d'achat total</span>
+                            <span class="stat-sub" id="stat-stock-profit">Bénéfice estimé : +0,00 FCFA</span>
                         </div>
                         <div class="stat-icon bg-info"><i class="fa-solid fa-boxes-stacked"></i></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <span class="stat-label">Créances clients (Acomptes)</span>
+                            <h2 id="stat-credit-due" class="text-warning">0,00 FCFA</h2>
+                            <span class="stat-sub" id="stat-credit-count">0 solde(s) en attente</span>
+                        </div>
+                        <div class="stat-icon" style="background-color: rgba(245, 158, 11, 0.15); color: #f59e0b;"><i class="fa-solid fa-hand-holding-dollar"></i></div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-info">
@@ -235,9 +246,44 @@
                                 <span>TOTAL</span>
                                 <span id="pos-total">0,00 FCFA</span>
                             </div>
+
+                            <!-- Règlement / Acompte -->
+                            <div class="payment-type-selector" style="margin-top: 12px; margin-bottom: 8px;">
+                                <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 6px;">Type de règlement :</label>
+                                <div style="display: flex; gap: 8px;">
+                                    <label class="payment-type-btn active" id="type-comptant-label" style="flex: 1; padding: 9px; border-radius: var(--radius-sm); text-align: center; cursor: pointer; border: 1px solid var(--primary); background: rgba(16, 185, 129, 0.15); font-size: 0.85rem; font-weight: 700; color: var(--primary);">
+                                        <input type="radio" name="sale-type" value="FULL" checked style="display: none;"> Paiement Total
+                                    </label>
+                                    <label class="payment-type-btn" id="type-acompte-label" style="flex: 1; padding: 9px; border-radius: var(--radius-sm); text-align: center; cursor: pointer; border: 1px solid var(--border-color); background: var(--bg-surface-light); font-size: 0.85rem; font-weight: 700; color: var(--text-muted);">
+                                        <input type="radio" name="sale-type" value="PARTIAL" style="display: none;"> Avec Acompte
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Détails de l'acompte (masqué par défaut) -->
+                            <div id="pos-acompte-box" style="display: none; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: var(--radius-md); padding: 12px; margin-bottom: 12px;">
+                                <div style="margin-bottom: 8px;">
+                                    <label style="font-size: 0.8rem; color: #f59e0b; font-weight: 700; display: block; margin-bottom: 4px;">Nom du client (Obligatoire) *</label>
+                                    <input type="text" id="pos-customer-name" placeholder="ex: M. Diallo" style="width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--bg-dark); border: 1px solid var(--border-color); color: var(--text-main); font-size: 0.85rem;">
+                                </div>
+                                <div style="margin-bottom: 8px;">
+                                    <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Téléphone du client</label>
+                                    <input type="text" id="pos-customer-phone" placeholder="ex: 07 00 00 00" style="width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--bg-dark); border: 1px solid var(--border-color); color: var(--text-main); font-size: 0.85rem;">
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center;">
+                                    <div>
+                                        <label style="font-size: 0.8rem; color: #34d399; font-weight: 700; display: block; margin-bottom: 4px;">Acompte versé (FCFA) *</label>
+                                        <input type="number" id="pos-acompte-amount" min="0" value="0" style="width: 100%; padding: 8px; border-radius: var(--radius-sm); background: var(--bg-dark); border: 1px solid var(--border-color); color: var(--text-main); font-size: 0.9rem; font-weight: 700;">
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <span style="font-size: 0.75rem; color: var(--danger); font-weight: 700; display: block;">Reste à payer :</span>
+                                        <span id="pos-acompte-remaining" style="font-size: 1.05rem; font-weight: 800; color: var(--danger);">0 FCFA</span>
+                                    </div>
+                                </div>
+                            </div>
                             
                             <div class="payment-method-selector">
-                                <label>Mode de paiement :</label>
+                                <label id="pos-payment-method-label">Mode de paiement du versement :</label>
                                 <div class="methods-group">
                                     <label class="method-btn active">
                                         <input type="radio" name="payment-method" value="CASH" checked> Espèces
@@ -257,8 +303,105 @@
                 </div>
             </section>
 
+            <!-- VIEW: CREDITS / ACOMPTES -->
+            <section id="view-credits" class="app-view">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <span class="stat-label">Total Reste à Payer (Créances)</span>
+                            <h2 id="stat-credit-remaining" class="text-danger">0,00 FCFA</h2>
+                            <span class="stat-sub">Somme restante due par les clients</span>
+                        </div>
+                        <div class="stat-icon bg-danger"><i class="fa-solid fa-hand-holding-dollar"></i></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <span class="stat-label">Acomptes déjà perçus</span>
+                            <h2 id="stat-credit-collected" class="text-success">0,00 FCFA</h2>
+                            <span class="stat-sub">Versements déjà encaissés</span>
+                        </div>
+                        <div class="stat-icon bg-success"><i class="fa-solid fa-receipt"></i></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <span class="stat-label">Dossiers en attente de solde</span>
+                            <h2 id="stat-credit-pending-count" class="text-warning">0</h2>
+                            <span class="stat-sub">Clients ayant un reliquat</span>
+                        </div>
+                        <div class="stat-icon" style="background-color: rgba(245, 158, 11, 0.15); color: #f59e0b;"><i class="fa-solid fa-user-clock"></i></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="table-actions" style="flex-wrap: wrap; gap: 12px;">
+                        <input type="text" id="credits-search" placeholder="Rechercher par nom client ou téléphone..." style="flex: 1; min-width: 260px;">
+                        <select id="credits-filter-status" style="background-color: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 10px 16px; color: var(--text-main);">
+                            <option value="PENDING">En attente de solde (Reste dû)</option>
+                            <option value="ALL">Tous les dossiers d'acomptes</option>
+                            <option value="COMPLETED">Entièrement soldés</option>
+                        </select>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Client</th>
+                                    <th>Contact</th>
+                                    <th>Articles pris</th>
+                                    <th>Total Vente</th>
+                                    <th>Acomptes Reçus</th>
+                                    <th>Reste à Payer</th>
+                                    <th>Statut</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="credits-tbody">
+                                <!-- Dynamic -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
             <!-- VIEW: PRODUCTS (INVENTORY) -->
             <section id="view-products" class="app-view">
+                <!-- Synthèse Financière de l'Inventaire (Prix d'achat, Prix de vente, Bénéfice) -->
+                <div class="stats-grid inventory-stats-grid" style="margin-bottom: 24px;">
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <span class="stat-label">Coût d'achat total</span>
+                            <h2 id="inv-total-purchase">0 FCFA</h2>
+                            <span class="stat-sub">Ce que vous avez payé</span>
+                        </div>
+                        <div class="stat-icon bg-info"><i class="fa-solid fa-money-bill-wave"></i></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <span class="stat-label">Valeur de vente totale</span>
+                            <h2 id="inv-total-sale">0 FCFA</h2>
+                            <span class="stat-sub">Estimation des ventes</span>
+                        </div>
+                        <div class="stat-icon bg-success"><i class="fa-solid fa-coins"></i></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <span class="stat-label">Bénéfice net estimé</span>
+                            <h2 id="inv-total-profit" class="text-success">0 FCFA</h2>
+                            <span class="stat-sub" id="inv-profit-margin">Marge estimée : 0%</span>
+                        </div>
+                        <div class="stat-icon" style="background-color: rgba(52, 211, 153, 0.15); color: #34d399;"><i class="fa-solid fa-chart-line"></i></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <span class="stat-label">Volume total en stock</span>
+                            <h2 id="inv-total-quantity">0 unités</h2>
+                            <span class="stat-sub" id="inv-total-products">0 référence(s)</span>
+                        </div>
+                        <div class="stat-icon" style="background-color: rgba(168, 85, 247, 0.15); color: #c084fc;"><i class="fa-solid fa-boxes-stacked"></i></div>
+                    </div>
+                </div>
+
                 <div class="card">
                     <div class="table-actions">
                         <input type="text" id="product-search" placeholder="Rechercher un produit...">
@@ -273,7 +416,9 @@
                                     <th>Catégorie</th>
                                     <th>Prix Achat</th>
                                     <th>Prix Vente</th>
+                                    <th>Bénéfice / U</th>
                                     <th>Stock</th>
+                                    <th>Bénéfice Stock</th>
                                     <th>Unité</th>
                                     <th>Actions</th>
                                 </tr>
@@ -485,8 +630,9 @@
                 </div>
                 <div class="form-row">
                     <div class="input-group">
-                        <label>Stock Initial</label>
-                        <input type="number" id="prod-stock" value="0">
+                        <label id="prod-stock-label">Stock Initial</label>
+                        <input type="number" id="prod-stock" value="0" min="0">
+                        <small id="prod-stock-help" class="text-muted" style="display: none; font-size: 0.75rem; margin-top: 4px;">Vous pouvez modifier ce chiffre pour ajuster la quantité en stock.</small>
                     </div>
                     <div class="input-group">
                         <label>Alerte Seuil Minimal *</label>
@@ -664,13 +810,93 @@
         </div>
     </div>
 
+    <!-- MODAL: ENCAISSER VERSEMENT ACOMPTE -->
+    <div id="modal-add-payment" class="modal">
+        <div class="modal-content" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3>Encaisser un versement</h3>
+                <span class="close-modal" data-target="modal-add-payment">&times;</span>
+            </div>
+            <form id="add-payment-form" style="padding: 24px;">
+                <input type="hidden" id="pay-sale-id">
+                <div style="background: rgba(15, 23, 42, 0.6); padding: 16px; border-radius: var(--radius-md); margin-bottom: 20px; border: 1px solid var(--border-color);">
+                    <div style="font-weight: 700; font-size: 1.1rem; color: var(--text-main);" id="pay-customer-name">Client : Nom</div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.9rem;">
+                        <span class="text-muted">Total facture : <strong class="text-main" id="pay-total-amount">0 FCFA</strong></span>
+                        <span class="text-muted">Déjà payé : <strong class="text-success" id="pay-already-paid">0 FCFA</strong></span>
+                    </div>
+                    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color); font-size: 1.05rem; display: flex; justify-content: space-between;">
+                        <span style="font-weight: 700; color: var(--danger);">Reste à régler :</span>
+                        <span id="pay-remaining-amount" style="font-weight: 800; color: var(--danger);">0 FCFA</span>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>Montant du versement (FCFA) *</label>
+                    <input type="number" id="pay-amount" min="1" step="1" required style="font-size: 1.1rem; font-weight: 700;">
+                </div>
+
+                <div class="input-group">
+                    <label>Mode de règlement *</label>
+                    <select id="pay-method" required>
+                        <option value="CASH">Espèces</option>
+                        <option value="CARD">Carte Bancaire</option>
+                        <option value="TRANSFER">Virement / Mobile Money</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label>Note ou Référence (optionnel)</label>
+                    <input type="text" id="pay-note" placeholder="ex: Solde partiel / Tranche 2">
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-gray close-modal" data-target="modal-add-payment">Annuler</button>
+                    <button type="submit" class="btn-primary">Enregistrer le versement</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: HISTORIQUE DES VERSEMENTS -->
+    <div id="modal-payment-history" class="modal">
+        <div class="modal-content" style="max-width: 650px;">
+            <div class="modal-header">
+                <h3>Historique des Règlements</h3>
+                <span class="close-modal" data-target="modal-payment-history">&times;</span>
+            </div>
+            <div style="padding: 24px;">
+                <div id="history-sale-summary" style="margin-bottom: 20px; background: rgba(15, 23, 42, 0.6); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color);"></div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date & Heure</th>
+                                <th>Montant</th>
+                                <th>Mode</th>
+                                <th>Encaissé par</th>
+                                <th>Note</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-payments-tbody">
+                            <!-- Dynamic -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="modal-actions" style="margin-top: 24px;">
+                    <button type="button" class="btn-gray close-modal" data-target="modal-payment-history">Fermer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase Compat Libraries -->
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Script -->
-    <script src="app.js?v=8"></script>
+    <script src="app.js?v=9"></script>
     
     <!-- PWA Service Worker Registration -->
     <script>

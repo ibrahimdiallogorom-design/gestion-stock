@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vision-tech-stock-v2';
+const CACHE_NAME = 'vision-tech-stock-v3';
 const urlsToCache = [
   '/',
   '/index.html',
