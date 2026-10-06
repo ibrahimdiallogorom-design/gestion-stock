@@ -14,9 +14,12 @@ import {
   Columns3,
   SlidersVertical,
   RotateCcw,
+  Share2,
+  Building2,
+  Store,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
-import { Product } from '../types';
+import { Product, STANDARD_CATEGORIES } from '../types';
 import { CardsGridView } from './CardsGridView';
 import { KanbanStockView } from './KanbanStockView';
 
@@ -39,11 +42,14 @@ export const InventoryView: React.FC = () => {
     deleteProduct,
     clearAllProducts,
     repairInflatedPrices,
+    openDistributionModal,
+    appUsers,
+    activeAppUser,
     setActiveTab,
   } = useStock();
 
   const categories = useMemo(() => {
-    return ['all', ...Array.from(new Set(products.map((p) => p.category)))];
+    return ['all', ...Array.from(new Set([...STANDARD_CATEGORIES, ...products.map((p) => p.category)].filter(Boolean)))];
   }, [products]);
 
   const filteredProducts = useMemo(() => {
@@ -164,6 +170,15 @@ export const InventoryView: React.FC = () => {
               <span>Vider le stock (0 F)</span>
             </button>
           )}
+
+          <button
+            onClick={() => openDistributionModal()}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg shadow-2xs transition-colors whitespace-nowrap"
+            title="Distribuer des produits du Grand Magasin vers les vendeurs et sous-boutiques"
+          >
+            <Share2 className="w-4 h-4" />
+            <span>Distribuer du stock</span>
+          </button>
 
           <button
             onClick={() => openProductModal()}
@@ -363,8 +378,8 @@ export const InventoryView: React.FC = () => {
                           >
                             {product.quantity}
                           </div>
-                          <div className="text-[10px] text-slate-400">
-                            {isOutOfStock ? 'Rupture' : isCritical ? 'Critique' : 'Conforme'}
+                          <div className="text-[10px] text-slate-500 font-mono">
+                            Dépôt: {product.centralQuantity !== undefined ? product.centralQuantity : product.quantity} · Caisses: {Object.values(product.distributedQuantities || {}).reduce((a, b) => a + (Number(b) || 0), 0)}
                           </div>
                         </td>
 
@@ -391,6 +406,13 @@ export const InventoryView: React.FC = () => {
                         {/* Actions */}
                         <td className={getRowPadding()}>
                           <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => openDistributionModal(product.id)}
+                              title="Distribuer aux vendeurs (Dotation)"
+                              className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+                            >
+                              <Share2 className="w-4 h-4" />
+                            </button>
                             <button
                               onClick={() => openMovementModal(product.id, 'IN')}
                               title="Entrée de stock"

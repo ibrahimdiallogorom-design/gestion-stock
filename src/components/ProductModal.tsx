@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Sparkles } from 'lucide-react';
 import { useStock } from '../context/StockContext';
-import { Product } from '../types';
+import { Product, STANDARD_CATEGORIES } from '../types';
 
 export const ProductModal: React.FC = () => {
   const { productModal, closeProductModal, addProduct, updateProduct, products } = useStock();
@@ -10,7 +10,9 @@ export const ProductModal: React.FC = () => {
 
   const [sku, setSku] = useState('');
   const [name, setName] = useState('');
-  const [category, setCategory] = useState('Mode & Textile');
+  const [category, setCategory] = useState<string>(STANDARD_CATEGORIES[0]);
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
+  const [customCategoryName, setCustomCategoryName] = useState('');
   const [quantity, setQuantity] = useState<number>(1);
   const [minThreshold, setMinThreshold] = useState<number>(2);
   const [costPrice, setCostPrice] = useState<number>(0);
@@ -19,7 +21,9 @@ export const ProductModal: React.FC = () => {
   const [location, setLocation] = useState('Rayon principal');
   const [error, setError] = useState<string | null>(null);
 
-  const existingCategories = Array.from(new Set(products.map((p) => p.category)));
+  const allCategories = Array.from(
+    new Set([...STANDARD_CATEGORIES, ...products.map((p) => p.category).filter(Boolean)])
+  );
 
   useEffect(() => {
     if (productModal.isOpen) {
@@ -40,7 +44,9 @@ export const ProductModal: React.FC = () => {
         const num = String(products.length + 1).padStart(3, '0');
         setSku(`${prefix}-${num}`);
         setName('');
-        setCategory(existingCategories[0] || 'Mode & Textile');
+        setCategory(STANDARD_CATEGORIES[0]);
+        setIsCustomCategory(false);
+        setCustomCategoryName('');
         setQuantity(1);
         setMinThreshold(2);
         setCostPrice(0);
@@ -79,11 +85,15 @@ export const ProductModal: React.FC = () => {
       return;
     }
 
+    const finalCategory = isCustomCategory
+      ? customCategoryName.trim() || 'Divers & Général'
+      : category;
+
     if (isEditing && productModal.product) {
       updateProduct(productModal.product.id, {
         sku: sku.trim(),
         name: name.trim(),
-        category,
+        category: finalCategory,
         minThreshold,
         costPrice,
         salePrice,
@@ -94,7 +104,7 @@ export const ProductModal: React.FC = () => {
       addProduct({
         sku: sku.trim(),
         name: name.trim(),
-        category,
+        category: finalCategory,
         quantity,
         minThreshold,
         costPrice,
@@ -170,21 +180,53 @@ export const ProductModal: React.FC = () => {
           {/* Category */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">
-                Catégorie / Rayon
-              </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-slate-900"
-              >
-                {existingCategories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-                <option value="Autre / Divers">Autre / Divers</option>
-              </select>
+              <div className="flex items-center justify-between mb-1">
+                <label className="font-semibold text-slate-700 block">
+                  Catégorie / Rayon
+                </label>
+                {isCustomCategory && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCustomCategory(false);
+                      setCustomCategoryName('');
+                    }}
+                    className="text-[11px] text-blue-600 hover:underline"
+                  >
+                    Choisir une liste
+                  </button>
+                )}
+              </div>
+              {!isCustomCategory ? (
+                <select
+                  value={category}
+                  onChange={(e) => {
+                    if (e.target.value === '__NEW__') {
+                      setIsCustomCategory(true);
+                      setCustomCategoryName('');
+                    } else {
+                      setCategory(e.target.value);
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-slate-900"
+                >
+                  {allCategories.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                  <option value="__NEW__">+ Créer une nouvelle catégorie...</option>
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={customCategoryName}
+                  onChange={(e) => setCustomCategoryName(e.target.value)}
+                  placeholder="Ex: Électronique, Boissons, etc."
+                  className="w-full px-3 py-2 bg-white border border-blue-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900"
+                  autoFocus
+                />
+              )}
             </div>
 
             <div>

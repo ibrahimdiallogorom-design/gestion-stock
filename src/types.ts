@@ -1,4 +1,4 @@
-export type MovementType = 'IN' | 'OUT' | 'ADJUSTMENT' | 'RETURN';
+export type MovementType = 'IN' | 'OUT' | 'ADJUSTMENT' | 'RETURN' | 'TRANSFER';
 
 export type StockStatus = 'normal' | 'low' | 'out_of_stock' | 'overstock';
 
@@ -8,12 +8,25 @@ export type ViewMode = 'table' | 'cards' | 'kanban';
 
 export type DisplayDensity = 'compact' | 'normal' | 'touch';
 
+export const STANDARD_CATEGORIES = [
+  'Électronique & Informatique',
+  'Alimentation & Boissons',
+  'Médicaments & Pharmacie',
+  'Mode & Vêtements',
+  'Cosmétique & Beauté',
+  'Quincaillerie & Matériaux',
+  'Fournitures & Papeterie',
+  'Divers & Général',
+] as const;
+
 export interface Product {
   id: string;
   sku: string;
   name: string;
   category: string;
-  quantity: number;
+  quantity: number; // Stock total de l'entreprise (Grand Magasin + tous les vendeurs)
+  centralQuantity?: number; // Stock disponible au Grand Magasin (Dépôt)
+  distributedQuantities?: Record<string, number>; // Répartition du stock { [userId]: quantité }
   minThreshold: number;
   costPrice: number; // Prix d'achat (FCFA)
   salePrice: number; // Prix de vente (FCFA)
@@ -42,6 +55,8 @@ export interface StockMovement {
   acompteAmount?: number; // Acompte payé
   remainingAmount?: number; // Total restant (Crédit)
   customerName?: string; // Nom du client (pour crédit / acompte)
+  targetUserId?: string;
+  targetUserName?: string;
 }
 
 export interface SheetsSyncState {
@@ -65,7 +80,7 @@ export interface Supplier {
   minOrderAmount?: number;
 }
 
-export type ViewTab = 'dashboard' | 'inventory' | 'caisse' | 'reports' | 'movements' | 'suppliers' | 'sheets' | 'design_system' | 'settings';
+export type ViewTab = 'dashboard' | 'inventory' | 'distribution' | 'caisse' | 'reports' | 'movements' | 'suppliers' | 'sheets' | 'design_system' | 'settings';
 
 export interface CartItem {
   product: Product;

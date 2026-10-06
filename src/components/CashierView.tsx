@@ -19,9 +19,10 @@ import {
   Clock,
   FileText,
   BadgePercent,
+  Store,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
-import { Product, CartItem, PaymentMethod } from '../types';
+import { Product, CartItem, PaymentMethod, STANDARD_CATEGORIES } from '../types';
 import { CashierLockScreen } from './CashierLockScreen';
 
 interface LastSaleReceipt {
@@ -48,12 +49,38 @@ export const CashierView: React.FC = () => {
     cashierName,
     cashierSession,
     processSale,
+    activeAppUser,
   } = useStock();
 
   // If cashier terminal is locked, display the secure lock screen
   if (!isCashierUnlocked) {
     return <CashierLockScreen />;
   }
+
+  const isCashier = activeAppUser?.role === 'CASHIER';
+  const myUserId = activeAppUser?.id;
+
+  const getAvailableStock = (prod: Product) => {
+    if (isCashier && myUserId && prod.distributedQuantities?.[myUserId] !== undefined) {
+      return prod.distributedQuantities[myUserId] || 0;
+    }
+    return prod.quantity;
+  };
+
+  // Compute total stock assigned to this cashier
+  const cashierInventoryStats = useMemo(() => {
+    if (!isCashier || !myUserId) return null;
+    let units = 0;
+    let value = 0;
+    products.forEach((p) => {
+      const q = p.distributedQuantities?.[myUserId] || 0;
+      if (q > 0) {
+        units += q;
+        value += q * p.salePrice;
+      }
+    });
+    return { units, value };
+  }, [isCashier, myUserId, products]);
 
   // POS State
   const [search, setSearch] = useState('');
@@ -69,8 +96,7 @@ export const CashierView: React.FC = () => {
 
   // Available categories
   const categories = useMemo(() => {
-    const set = new Set(products.map((p) => p.category));
-    return ['all', ...Array.from(set)];
+    return ['all', ...Array.from(new Set([...STANDARD_CATEGORIES, ...products.map((p) => p.category)].filter(Boolean)))];
   }, [products]);
 
   // Filtered products for quick touch selection
@@ -87,14 +113,18 @@ export const CashierView: React.FC = () => {
 
   // Cart operations
   const addToCart = (product: Product) => {
-    if (product.quantity <= 0) return;
+    const available = getAvailableStock(product);
+    if (available <= 0) {
+      setSaleError(`Rupture de stock pour "${product.name}" (${isCashier ? 'en caisse' : 'en stock'}).`);
+      return;
+    }
     setSaleError(null);
 
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
       if (existing) {
-        if (existing.quantity >= product.quantity) {
-          setSaleError(`Stock maximal atteint pour "${product.name}" (${product.quantity} dispo).`);
+        if (existing.quantity >= available) {
+          setSaleError(`Stock maximal atteint pour "${product.name}" (${available} disponible${isCashier ? ' dans votre caisse' : ''}).`);
           return prev;
         }
         return prev.map((item) =>
@@ -114,7 +144,8 @@ export const CashierView: React.FC = () => {
         .map((item) => {
           if (item.product.id === productId) {
             const newQty = item.quantity + delta;
-            const liveStock = products.find((p) => p.id === productId)?.quantity ?? 0;
+            const targetProd = products.find((p) => p.id === productId);
+            const liveStock = targetProd ? getAvailableStock(targetProd) : 0;
             if (newQty > liveStock) {
               setSaleError(`Quantité limitée au stock disponible (${liveStock}).`);
               return item;
@@ -250,6 +281,17 @@ export const CashierView: React.FC = () => {
 
         {/* Session Metrics & Lock Button */}
         <div className="flex flex-wrap items-center gap-3">
+          {cashierInventoryStats && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-900">
+              <Store className="w-4 h-4 text-indigo-600" />
+              <span>Stock en caisse : <strong>{cashierInventoryStats.units} pcs</strong></span>
+              <span className="text-indigo-300">|</span>
+              <span className="font-mono font-bold text-indigo-700">
+                {formatFCFA(cashierInventoryStats.value)}
+              </span>
+            </div>
+          )}
+
           <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700">
             <TrendingUp className="w-4 h-4 text-blue-600" />
             <span>Ventes session : <strong>{cashierSession.totalSalesCount}</strong></span>
@@ -308,8 +350,9 @@ export const CashierView: React.FC = () => {
           {/* Product Cards Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {filteredProducts.map((product) => {
-              const inStock = product.quantity > 0;
-              const isLow = product.quantity > 0 && product.quantity <= product.minThreshold;
+              const liveQty = getAvailableStock(product);
+              const inStock = liveQty > 0;
+              const isLow = liveQty > 0 && liveQty <= product.minThreshold;
               const cartItem = cart.find((i) => i.product.id === product.id);
 
               return (
@@ -354,7 +397,7 @@ export const CashierView: React.FC = () => {
                           : 'bg-emerald-100 text-emerald-800'
                       }`}
                     >
-                      {inStock ? `${product.quantity} dispo` : 'Rupture'}
+                      {inStock ? `${liveQty} ${isCashier ? 'en caisse' : 'dispo'}` : 'Rupture'}
                     </span>
                   </div>
                 </button>

@@ -116,6 +116,26 @@ interface StockContextType {
   ) => Promise<{ success: boolean; ticketNumber: string; error?: string }>;
   clearAllProducts: () => void;
   repairInflatedPrices: () => void;
+  // Multi-Store & Stock Distribution
+  distributeProduct: (
+    productId: string,
+    targetUserId: string,
+    quantity: number,
+    notes?: string
+  ) => Promise<{ success: boolean; message: string }>;
+  recallProduct: (
+    productId: string,
+    sourceUserId: string,
+    quantity: number,
+    notes?: string
+  ) => Promise<{ success: boolean; message: string }>;
+  distributionModal: {
+    isOpen: boolean;
+    productId?: string;
+    defaultTargetUserId?: string;
+  };
+  openDistributionModal: (productId?: string, defaultTargetUserId?: string) => void;
+  closeDistributionModal: () => void;
   // Global Application Authentication & User Accounts
   activeAppUser: AppUser | null;
   appUsers: AppUser[];
@@ -169,9 +189,16 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               sale = Math.round(sale / 650);
             }
 
+            const distributed = p.distributedQuantities || {};
+            const sumDist = Object.values(distributed).reduce((a, b) => a + (Number(b) || 0), 0);
+            const totalQty = Math.max(0, Number(p.quantity) || 0);
+            const centralQty = p.centralQuantity !== undefined ? Math.max(0, Number(p.centralQuantity) || 0) : Math.max(0, totalQty - sumDist);
+
             return {
               ...p,
-              quantity: Math.max(0, Number(p.quantity) || 0),
+              quantity: totalQty,
+              centralQuantity: centralQty,
+              distributedQuantities: distributed,
               minThreshold: Math.max(0, Number(p.minThreshold) || 0),
               costPrice: Math.max(0, cost),
               salePrice: Math.max(0, sale),
@@ -399,6 +426,30 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     message: '',
     onConfirm: () => {},
   });
+
+  const [distributionModal, setDistributionModal] = useState<{
+    isOpen: boolean;
+    productId?: string;
+    defaultTargetUserId?: string;
+  }>({
+    isOpen: false,
+  });
+
+  const openDistributionModal = (productId?: string, defaultTargetUserId?: string) => {
+    setDistributionModal({
+      isOpen: true,
+      productId,
+      defaultTargetUserId,
+    });
+  };
+
+  const closeDistributionModal = () => {
+    setDistributionModal({
+      isOpen: false,
+      productId: undefined,
+      defaultTargetUserId: undefined,
+    });
+  };
 
   // Sync to localStorage
   useEffect(() => {
@@ -811,6 +862,156 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(fixed));
   };
 
+  const distributeProduct = async (
+    productId: string,
+    targetUserId: string,
+    quantityToDistribute: number,
+    notes?: string
+  ): Promise<{ success: boolean; message: string }> => {
+    if (quantityToDistribute <= 0) {
+      return { success: false, message: 'La quantité à distribuer doit être supérieure à 0.' };
+    }
+
+    const targetUser = appUsers.find((u) => u.id === targetUserId);
+    if (!targetUser) {
+      return { success: false, message: 'Vendeur / Caissier destinataire introuvable.' };
+    }
+
+    const prod = products.find((p) => p.id === productId);
+    if (!prod) {
+      return { success: false, message: 'Article introuvable dans le catalogue.' };
+    }
+
+    const currentCentral = prod.centralQuantity !== undefined ? prod.centralQuantity : prod.quantity;
+    if (currentCentral < quantityToDistribute) {
+      return {
+        success: false,
+        message: `Stock insuffisant au Grand Magasin (Disponible: ${currentCentral}, Demandé: ${quantityToDistribute}).`,
+      };
+    }
+
+    const now = new Date().toISOString();
+    const newCentral = currentCentral - quantityToDistribute;
+    const newDistributed = { ...(prod.distributedQuantities || {}) };
+    newDistributed[targetUserId] = (newDistributed[targetUserId] || 0) + quantityToDistribute;
+
+    const sumDist = Object.values(newDistributed).reduce((a, b) => a + (Number(b) || 0), 0);
+    const newTotal = newCentral + sumDist;
+
+    const updatedProduct: Product = {
+      ...prod,
+      centralQuantity: newCentral,
+      distributedQuantities: newDistributed,
+      quantity: newTotal,
+      lastUpdated: now,
+    };
+
+    const updatedProducts = products.map((p) => (p.id === productId ? updatedProduct : p));
+    setProducts(updatedProducts);
+
+    const movement: StockMovement = {
+      id: `mov-${Date.now()}-${prod.id}`,
+      productId: prod.id,
+      productSku: prod.sku,
+      productName: prod.name,
+      type: 'TRANSFER',
+      quantityDelta: -quantityToDistribute,
+      previousStock: currentCentral,
+      newStock: newCentral,
+      reason: `Distribution vers ${targetUser.fullName} (${targetUser.storeName || targetUser.username})`,
+      operator: activeAppUser?.fullName || 'Responsable Stock',
+      storeName: targetUser.storeName || 'Boutique VisionTech',
+      targetUserId: targetUser.id,
+      targetUserName: targetUser.fullName,
+      notes: notes || `Transfert de ${quantityToDistribute} unité(s) depuis le Grand Magasin vers ${targetUser.fullName}`,
+      createdAt: now,
+    };
+
+    const updatedMovements = [movement, ...movements];
+    setMovements(updatedMovements);
+
+    if (sheetsSync.autoSync && sheetsSync.spreadsheetId && hasGoogleToken) {
+      const token = await getAccessToken();
+      if (token) {
+        pushDataToSheets(sheetsSync.spreadsheetId, updatedProducts, updatedMovements, token).catch(console.warn);
+      }
+    }
+
+    return {
+      success: true,
+      message: `${quantityToDistribute} unité(s) de "${prod.name}" distribuée(s) avec succès à ${targetUser.fullName}.`,
+    };
+  };
+
+  const recallProduct = async (
+    productId: string,
+    sourceUserId: string,
+    quantityToRecall: number,
+    notes?: string
+  ): Promise<{ success: boolean; message: string }> => {
+    if (quantityToRecall <= 0) {
+      return { success: false, message: 'La quantité à récupérer doit être supérieure à 0.' };
+    }
+
+    const sourceUser = appUsers.find((u) => u.id === sourceUserId);
+    const prod = products.find((p) => p.id === productId);
+    if (!prod) {
+      return { success: false, message: 'Article introuvable dans le catalogue.' };
+    }
+
+    const currentHeld = prod.distributedQuantities?.[sourceUserId] || 0;
+    if (currentHeld < quantityToRecall) {
+      return {
+        success: false,
+        message: `Ce vendeur ne possède que ${currentHeld} unité(s) en stock.`,
+      };
+    }
+
+    const now = new Date().toISOString();
+    const currentCentral = prod.centralQuantity !== undefined ? prod.centralQuantity : Math.max(0, prod.quantity - currentHeld);
+    const newCentral = currentCentral + quantityToRecall;
+    const newDistributed = { ...(prod.distributedQuantities || {}) };
+    newDistributed[sourceUserId] = currentHeld - quantityToRecall;
+
+    const sumDist = Object.values(newDistributed).reduce((a, b) => a + (Number(b) || 0), 0);
+    const newTotal = newCentral + sumDist;
+
+    const updatedProduct: Product = {
+      ...prod,
+      centralQuantity: newCentral,
+      distributedQuantities: newDistributed,
+      quantity: newTotal,
+      lastUpdated: now,
+    };
+
+    const updatedProducts = products.map((p) => (p.id === productId ? updatedProduct : p));
+    setProducts(updatedProducts);
+
+    const movement: StockMovement = {
+      id: `mov-${Date.now()}-${prod.id}`,
+      productId: prod.id,
+      productSku: prod.sku,
+      productName: prod.name,
+      type: 'RETURN',
+      quantityDelta: quantityToRecall,
+      previousStock: currentCentral,
+      newStock: newCentral,
+      reason: `Retour de stock de ${sourceUser?.fullName || 'Vendeur'} vers le Grand Magasin`,
+      operator: activeAppUser?.fullName || 'Responsable Stock',
+      storeName: 'Grand Magasin Central',
+      notes: notes || `Récupération de ${quantityToRecall} unité(s) vers le Grand Magasin`,
+      createdAt: now,
+    };
+
+    const updatedMovements = [movement, ...movements];
+    setMovements(updatedMovements);
+
+    return {
+      success: true,
+      message: `${quantityToRecall} unité(s) réintégrée(s) au Grand Magasin.`,
+    };
+  };
+
   const processSale = async (
     items: CartItem[],
     paymentMethod: PaymentMethod,
@@ -829,11 +1030,21 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Verify stock availability
     for (const item of items) {
       const prod = products.find((p) => p.id === item.product.id);
-      if (!prod || prod.quantity < item.quantity) {
+      if (!prod) {
+        return { success: false, ticketNumber: '', error: `Article introuvable.` };
+      }
+      const isCashier = activeAppUser?.role === 'CASHIER';
+      const cashierStock = (isCashier && activeAppUser?.id && prod.distributedQuantities?.[activeAppUser.id] !== undefined)
+        ? (prod.distributedQuantities[activeAppUser.id] || 0)
+        : null;
+      const available = cashierStock !== null ? cashierStock : prod.quantity;
+      if (available < item.quantity) {
         return {
           success: false,
           ticketNumber: '',
-          error: `Stock insuffisant pour "${item.product.name}" (disponible: ${prod?.quantity ?? 0}).`,
+          error: cashierStock !== null
+            ? `Stock insuffisant dans votre caisse pour "${item.product.name}" (disponible: ${available}). Demandez une dotation au Grand Magasin.`
+            : `Stock insuffisant pour "${item.product.name}" (disponible: ${prod.quantity}).`,
         };
       }
     }
@@ -860,7 +1071,17 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const subtotal = prod.salePrice * soldItem.quantity;
       totalAmount += subtotal;
 
-      const newQty = Math.max(0, prod.quantity - soldItem.quantity);
+      let centralQty = prod.centralQuantity !== undefined ? prod.centralQuantity : prod.quantity;
+      const distributed = { ...(prod.distributedQuantities || {}) };
+
+      if (activeAppUser?.role === 'CASHIER' && activeAppUser?.id && distributed[activeAppUser.id] !== undefined) {
+        distributed[activeAppUser.id] = Math.max(0, distributed[activeAppUser.id] - soldItem.quantity);
+      } else {
+        centralQty = Math.max(0, centralQty - soldItem.quantity);
+      }
+      const sumDist = Object.values(distributed).reduce((a, b) => a + (Number(b) || 0), 0);
+      const newQty = centralQty + sumDist;
+
       newMovements.push({
         id: `mov-${Date.now()}-${prod.id}`,
         productId: prod.id,
@@ -886,6 +1107,8 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return {
         ...prod,
         quantity: newQty,
+        centralQuantity: centralQty,
+        distributedQuantities: distributed,
         lastUpdated: now,
       };
     });
@@ -1113,6 +1336,12 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         processSale,
         clearAllProducts,
         repairInflatedPrices,
+        // Multi-Store & Stock Distribution
+        distributeProduct,
+        recallProduct,
+        distributionModal,
+        openDistributionModal,
+        closeDistributionModal,
         // Modals
         movementModal,
         openMovementModal,

@@ -16,11 +16,13 @@ import { DesignSystemView } from './components/DesignSystemView';
 import { SettingsView } from './components/SettingsView';
 import { CashierView } from './components/CashierView';
 import { DailyReportsView } from './components/DailyReportsView';
+import { DistributionView } from './components/DistributionView';
 import { SwitchAccountModal } from './components/SwitchAccountModal';
 import { LoginScreen } from './components/LoginScreen';
 import { MovementModal } from './components/MovementModal';
 import { ProductModal } from './components/ProductModal';
 import { ConfirmModal } from './components/ConfirmModal';
+import { DistributionModal } from './components/DistributionModal';
 import { THEME_CONFIGS } from './components/ThemeClasses';
 import {
   LayoutDashboard,
@@ -59,6 +61,7 @@ const AppContent: React.FC = () => {
         <main className="flex-1 min-h-0 overflow-y-auto pb-16 md:pb-0">
           {activeTab === 'dashboard' && <DashboardView />}
           {activeTab === 'inventory' && <InventoryView />}
+          {activeTab === 'distribution' && <DistributionView />}
           {activeTab === 'caisse' && <CashierView />}
           {activeTab === 'reports' && <DailyReportsView />}
           {activeTab === 'movements' && <MovementsView />}
@@ -130,6 +133,7 @@ const AppContent: React.FC = () => {
       <ProductModal />
       <ConfirmModal />
       <SwitchAccountModal />
+      <DistributionModal />
     </div>
   );
 };

@@ -8,6 +8,7 @@ import {
   Package,
   Layers,
   Sparkles,
+  Share2,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { Product } from '../types';
@@ -23,6 +24,7 @@ export const CardsGridView: React.FC = () => {
     openConfirmModal,
     deleteProduct,
     recordMovement,
+    openDistributionModal,
     theme,
   } = useStock();
 
@@ -55,7 +57,19 @@ export const CardsGridView: React.FC = () => {
         border: 'border-amber-200/50',
         accent: 'bg-amber-600',
       },
+      'Mode & Vêtements': {
+        bg: 'from-amber-500/10 via-rose-500/10 to-orange-500/10',
+        text: 'text-amber-800',
+        border: 'border-amber-200/50',
+        accent: 'bg-amber-600',
+      },
       'Électronique & Son': {
+        bg: 'from-blue-500/10 via-indigo-500/10 to-violet-500/10',
+        text: 'text-blue-800',
+        border: 'border-blue-200/50',
+        accent: 'bg-blue-600',
+      },
+      'Électronique & Informatique': {
         bg: 'from-blue-500/10 via-indigo-500/10 to-violet-500/10',
         text: 'text-blue-800',
         border: 'border-blue-200/50',
@@ -67,11 +81,41 @@ export const CardsGridView: React.FC = () => {
         border: 'border-emerald-200/50',
         accent: 'bg-emerald-600',
       },
+      'Alimentation & Boissons': {
+        bg: 'from-amber-600/10 via-yellow-500/10 to-stone-500/10',
+        text: 'text-yellow-800',
+        border: 'border-yellow-200/50',
+        accent: 'bg-yellow-600',
+      },
+      'Médicaments & Pharmacie': {
+        bg: 'from-emerald-500/10 via-teal-500/10 to-cyan-500/10',
+        text: 'text-emerald-800',
+        border: 'border-emerald-200/50',
+        accent: 'bg-emerald-600',
+      },
       'Soins & Beauté': {
         bg: 'from-purple-500/10 via-pink-500/10 to-rose-500/10',
         text: 'text-purple-800',
         border: 'border-purple-200/50',
         accent: 'bg-purple-600',
+      },
+      'Cosmétique & Beauté': {
+        bg: 'from-purple-500/10 via-pink-500/10 to-rose-500/10',
+        text: 'text-purple-800',
+        border: 'border-purple-200/50',
+        accent: 'bg-purple-600',
+      },
+      'Quincaillerie & Matériaux': {
+        bg: 'from-slate-600/10 via-zinc-500/10 to-stone-500/10',
+        text: 'text-slate-800',
+        border: 'border-slate-300',
+        accent: 'bg-slate-700',
+      },
+      'Fournitures & Papeterie': {
+        bg: 'from-cyan-500/10 via-sky-500/10 to-blue-500/10',
+        text: 'text-cyan-800',
+        border: 'border-cyan-200/50',
+        accent: 'bg-cyan-600',
       },
       'Épicerie Fine': {
         bg: 'from-amber-600/10 via-yellow-500/10 to-stone-500/10',
@@ -271,6 +315,13 @@ export const CardsGridView: React.FC = () => {
                   className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-white rounded-md transition-colors"
                 >
                   <ArrowDownRight className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => openDistributionModal(p.id)}
+                  title="Distribuer aux vendeurs (Dotation)"
+                  className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-white rounded-md transition-colors"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={() => openProductModal(p)}

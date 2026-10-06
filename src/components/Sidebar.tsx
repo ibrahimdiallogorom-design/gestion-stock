@@ -14,6 +14,8 @@ import {
   UserCheck,
   Receipt,
   Users,
+  Store,
+  Share2,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { ViewTab } from '../types';
@@ -57,6 +59,13 @@ export const Sidebar: React.FC = () => {
       icon: <Boxes className="w-4 h-4" />,
       badge: lowStockCount + outOfStockCount > 0 ? lowStockCount + outOfStockCount : undefined,
       badgeColor: outOfStockCount > 0 ? 'text-rose-600 bg-rose-50' : 'text-amber-600 bg-amber-50',
+    },
+    {
+      id: 'distribution',
+      label: 'Grand Magasin & Caisses',
+      icon: <Store className="w-4 h-4" />,
+      badge: 'Multi-Boutiques',
+      badgeColor: 'text-blue-700 bg-blue-50 font-medium',
     },
     {
       id: 'caisse',
