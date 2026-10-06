@@ -15,8 +15,8 @@ export interface Product {
   category: string;
   quantity: number;
   minThreshold: number;
-  costPrice: number; // Prix d'achat HT (€)
-  salePrice: number; // Prix de vente TTC (€)
+  costPrice: number; // Prix d'achat HT (FCFA)
+  salePrice: number; // Prix de vente TTC (FCFA)
   supplier: string;
   location?: string;
   lastUpdated: string;

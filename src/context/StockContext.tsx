@@ -144,7 +144,23 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [products, setProducts] = useState<Product[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed: Product[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // If previous data used Euro amounts (e.g. salePrice <= 500), automatically migrate to FCFA
+          const hasEuroPrices = parsed.some((p) => p.salePrice > 0 && p.salePrice <= 500);
+          if (hasEuroPrices) {
+            const migrated = parsed.map((p) => ({
+              ...p,
+              costPrice: p.costPrice <= 500 ? Math.round(p.costPrice * 650) : p.costPrice,
+              salePrice: p.salePrice <= 500 ? Math.round(p.salePrice * 650) : p.salePrice,
+            }));
+            localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(migrated));
+            return migrated;
+          }
+          return parsed;
+        }
+      }
     } catch (e) {
       console.error('Error loading products from cache', e);
     }
@@ -154,7 +170,21 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [movements, setMovements] = useState<StockMovement[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.MOVEMENTS);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed: StockMovement[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const hasEuroMovements = parsed.some((m) => m.saleAmount && m.saleAmount > 0 && m.saleAmount <= 500);
+          if (hasEuroMovements) {
+            const migrated = parsed.map((m) => ({
+              ...m,
+              saleAmount: m.saleAmount && m.saleAmount <= 500 ? Math.round(m.saleAmount * 650) : m.saleAmount,
+            }));
+            localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(migrated));
+            return migrated;
+          }
+          return parsed;
+        }
+      }
     } catch (e) {
       console.error('Error loading movements from cache', e);
     }

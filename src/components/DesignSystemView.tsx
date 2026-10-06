@@ -216,15 +216,15 @@ export const DesignSystemView: React.FC = () => {
             <div className="space-y-1 text-xs text-slate-800">
               <div className="flex justify-between py-0.5 border-b border-slate-200">
                 <span>SKU-001  Oxford Chemise</span>
-                <span className="tabular-nums font-bold">28 pcs · 1 820.00 €</span>
+                <span className="tabular-nums font-bold">28 pcs · 700 000 F</span>
               </div>
               <div className="flex justify-between py-0.5 border-b border-slate-200">
                 <span>SKU-002  Pantalon Chino</span>
-                <span className="tabular-nums font-bold">06 pcs ·   474.00 €</span>
+                <span className="tabular-nums font-bold">06 pcs · 180 000 F</span>
               </div>
               <div className="flex justify-between py-0.5">
                 <span>SKU-003  Casque Audio NC</span>
-                <span className="tabular-nums font-bold">14 pcs · 2 086.00 €</span>
+                <span className="tabular-nums font-bold">14 pcs · 1 050 000 F</span>
               </div>
             </div>
             <p className="text-[11px] text-slate-400 font-sans mt-2">

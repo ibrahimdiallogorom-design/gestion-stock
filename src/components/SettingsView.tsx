@@ -52,7 +52,7 @@ export const SettingsView: React.FC = () => {
   } = useStock();
 
   const [storeName, setStoreName] = useState('Boutique VisionTech');
-  const [currency, setCurrency] = useState('EUR (€)');
+  const [currency, setCurrency] = useState('FCFA (Franc CFA)');
   const [defaultThreshold, setDefaultThreshold] = useState(5);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
@@ -266,12 +266,12 @@ export const SettingsView: React.FC = () => {
               <select
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-slate-900"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-slate-900 font-semibold"
               >
+                <option value="FCFA (Franc CFA)">Franc CFA (FCFA / XOF)</option>
                 <option value="EUR (€)">Euro (€)</option>
                 <option value="USD ($)">Dollar US ($)</option>
-                <option value="CHF">Franc Suisse (CHF)</option>
-                <option value="CAD ($)">Dollar Canadien ($)</option>
+                <option value="GNF">Franc Guinéen (GNF)</option>
               </select>
             </div>
           </div>

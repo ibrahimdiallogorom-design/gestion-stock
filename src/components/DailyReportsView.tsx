@@ -228,9 +228,9 @@ export const DailyReportsView: React.FC = () => {
     });
   }, [dailyTickets, availableStores, selectedStore]);
 
-  // Format currency
+  // Format currency in Francs CFA
   const formatMoney = (val: number) => {
-    return `${val.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+    return `${Math.round(val).toLocaleString('fr-FR')} FCFA`;
   };
 
   const handlePrintZ = (storeName: string = 'ALL') => {
@@ -244,14 +244,14 @@ export const DailyReportsView: React.FC = () => {
 
   // CSV Export
   const exportCSV = () => {
-    const headers = ['Date', 'Ticket', 'Boutique', 'Caissier', 'Mode de Paiement', 'Total (€)', 'Articles'];
+    const headers = ['Date', 'Ticket', 'Boutique', 'Caissier', 'Mode de Paiement', 'Total (FCFA)', 'Articles'];
     const rows = dailyTickets.map((t) => [
       new Date(t.timestamp).toLocaleString('fr-FR'),
       t.ticketNumber,
       `"${t.storeName}"`,
       `"${t.cashier}"`,
       t.paymentMethod,
-      t.totalAmount.toFixed(2),
+      Math.round(t.totalAmount).toString(),
       `"${t.items.map((i) => `${i.name} (x${i.quantity})`).join(', ')}"`,
     ]);
 

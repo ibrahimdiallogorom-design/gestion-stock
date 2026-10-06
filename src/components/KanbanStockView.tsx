@@ -114,7 +114,7 @@ export const KanbanStockView: React.FC = () => {
                       <strong className="font-mono text-slate-900">{p.quantity}</strong> / {p.minThreshold} min
                     </span>
                     <span className="font-mono text-slate-700 font-semibold">
-                      {p.salePrice.toFixed(2)} €
+                      {Math.round(p.salePrice).toLocaleString('fr-FR')} F
                     </span>
                   </div>
 

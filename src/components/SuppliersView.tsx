@@ -144,7 +144,7 @@ export const SuppliersView: React.FC = () => {
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
                   <span className="text-slate-400 text-[11px] block">Minimum de Commande</span>
                   <div className="font-mono font-bold text-slate-800 text-sm mt-1">
-                    {selectedSupplier.minOrderAmount} € HT
+                    {Math.round(selectedSupplier.minOrderAmount || 0).toLocaleString('fr-FR')} FCFA
                   </div>
                 </div>
 
@@ -238,7 +238,7 @@ export const SuppliersView: React.FC = () => {
                               {p.minThreshold}
                             </td>
                             <td className="py-3 px-4 text-right font-mono tabular-nums font-semibold text-slate-700">
-                              {p.costPrice.toFixed(2)} €
+                              {Math.round(p.costPrice).toLocaleString('fr-FR')} F
                             </td>
                             <td className="py-3 px-4 text-center">
                               <button

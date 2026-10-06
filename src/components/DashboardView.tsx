@@ -89,13 +89,13 @@ export const DashboardView: React.FC = () => {
           </div>
           <div className="mt-3">
             <span className="text-2xl font-bold text-slate-900 font-mono tabular-nums">
-              {totalStockValue.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+              {Math.round(totalStockValue).toLocaleString('fr-FR')} FCFA
             </span>
           </div>
           <div className="mt-2 text-xs text-slate-500 flex items-center justify-between pt-2 border-t border-slate-100">
             <span>Potentiel Vente TTC :</span>
             <span className="font-mono tabular-nums font-semibold text-slate-700">
-              {totalRetailValue.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+              {Math.round(totalRetailValue).toLocaleString('fr-FR')} FCFA
             </span>
           </div>
         </div>
@@ -353,11 +353,7 @@ export const DashboardView: React.FC = () => {
                       {cat.units}
                     </td>
                     <td className="py-3 px-6 text-right font-mono tabular-nums font-semibold text-slate-900">
-                      {cat.value.toLocaleString('fr-FR', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}{' '}
-                      €
+                      {Math.round(cat.value).toLocaleString('fr-FR')} FCFA
                     </td>
                     <td className="py-3 px-6 text-right">
                       <div className="flex items-center justify-end gap-2">

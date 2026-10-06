@@ -351,12 +351,12 @@ export const InventoryView: React.FC = () => {
 
                         {/* Cost Price */}
                         <td className={`${getRowPadding()} text-right font-mono tabular-nums text-slate-600`}>
-                          {product.costPrice.toFixed(2)} €
+                          {Math.round(product.costPrice).toLocaleString('fr-FR')} F
                         </td>
 
                         {/* Sale Price */}
                         <td className={`${getRowPadding()} text-right font-mono tabular-nums font-semibold text-slate-800`}>
-                          {product.salePrice.toFixed(2)} €
+                          {Math.round(product.salePrice).toLocaleString('fr-FR')} F
                         </td>
 
                         {/* Supplier */}

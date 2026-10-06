@@ -32,6 +32,8 @@ interface LastSaleReceipt {
   changeAmount?: number;
 }
 
+const formatFCFA = (val: number) => `${Math.round(val).toLocaleString('fr-FR')} FCFA`;
+
 export const CashierView: React.FC = () => {
   const {
     products,
@@ -214,7 +216,7 @@ export const CashierView: React.FC = () => {
             <span>Ventes session : <strong>{cashierSession.totalSalesCount}</strong></span>
             <span className="text-slate-300">|</span>
             <span className="font-mono font-semibold text-blue-700">
-              {cashierSession.totalSalesAmount.toFixed(2)} €
+              {formatFCFA(cashierSession.totalSalesAmount)}
             </span>
           </div>
 
@@ -301,7 +303,7 @@ export const CashierView: React.FC = () => {
 
                   <div className="flex items-center justify-between pt-2 border-t border-slate-100">
                     <span className="font-mono text-sm font-bold text-blue-700">
-                      {product.salePrice.toFixed(2)} €
+                      {formatFCFA(product.salePrice)}
                     </span>
 
                     <span
@@ -361,7 +363,7 @@ export const CashierView: React.FC = () => {
                     {item.product.name}
                   </span>
                   <span className="text-[11px] text-slate-400 font-mono">
-                    {item.product.salePrice.toFixed(2)} € / u
+                    {formatFCFA(item.product.salePrice)} / u
                   </span>
                 </div>
 
@@ -383,8 +385,8 @@ export const CashierView: React.FC = () => {
                   </button>
                 </div>
 
-                <div className="w-16 text-right font-mono font-bold text-slate-900 shrink-0 ml-2">
-                  {(item.product.salePrice * item.quantity).toFixed(2)} €
+                <div className="w-24 text-right font-mono font-bold text-slate-900 shrink-0 ml-2">
+                  {formatFCFA(item.product.salePrice * item.quantity)}
                 </div>
 
                 <button
@@ -410,16 +412,16 @@ export const CashierView: React.FC = () => {
             <div className="space-y-2 pt-3 border-t border-slate-200 text-xs">
               <div className="flex justify-between text-slate-500">
                 <span>Total HT</span>
-                <span className="font-mono">{cartTotalHT.toFixed(2)} €</span>
+                <span className="font-mono">{formatFCFA(cartTotalHT)}</span>
               </div>
               <div className="flex justify-between text-slate-500">
-                <span>TVA (20%)</span>
-                <span className="font-mono">{cartTotalTVA.toFixed(2)} €</span>
+                <span>TVA (18%)</span>
+                <span className="font-mono">{formatFCFA(cartTotalTVA)}</span>
               </div>
               <div className="flex justify-between items-baseline pt-2 border-t border-slate-200 text-base font-bold text-slate-900">
                 <span>Total TTC à Payer</span>
                 <span className="font-mono text-xl text-blue-700">
-                  {cartTotalTTC.toFixed(2)} €
+                  {formatFCFA(cartTotalTTC)}
                 </span>
               </div>
             </div>
@@ -477,7 +479,7 @@ export const CashierView: React.FC = () => {
                     <span>Montant Reçu du Client</span>
                     <button
                       type="button"
-                      onClick={() => setTenderedInput(cartTotalTTC.toFixed(2))}
+                      onClick={() => setTenderedInput(cartTotalTTC.toString())}
                       className="text-[11px] text-blue-600 hover:underline"
                     >
                       Montant Exact
@@ -486,21 +488,21 @@ export const CashierView: React.FC = () => {
                   <div className="flex gap-2">
                     <input
                       type="number"
-                      step="0.01"
+                      step="500"
                       min={cartTotalTTC}
                       value={tenderedInput}
                       onChange={(e) => setTenderedInput(e.target.value)}
-                      placeholder={`${cartTotalTTC.toFixed(2)} €`}
+                      placeholder={formatFCFA(cartTotalTTC)}
                       className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
                     />
-                    {[10, 20, 50].map((bill) => (
+                    {[2000, 5000, 10000, 20000].map((bill) => (
                       <button
                         key={bill}
                         type="button"
                         onClick={() => setTenderedInput(bill.toString())}
-                        className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-mono font-medium text-slate-700 hover:bg-slate-100"
+                        className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-mono font-medium text-slate-700 hover:bg-slate-100"
                       >
-                        {bill}€
+                        {bill.toLocaleString('fr-FR')} F
                       </button>
                     ))}
                   </div>
@@ -513,7 +515,7 @@ export const CashierView: React.FC = () => {
                           isCashInsufficient ? 'text-rose-600' : 'text-emerald-600'
                         }`}
                       >
-                        {isCashInsufficient ? 'Montant insuffisant' : `${changeToReturn.toFixed(2)} €`}
+                        {isCashInsufficient ? 'Montant insuffisant' : formatFCFA(changeToReturn)}
                       </span>
                     </div>
                   )}
@@ -544,7 +546,7 @@ export const CashierView: React.FC = () => {
             <span>
               {isProcessing
                 ? 'Enregistrement en cours...'
-                : `Encaisser & Valider (${cartTotalTTC.toFixed(2)} €)`}
+                : `Encaisser & Valider (${formatFCFA(cartTotalTTC)})`}
             </span>
           </button>
         </div>
@@ -576,7 +578,7 @@ export const CashierView: React.FC = () => {
                     <span>{it.quantity}x {it.product.name}</span>
                   </div>
                   <span className="font-bold shrink-0">
-                    {(it.product.salePrice * it.quantity).toFixed(2)} €
+                    {formatFCFA(it.product.salePrice * it.quantity)}
                   </span>
                 </div>
               ))}
@@ -598,17 +600,17 @@ export const CashierView: React.FC = () => {
                 <>
                   <div className="flex justify-between">
                     <span>Reçu client :</span>
-                    <span>{lastReceipt.tenderedAmount.toFixed(2)} €</span>
+                    <span>{formatFCFA(lastReceipt.tenderedAmount)}</span>
                   </div>
                   <div className="flex justify-between font-bold text-emerald-700">
                     <span>Rendu monnaie :</span>
-                    <span>{(lastReceipt.changeAmount || 0).toFixed(2)} €</span>
+                    <span>{formatFCFA(lastReceipt.changeAmount || 0)}</span>
                   </div>
                 </>
               )}
               <div className="flex justify-between text-sm font-bold text-slate-900 pt-2 border-t border-slate-300">
                 <span>TOTAL TTC :</span>
-                <span>{lastReceipt.totalAmount.toFixed(2)} €</span>
+                <span>{formatFCFA(lastReceipt.totalAmount)}</span>
               </div>
             </div>
 

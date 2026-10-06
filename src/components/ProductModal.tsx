@@ -240,11 +240,11 @@ export const ProductModal: React.FC = () => {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="font-semibold text-slate-700 block mb-1">
-                Prix d'achat HT (€)
+                Prix d'achat HT (FCFA)
               </label>
               <input
                 type="number"
-                step="0.01"
+                step="100"
                 min="0"
                 value={costPrice}
                 onChange={(e) => setCostPrice(Number(e.target.value))}
@@ -254,11 +254,11 @@ export const ProductModal: React.FC = () => {
 
             <div>
               <label className="font-semibold text-slate-700 block mb-1">
-                Prix de vente TTC (€)
+                Prix de vente TTC (FCFA)
               </label>
               <input
                 type="number"
-                step="0.01"
+                step="100"
                 min="0"
                 value={salePrice}
                 onChange={(e) => setSalePrice(Number(e.target.value))}
