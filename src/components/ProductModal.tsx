@@ -240,7 +240,7 @@ export const ProductModal: React.FC = () => {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="font-semibold text-slate-700 block mb-1">
-                Prix d'achat HT (FCFA)
+                Prix d'achat (FCFA)
               </label>
               <input
                 type="number"
@@ -254,7 +254,7 @@ export const ProductModal: React.FC = () => {
 
             <div>
               <label className="font-semibold text-slate-700 block mb-1">
-                Prix de vente TTC (FCFA)
+                Prix de vente (FCFA)
               </label>
               <input
                 type="number"

@@ -196,7 +196,7 @@ export const SuppliersView: React.FC = () => {
                       <th className="py-3 px-4">Article</th>
                       <th className="py-3 px-4 text-right">Stock Actuel</th>
                       <th className="py-3 px-4 text-right">Seuil Min</th>
-                      <th className="py-3 px-4 text-right">Prix Achat HT</th>
+                      <th className="py-3 px-4 text-right">Prix d'Achat</th>
                       <th className="py-3 px-4 text-center">Action Réassort</th>
                     </tr>
                   </thead>

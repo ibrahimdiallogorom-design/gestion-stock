@@ -324,7 +324,7 @@ export const SheetsSyncView: React.FC = () => {
               Onglet 1 : « Produits »
             </span>
             <p className="text-[11px] text-slate-500">
-              Colonnes : ID, SKU, Nom Article, Catégorie, Quantité en Stock, Seuil Minimum, Prix Achat HT, Prix Vente TTC, Fournisseur, Emplacement, Dernière MàJ.
+              Colonnes : ID, SKU, Nom Article, Catégorie, Quantité en Stock, Seuil Minimum, Prix d'Achat (FCFA), Prix de Vente (FCFA), Fournisseur, Emplacement, Dernière MàJ.
             </p>
           </div>
           <div className="bg-white p-3.5 rounded-lg border border-slate-200">

@@ -16,6 +16,9 @@ import {
   Receipt,
   UserCheck,
   TrendingUp,
+  Clock,
+  FileText,
+  BadgePercent,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { Product, CartItem, PaymentMethod } from '../types';
@@ -30,6 +33,9 @@ interface LastSaleReceipt {
   totalAmount: number;
   tenderedAmount?: number;
   changeAmount?: number;
+  acompteAmount?: number;
+  remainingAmount?: number;
+  customerName?: string;
 }
 
 const formatFCFA = (val: number) => `${Math.round(val).toLocaleString('fr-FR')} FCFA`;
@@ -55,6 +61,8 @@ export const CashierView: React.FC = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
   const [tenderedInput, setTenderedInput] = useState<string>('');
+  const [acompteInput, setAcompteInput] = useState<string>('');
+  const [customerNameInput, setCustomerNameInput] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [saleError, setSaleError] = useState<string | null>(null);
   const [lastReceipt, setLastReceipt] = useState<LastSaleReceipt | null>(null);
@@ -127,40 +135,68 @@ export const CashierView: React.FC = () => {
   const clearCart = () => {
     setCart([]);
     setTenderedInput('');
+    setAcompteInput('');
+    setCustomerNameInput('');
     setSaleError(null);
   };
 
-  // Calculations
-  const cartTotalTTC = useMemo(() => {
+  // Calculations (Direct Totals, TVA column removed per request)
+  const cartTotal = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.product.salePrice * item.quantity, 0);
   }, [cart]);
 
-  const cartTotalHT = useMemo(() => cartTotalTTC / 1.2, [cartTotalTTC]);
-  const cartTotalTVA = useMemo(() => cartTotalTTC - cartTotalHT, [cartTotalTTC, cartTotalHT]);
-
+  // Cash handling
   const tenderedAmount = parseFloat(tenderedInput) || 0;
   const changeToReturn = paymentMethod === 'CASH' && tenderedAmount > 0
-    ? Math.max(0, tenderedAmount - cartTotalTTC)
+    ? Math.max(0, tenderedAmount - cartTotal)
     : 0;
   const isCashInsufficient =
-    paymentMethod === 'CASH' && tenderedInput.trim() !== '' && tenderedAmount < cartTotalTTC;
+    paymentMethod === 'CASH' && tenderedInput.trim() !== '' && tenderedAmount < cartTotal;
+
+  // Acompte & Credit calculations
+  const parsedAcompte = parseFloat(acompteInput) || 0;
+  const currentAcompte = paymentMethod === 'CREDIT'
+    ? (acompteInput.trim() !== '' ? Math.max(0, parsedAcompte) : 0)
+    : Math.max(0, parsedAcompte);
+  const currentRemaining = Math.max(0, cartTotal - currentAcompte);
+
+  const isAcompteInvalid =
+    paymentMethod === 'ACOMPTE' &&
+    (acompteInput.trim() === '' || currentAcompte <= 0 || currentAcompte > cartTotal);
 
   // Checkout submission
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     setSaleError(null);
 
-    if (paymentMethod === 'CASH' && tenderedAmount > 0 && tenderedAmount < cartTotalTTC) {
+    if (paymentMethod === 'CASH' && tenderedAmount > 0 && tenderedAmount < cartTotal) {
       setSaleError('Le montant en espèces donné par le client est inférieur au total.');
+      return;
+    }
+
+    if (paymentMethod === 'ACOMPTE' && (currentAcompte <= 0 || currentAcompte > cartTotal)) {
+      setSaleError('Veuillez saisir un acompte valide (supérieur à 0 et inférieur ou égal au total).');
+      return;
+    }
+
+    if (paymentMethod === 'CREDIT' && !customerNameInput.trim()) {
+      setSaleError('Veuillez renseigner le nom ou téléphone du client débiteur pour enregistrer ce crédit.');
       return;
     }
 
     setIsProcessing(true);
     try {
+      const acompteToSave = paymentMethod === 'ACOMPTE' || paymentMethod === 'CREDIT' ? currentAcompte : undefined;
+      const remainingToSave = paymentMethod === 'ACOMPTE' || paymentMethod === 'CREDIT' ? currentRemaining : undefined;
+      const customerToSave = customerNameInput.trim() || undefined;
+
       const result = await processSale(
         cart,
         paymentMethod,
-        paymentMethod === 'CASH' ? tenderedAmount : undefined
+        paymentMethod === 'CASH' ? tenderedAmount : undefined,
+        acompteToSave,
+        remainingToSave,
+        customerToSave
       );
 
       if (result.success) {
@@ -170,9 +206,12 @@ export const CashierView: React.FC = () => {
           cashier: cashierName,
           items: [...cart],
           paymentMethod,
-          totalAmount: cartTotalTTC,
+          totalAmount: cartTotal,
           tenderedAmount: paymentMethod === 'CASH' ? tenderedAmount : undefined,
           changeAmount: paymentMethod === 'CASH' ? changeToReturn : undefined,
+          acompteAmount: acompteToSave,
+          remainingAmount: remainingToSave,
+          customerName: customerToSave,
         });
         clearCart();
       } else {
@@ -323,11 +362,19 @@ export const CashierView: React.FC = () => {
             })}
           </div>
 
-          {filteredProducts.length === 0 && (
+          {products.length === 0 ? (
+            <div className="p-10 text-center bg-white border border-slate-200 rounded-2xl text-slate-400 text-xs space-y-2">
+              <ShoppingCart className="w-10 h-10 text-slate-300 mx-auto" />
+              <p className="font-bold text-slate-700 text-sm">Le catalogue est actuellement vide</p>
+              <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                Tous les produits fictifs ont été supprimés. Rendez-vous dans l'onglet <strong>Inventaire</strong> pour ajouter vos articles réels.
+              </p>
+            </div>
+          ) : filteredProducts.length === 0 ? (
             <div className="p-8 text-center bg-white border border-slate-200 rounded-2xl text-slate-400 text-xs">
               Aucun produit ne correspond à votre recherche.
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Right Column: Ticket / Cart / Checkout (5/12) */}
@@ -407,23 +454,32 @@ export const CashierView: React.FC = () => {
             )}
           </div>
 
-          {/* Pricing Totals */}
+          {/* Pricing Totals (No TVA - Direct Retail Prices) */}
           {cart.length > 0 && (
-            <div className="space-y-2 pt-3 border-t border-slate-200 text-xs">
-              <div className="flex justify-between text-slate-500">
-                <span>Total HT</span>
-                <span className="font-mono">{formatFCFA(cartTotalHT)}</span>
-              </div>
-              <div className="flex justify-between text-slate-500">
-                <span>TVA (18%)</span>
-                <span className="font-mono">{formatFCFA(cartTotalTVA)}</span>
-              </div>
-              <div className="flex justify-between items-baseline pt-2 border-t border-slate-200 text-base font-bold text-slate-900">
-                <span>Total TTC à Payer</span>
+            <div className="space-y-2.5 pt-3 border-t border-slate-200 text-xs">
+              <div className="flex justify-between items-baseline pt-1 text-base font-bold text-slate-900">
+                <span>Total à Payer</span>
                 <span className="font-mono text-xl text-blue-700">
-                  {formatFCFA(cartTotalTTC)}
+                  {formatFCFA(cartTotal)}
                 </span>
               </div>
+
+              {(paymentMethod === 'ACOMPTE' || paymentMethod === 'CREDIT') && (
+                <div className="p-3 bg-amber-50/90 border border-amber-200 rounded-xl space-y-1.5 text-xs">
+                  <div className="flex justify-between items-center text-slate-700">
+                    <span className="font-semibold">Acompte payé :</span>
+                    <span className="font-mono font-bold text-emerald-700 text-sm">
+                      {formatFCFA(currentAcompte)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-amber-900 font-bold border-t border-amber-200/70 pt-1.5">
+                    <span>Total restant :</span>
+                    <span className="font-mono text-base text-amber-800 font-black">
+                      {formatFCFA(currentRemaining)}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -433,11 +489,11 @@ export const CashierView: React.FC = () => {
               <label className="block text-xs font-semibold text-slate-700">
                 Mode de Règlement
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('CASH')}
-                  className={`p-2.5 rounded-xl border flex flex-col items-center gap-1 transition-all text-xs font-semibold ${
+                  className={`p-2 rounded-xl border flex flex-col items-center gap-1 transition-all text-[11px] font-semibold ${
                     paymentMethod === 'CASH'
                       ? 'border-blue-600 bg-blue-50 text-blue-800 shadow-2xs'
                       : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
@@ -448,20 +504,44 @@ export const CashierView: React.FC = () => {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setPaymentMethod('ACOMPTE')}
+                  className={`p-2 rounded-xl border flex flex-col items-center gap-1 transition-all text-[11px] font-semibold ${
+                    paymentMethod === 'ACOMPTE'
+                      ? 'border-emerald-600 bg-emerald-50 text-emerald-800 shadow-2xs'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <Clock className="w-4 h-4" />
+                  <span>Acompte</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('CREDIT')}
+                  className={`p-2 rounded-xl border flex flex-col items-center gap-1 transition-all text-[11px] font-semibold ${
+                    paymentMethod === 'CREDIT'
+                      ? 'border-amber-600 bg-amber-50 text-amber-900 shadow-2xs'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Crédit</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setPaymentMethod('CARD')}
-                  className={`p-2.5 rounded-xl border flex flex-col items-center gap-1 transition-all text-xs font-semibold ${
+                  className={`p-2 rounded-xl border flex flex-col items-center gap-1 transition-all text-[11px] font-semibold ${
                     paymentMethod === 'CARD'
                       ? 'border-blue-600 bg-blue-50 text-blue-800 shadow-2xs'
                       : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
                   }`}
                 >
                   <CreditCard className="w-4 h-4" />
-                  <span>Carte Bancaire</span>
+                  <span>Carte</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('TRANSFER')}
-                  className={`p-2.5 rounded-xl border flex flex-col items-center gap-1 transition-all text-xs font-semibold ${
+                  className={`p-2 rounded-xl border flex flex-col items-center gap-1 transition-all text-[11px] font-semibold ${
                     paymentMethod === 'TRANSFER'
                       ? 'border-blue-600 bg-blue-50 text-blue-800 shadow-2xs'
                       : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
@@ -479,7 +559,7 @@ export const CashierView: React.FC = () => {
                     <span>Montant Reçu du Client</span>
                     <button
                       type="button"
-                      onClick={() => setTenderedInput(cartTotalTTC.toString())}
+                      onClick={() => setTenderedInput(cartTotal.toString())}
                       className="text-[11px] text-blue-600 hover:underline"
                     >
                       Montant Exact
@@ -489,10 +569,10 @@ export const CashierView: React.FC = () => {
                     <input
                       type="number"
                       step="500"
-                      min={cartTotalTTC}
+                      min={cartTotal}
                       value={tenderedInput}
                       onChange={(e) => setTenderedInput(e.target.value)}
-                      placeholder={formatFCFA(cartTotalTTC)}
+                      placeholder={formatFCFA(cartTotal)}
                       className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
                     />
                     {[2000, 5000, 10000, 20000].map((bill) => (
@@ -521,6 +601,121 @@ export const CashierView: React.FC = () => {
                   )}
                 </div>
               )}
+
+              {/* Acompte Handler */}
+              {paymentMethod === 'ACOMPTE' && (
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Nom / Téléphone du Client <span className="text-slate-400 font-normal">(Recommandé)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={customerNameInput}
+                      onChange={(e) => setCustomerNameInput(e.target.value)}
+                      placeholder="Ex: M. Oumar Sawadogo (70 00 00 00)"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1">
+                      <span>Acompte payé</span>
+                      <span className="text-[11px] text-slate-500">Max: {formatFCFA(cartTotal)}</span>
+                    </div>
+                    <input
+                      type="number"
+                      step="500"
+                      min="0"
+                      max={cartTotal}
+                      value={acompteInput}
+                      onChange={(e) => setAcompteInput(e.target.value)}
+                      placeholder="Saisir l'acompte payé..."
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                    />
+                    <div className="flex gap-1.5 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => setAcompteInput(Math.round(cartTotal * 0.25).toString())}
+                        className="flex-1 py-1 px-1 bg-white border border-slate-200 rounded-lg text-[10px] font-mono hover:bg-slate-100"
+                      >
+                        25% ({formatFCFA(cartTotal * 0.25)})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAcompteInput(Math.round(cartTotal * 0.5).toString())}
+                        className="flex-1 py-1 px-1 bg-white border border-slate-200 rounded-lg text-[10px] font-mono hover:bg-slate-100"
+                      >
+                        50% ({formatFCFA(cartTotal * 0.5)})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAcompteInput(Math.round(cartTotal * 0.75).toString())}
+                        className="flex-1 py-1 px-1 bg-white border border-slate-200 rounded-lg text-[10px] font-mono hover:bg-slate-100"
+                      >
+                        75% ({formatFCFA(cartTotal * 0.75)})
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-xs space-y-1">
+                    <div className="flex justify-between text-slate-700">
+                      <span>Acompte payé :</span>
+                      <span className="font-mono font-bold text-emerald-800">{formatFCFA(currentAcompte)}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-amber-900 border-t border-emerald-200/60 pt-1">
+                      <span>Total restant :</span>
+                      <span className="font-mono text-sm text-amber-700">{formatFCFA(currentRemaining)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Crédit Handler */}
+              {paymentMethod === 'CREDIT' && (
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Nom / Téléphone du Client Débiteur <span className="text-rose-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={customerNameInput}
+                      onChange={(e) => setCustomerNameInput(e.target.value)}
+                      placeholder="Ex: M. Diallo Ibrahim (01 02 03 04)"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1">
+                      <span>Acompte payé (Optionnel)</span>
+                      <span className="text-[11px] text-slate-400">0 si crédit à 100%</span>
+                    </div>
+                    <input
+                      type="number"
+                      step="500"
+                      min="0"
+                      max={cartTotal}
+                      value={acompteInput}
+                      onChange={(e) => setAcompteInput(e.target.value)}
+                      placeholder="0 FCFA"
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                    />
+                  </div>
+
+                  <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs space-y-1">
+                    <div className="flex justify-between text-slate-700">
+                      <span>Acompte payé :</span>
+                      <span className="font-mono font-bold text-emerald-800">{formatFCFA(currentAcompte)}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-amber-900 border-t border-amber-200/60 pt-1">
+                      <span>Total restant :</span>
+                      <span className="font-mono text-sm text-amber-700">{formatFCFA(currentRemaining)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -534,11 +729,15 @@ export const CashierView: React.FC = () => {
           {/* Validation CTA */}
           <button
             type="button"
-            disabled={cart.length === 0 || isProcessing || isCashInsufficient}
+            disabled={cart.length === 0 || isProcessing || isCashInsufficient || isAcompteInvalid}
             onClick={handleCheckout}
             className={`w-full py-3.5 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-xs ${
-              cart.length === 0 || isProcessing || isCashInsufficient
+              cart.length === 0 || isProcessing || isCashInsufficient || isAcompteInvalid
                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                : paymentMethod === 'ACOMPTE'
+                ? 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-emerald-600/25'
+                : paymentMethod === 'CREDIT'
+                ? 'bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white shadow-amber-600/25'
                 : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-emerald-600/25'
             }`}
           >
@@ -546,7 +745,11 @@ export const CashierView: React.FC = () => {
             <span>
               {isProcessing
                 ? 'Enregistrement en cours...'
-                : `Encaisser & Valider (${formatFCFA(cartTotalTTC)})`}
+                : paymentMethod === 'ACOMPTE'
+                ? `Valider Acompte (${formatFCFA(currentAcompte)} payé | Restant: ${formatFCFA(currentRemaining)})`
+                : paymentMethod === 'CREDIT'
+                ? `Valider Vente à Crédit (Total Restant: ${formatFCFA(currentRemaining)})`
+                : `Encaisser & Valider (${formatFCFA(cartTotal)})`}
             </span>
           </button>
         </div>
@@ -585,18 +788,30 @@ export const CashierView: React.FC = () => {
             </div>
 
             {/* Financial Details */}
-            <div className="space-y-1 text-slate-600">
+            <div className="space-y-1.5 text-slate-600">
               <div className="flex justify-between">
                 <span>Mode règlement :</span>
                 <span className="font-bold text-slate-900">
                   {lastReceipt.paymentMethod === 'CASH'
                     ? 'Espèces'
+                    : lastReceipt.paymentMethod === 'ACOMPTE'
+                    ? 'Acompte'
+                    : lastReceipt.paymentMethod === 'CREDIT'
+                    ? 'Crédit'
                     : lastReceipt.paymentMethod === 'CARD'
                     ? 'Carte Bancaire'
-                    : 'Virement'}
+                    : 'Virement / Mobile Money'}
                 </span>
               </div>
-              {lastReceipt.tenderedAmount !== undefined && (
+
+              {lastReceipt.customerName && (
+                <div className="flex justify-between">
+                  <span>Client :</span>
+                  <span className="font-bold text-slate-900">{lastReceipt.customerName}</span>
+                </div>
+              )}
+
+              {lastReceipt.paymentMethod === 'CASH' && lastReceipt.tenderedAmount !== undefined && (
                 <>
                   <div className="flex justify-between">
                     <span>Reçu client :</span>
@@ -608,8 +823,22 @@ export const CashierView: React.FC = () => {
                   </div>
                 </>
               )}
+
+              {(lastReceipt.paymentMethod === 'ACOMPTE' || lastReceipt.paymentMethod === 'CREDIT') && (
+                <>
+                  <div className="flex justify-between font-semibold text-emerald-700">
+                    <span>Acompte payé :</span>
+                    <span className="font-mono">{formatFCFA(lastReceipt.acompteAmount || 0)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-amber-700">
+                    <span>Total restant :</span>
+                    <span className="font-mono">{formatFCFA(lastReceipt.remainingAmount || 0)}</span>
+                  </div>
+                </>
+              )}
+
               <div className="flex justify-between text-sm font-bold text-slate-900 pt-2 border-t border-slate-300">
-                <span>TOTAL TTC :</span>
+                <span>TOTAL :</span>
                 <span>{formatFCFA(lastReceipt.totalAmount)}</span>
               </div>
             </div>

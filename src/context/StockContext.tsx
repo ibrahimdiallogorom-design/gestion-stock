@@ -109,8 +109,12 @@ interface StockContextType {
   processSale: (
     items: CartItem[],
     paymentMethod: PaymentMethod,
-    customerTendered?: number
+    customerTendered?: number,
+    acompteAmount?: number,
+    remainingAmount?: number,
+    customerName?: string
   ) => Promise<{ success: boolean; ticketNumber: string; error?: string }>;
+  clearAllProducts: () => void;
   // Global Application Authentication & User Accounts
   activeAppUser: AppUser | null;
   appUsers: AppUser[];
@@ -146,19 +150,19 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const saved = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
       if (saved) {
         const parsed: Product[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          // If previous data used Euro amounts (e.g. salePrice <= 500), automatically migrate to FCFA
-          const hasEuroPrices = parsed.some((p) => p.salePrice > 0 && p.salePrice <= 500);
-          if (hasEuroPrices) {
-            const migrated = parsed.map((p) => ({
-              ...p,
-              costPrice: p.costPrice <= 500 ? Math.round(p.costPrice * 650) : p.costPrice,
-              salePrice: p.salePrice <= 500 ? Math.round(p.salePrice * 650) : p.salePrice,
-            }));
-            localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(migrated));
-            return migrated;
-          }
-          return parsed;
+        if (Array.isArray(parsed)) {
+          // Purge all fictional / demo products (prod-001 to prod-010, etc.)
+          const sanitized = parsed.filter(
+            (p) => !p.id.startsWith('prod-00') && !p.id.startsWith('prod-010')
+          );
+          // Migrate any remaining custom products to FCFA if needed
+          const migrated = sanitized.map((p) => ({
+            ...p,
+            costPrice: p.costPrice > 0 && p.costPrice <= 500 ? Math.round(p.costPrice * 650) : p.costPrice,
+            salePrice: p.salePrice > 0 && p.salePrice <= 500 ? Math.round(p.salePrice * 650) : p.salePrice,
+          }));
+          localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(migrated));
+          return migrated;
         }
       }
     } catch (e) {
@@ -172,17 +176,11 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const saved = localStorage.getItem(STORAGE_KEYS.MOVEMENTS);
       if (saved) {
         const parsed: StockMovement[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const hasEuroMovements = parsed.some((m) => m.saleAmount && m.saleAmount > 0 && m.saleAmount <= 500);
-          if (hasEuroMovements) {
-            const migrated = parsed.map((m) => ({
-              ...m,
-              saleAmount: m.saleAmount && m.saleAmount <= 500 ? Math.round(m.saleAmount * 650) : m.saleAmount,
-            }));
-            localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(migrated));
-            return migrated;
-          }
-          return parsed;
+        if (Array.isArray(parsed)) {
+          // Purge all fictional demo movements (mov-1001 to mov-1006)
+          const sanitized = parsed.filter((m) => !m.id.startsWith('mov-100'));
+          localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(sanitized));
+          return sanitized;
         }
       }
     } catch (e) {
@@ -770,10 +768,20 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setCashierSession((prev) => ({ ...prev, cashierName: clean }));
   };
 
+  const clearAllProducts = () => {
+    setProducts([]);
+    setMovements([]);
+    localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify([]));
+  };
+
   const processSale = async (
     items: CartItem[],
     paymentMethod: PaymentMethod,
-    customerTendered?: number
+    customerTendered?: number,
+    acompteAmount?: number,
+    remainingAmount?: number,
+    customerName?: string
   ): Promise<{ success: boolean; ticketNumber: string; error?: string }> => {
     if (!isCashierUnlocked) {
       return { success: false, ticketNumber: '', error: 'Session caisse verrouillée. Veuillez vous identifier.' };
@@ -799,9 +807,13 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const paymentLabel =
       paymentMethod === 'CASH'
         ? 'Espèces'
+        : paymentMethod === 'ACOMPTE'
+        ? 'Acompte'
+        : paymentMethod === 'CREDIT'
+        ? 'Crédit'
         : paymentMethod === 'CARD'
         ? 'Carte Bancaire'
-        : 'Virement';
+        : 'Virement / Mobile Money';
 
     let totalAmount = 0;
     const newMovements: StockMovement[] = [];
@@ -822,14 +834,17 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         quantityDelta: -soldItem.quantity,
         previousStock: prod.quantity,
         newStock: newQty,
-        reason: `Vente Caisse #${ticketNumber} (${paymentLabel})`,
+        reason: `Vente Caisse #${ticketNumber} (${paymentLabel}${customerName ? ` - ${customerName}` : ''})`,
         operator: activeAppUser?.fullName || cashierName,
-        notes: `Règlement ${paymentLabel} - Ticket ${ticketNumber}`,
+        notes: `Règlement ${paymentLabel}${paymentMethod === 'ACOMPTE' ? ` (Acompte payé: ${acompteAmount ?? 0} F, Restant: ${remainingAmount ?? 0} F)` : paymentMethod === 'CREDIT' ? ` (Crédit restant: ${remainingAmount ?? totalAmount} F)` : ''}${customerName ? ` - Client: ${customerName}` : ''} - Ticket ${ticketNumber}`,
         createdAt: now,
         storeName: activeAppUser?.storeName || 'Boutique VisionTech Centrale',
         ticketNumber: ticketNumber,
         saleAmount: subtotal,
         paymentMethod: paymentMethod,
+        acompteAmount: acompteAmount,
+        remainingAmount: remainingAmount,
+        customerName: customerName,
       });
 
       return {
@@ -1060,6 +1075,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         changeCashierPin,
         setCashierName,
         processSale,
+        clearAllProducts,
         // Modals
         movementModal,
         openMovementModal,

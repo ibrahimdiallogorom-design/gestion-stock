@@ -224,13 +224,13 @@ export const CardsGridView: React.FC = () => {
                 {/* Financial Summary */}
                 <div className="grid grid-cols-2 gap-2 text-xs pt-1">
                   <div>
-                    <span className="text-[10px] text-slate-400 block">Prix Achat HT</span>
+                    <span className="text-[10px] text-slate-400 block">Prix d'Achat</span>
                     <span className="font-mono tabular-nums text-slate-700 font-medium">
                       {Math.round(p.costPrice).toLocaleString('fr-FR')} F
                     </span>
                   </div>
                   <div className="text-right">
-                    <span className="text-[10px] text-slate-400 block">Prix Vente TTC</span>
+                    <span className="text-[10px] text-slate-400 block">Prix de Vente</span>
                     <span className="font-mono tabular-nums font-bold text-slate-900">
                       {Math.round(p.salePrice).toLocaleString('fr-FR')} F
                     </span>

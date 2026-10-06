@@ -284,8 +284,8 @@ export const InventoryView: React.FC = () => {
                   <th className="py-3 px-4">Catégorie</th>
                   <th className="py-3 px-4 text-right">Stock Actuel</th>
                   <th className="py-3 px-4 text-right">Seuil Min.</th>
-                  <th className="py-3 px-4 text-right">Prix Achat HT</th>
-                  <th className="py-3 px-4 text-right">Prix Vente TTC</th>
+                  <th className="py-3 px-4 text-right">Prix d'Achat</th>
+                  <th className="py-3 px-4 text-right">Prix de Vente</th>
                   <th className="py-3 px-4">Fournisseur</th>
                   <th className="py-3 px-4 text-center">Actions Rapides</th>
                 </tr>

@@ -15,8 +15,8 @@ export interface Product {
   category: string;
   quantity: number;
   minThreshold: number;
-  costPrice: number; // Prix d'achat HT (FCFA)
-  salePrice: number; // Prix de vente TTC (FCFA)
+  costPrice: number; // Prix d'achat (FCFA)
+  salePrice: number; // Prix de vente (FCFA)
   supplier: string;
   location?: string;
   lastUpdated: string;
@@ -39,6 +39,9 @@ export interface StockMovement {
   ticketNumber?: string;
   saleAmount?: number;
   paymentMethod?: PaymentMethod;
+  acompteAmount?: number; // Acompte payé
+  remainingAmount?: number; // Total restant (Crédit)
+  customerName?: string; // Nom du client (pour crédit / acompte)
 }
 
 export interface SheetsSyncState {
@@ -69,7 +72,7 @@ export interface CartItem {
   quantity: number;
 }
 
-export type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER';
+export type PaymentMethod = 'CASH' | 'ACOMPTE' | 'CREDIT' | 'CARD' | 'TRANSFER';
 
 export interface CashierSession {
   isUnlocked: boolean;

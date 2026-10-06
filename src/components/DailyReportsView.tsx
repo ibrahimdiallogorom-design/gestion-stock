@@ -111,6 +111,9 @@ export const DailyReportsView: React.FC = () => {
       cashier: string;
       paymentMethod: PaymentMethod;
       totalAmount: number;
+      acompteAmount?: number;
+      remainingAmount?: number;
+      customerName?: string;
       items: { name: string; quantity: number; amount: number }[];
     }>();
 
@@ -129,12 +132,18 @@ export const DailyReportsView: React.FC = () => {
           cashier,
           paymentMethod: payment,
           totalAmount: 0,
+          acompteAmount: m.acompteAmount,
+          remainingAmount: m.remainingAmount,
+          customerName: m.customerName,
           items: [],
         });
       }
 
       const ticket = map.get(ticketId)!;
       ticket.totalAmount += amount;
+      if (m.acompteAmount !== undefined) ticket.acompteAmount = m.acompteAmount;
+      if (m.remainingAmount !== undefined) ticket.remainingAmount = m.remainingAmount;
+      if (m.customerName) ticket.customerName = m.customerName;
       ticket.items.push({
         name: m.productName,
         quantity: Math.abs(m.quantityDelta),
@@ -244,14 +253,17 @@ export const DailyReportsView: React.FC = () => {
 
   // CSV Export
   const exportCSV = () => {
-    const headers = ['Date', 'Ticket', 'Boutique', 'Caissier', 'Mode de Paiement', 'Total (FCFA)', 'Articles'];
+    const headers = ['Date', 'Ticket', 'Boutique', 'Caissier', 'Client', 'Mode de Paiement', 'Total (FCFA)', 'Acompte Payé (FCFA)', 'Crédit Restant (FCFA)', 'Articles'];
     const rows = dailyTickets.map((t) => [
       new Date(t.timestamp).toLocaleString('fr-FR'),
       t.ticketNumber,
       `"${t.storeName}"`,
       `"${t.cashier}"`,
-      t.paymentMethod,
+      `"${t.customerName || 'Client comptoir'}"`,
+      t.paymentMethod === 'ACOMPTE' ? 'Acompte' : t.paymentMethod === 'CREDIT' ? 'Crédit' : t.paymentMethod === 'CASH' ? 'Espèces' : t.paymentMethod === 'CARD' ? 'Carte' : 'Virement',
       Math.round(t.totalAmount).toString(),
+      Math.round(t.acompteAmount ?? (t.paymentMethod === 'ACOMPTE' ? t.totalAmount : 0)).toString(),
+      Math.round(t.remainingAmount ?? (t.paymentMethod === 'CREDIT' ? t.totalAmount : 0)).toString(),
       `"${t.items.map((i) => `${i.name} (x${i.quantity})`).join(', ')}"`,
     ]);
 
@@ -422,6 +434,8 @@ export const DailyReportsView: React.FC = () => {
             >
               <option value="ALL">Tous les Modes de Règlement</option>
               <option value="CASH">Espèces uniquement</option>
+              <option value="ACOMPTE">Acomptes</option>
+              <option value="CREDIT">Ventes à Crédit</option>
               <option value="CARD">Carte Bancaire uniquement</option>
               <option value="TRANSFER">Virement / Mobile Money</option>
             </select>
@@ -685,11 +699,18 @@ export const DailyReportsView: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="text-[11px] text-slate-600">
-                      Articles :{' '}
-                      <span className="font-medium text-slate-800">
-                        {ticket.items.map((i) => `${i.name} (x${i.quantity})`).join(', ')}
+                    <div className="text-[11px] text-slate-600 flex flex-wrap items-center gap-x-2">
+                      <span>
+                        Articles :{' '}
+                        <span className="font-medium text-slate-800">
+                          {ticket.items.map((i) => `${i.name} (x${i.quantity})`).join(', ')}
+                        </span>
                       </span>
+                      {ticket.customerName && (
+                        <span className="text-amber-800 font-semibold bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
+                          👤 Client : {ticket.customerName}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -698,6 +719,10 @@ export const DailyReportsView: React.FC = () => {
                       className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         ticket.paymentMethod === 'CASH'
                           ? 'bg-emerald-100 text-emerald-800'
+                          : ticket.paymentMethod === 'ACOMPTE'
+                          ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                          : ticket.paymentMethod === 'CREDIT'
+                          ? 'bg-amber-100 text-amber-950 border border-amber-300'
                           : ticket.paymentMethod === 'CARD'
                           ? 'bg-blue-100 text-blue-800'
                           : 'bg-purple-100 text-purple-800'
@@ -705,6 +730,10 @@ export const DailyReportsView: React.FC = () => {
                     >
                       {ticket.paymentMethod === 'CASH'
                         ? 'Espèces'
+                        : ticket.paymentMethod === 'ACOMPTE'
+                        ? `Acompte (${formatMoney(ticket.acompteAmount ?? 0)} payé | Reste: ${formatMoney(ticket.remainingAmount ?? 0)})`
+                        : ticket.paymentMethod === 'CREDIT'
+                        ? `Crédit (Reste: ${formatMoney(ticket.remainingAmount ?? ticket.totalAmount)})`
                         : ticket.paymentMethod === 'CARD'
                         ? 'Carte Bancaire'
                         : 'Virement / Mobile'}

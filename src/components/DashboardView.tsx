@@ -84,7 +84,7 @@ export const DashboardView: React.FC = () => {
         {/* Card 1: Valorisation */}
         <div className="bg-white p-5 rounded-xl border border-slate-200">
           <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Valorisation Stock HT</span>
+            <span>Valeur Totale du Stock</span>
             <TrendingUp className="w-4 h-4 text-blue-600" />
           </div>
           <div className="mt-3">
@@ -93,7 +93,7 @@ export const DashboardView: React.FC = () => {
             </span>
           </div>
           <div className="mt-2 text-xs text-slate-500 flex items-center justify-between pt-2 border-t border-slate-100">
-            <span>Potentiel Vente TTC :</span>
+            <span>Potentiel de Vente :</span>
             <span className="font-mono tabular-nums font-semibold text-slate-700">
               {Math.round(totalRetailValue).toLocaleString('fr-FR')} FCFA
             </span>
@@ -336,7 +336,7 @@ export const DashboardView: React.FC = () => {
                 <th className="py-3 px-6">Catégorie</th>
                 <th className="py-3 px-6 text-right">Références</th>
                 <th className="py-3 px-6 text-right">Volume d'Unités</th>
-                <th className="py-3 px-6 text-right">Valeur Stock HT</th>
+                <th className="py-3 px-6 text-right">Valeur du Stock</th>
                 <th className="py-3 px-6 text-right">Part dans le stock</th>
               </tr>
             </thead>
