@@ -155,14 +155,16 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const sanitized = parsed.filter(
             (p) => !p.id.startsWith('prod-00') && !p.id.startsWith('prod-010')
           );
-          // Migrate any remaining custom products to FCFA if needed
-          const migrated = sanitized.map((p) => ({
+          // Clean products: ensure numeric safety without any artificial price multipliers
+          const cleanProducts = sanitized.map((p) => ({
             ...p,
-            costPrice: p.costPrice > 0 && p.costPrice <= 500 ? Math.round(p.costPrice * 650) : p.costPrice,
-            salePrice: p.salePrice > 0 && p.salePrice <= 500 ? Math.round(p.salePrice * 650) : p.salePrice,
+            quantity: Number(p.quantity) || 0,
+            minThreshold: Number(p.minThreshold) || 0,
+            costPrice: Number(p.costPrice) || 0,
+            salePrice: Number(p.salePrice) || 0,
           }));
-          localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(migrated));
-          return migrated;
+          localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(cleanProducts));
+          return cleanProducts;
         }
       }
     } catch (e) {

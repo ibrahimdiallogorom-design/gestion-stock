@@ -23,27 +23,48 @@ export const DashboardView: React.FC = () => {
     openProductModal,
   } = useStock();
 
-  // Metrics computation
-  const totalStockValue = products.reduce((acc, p) => acc + p.quantity * p.costPrice, 0);
-  const totalRetailValue = products.reduce((acc, p) => acc + p.quantity * p.salePrice, 0);
-  const totalUnits = products.reduce((acc, p) => acc + p.quantity, 0);
+  // Strict, verified financial calculations
+  const totalCostValue = products.reduce(
+    (acc, p) => acc + (Math.max(0, Number(p.quantity) || 0) * Math.max(0, Number(p.costPrice) || 0)),
+    0
+  );
+  const totalSaleValue = products.reduce(
+    (acc, p) => acc + (Math.max(0, Number(p.quantity) || 0) * Math.max(0, Number(p.salePrice) || 0)),
+    0
+  );
+  const totalUnits = products.reduce(
+    (acc, p) => acc + Math.max(0, Number(p.quantity) || 0),
+    0
+  );
+  const totalProfitExpected = Math.max(0, totalSaleValue - totalCostValue);
+  const marginPercentage = totalSaleValue > 0 ? (totalProfitExpected / totalSaleValue) * 100 : 0;
 
-  const outOfStockProducts = products.filter((p) => p.quantity === 0);
-  const criticalStockProducts = products.filter((p) => p.quantity > 0 && p.quantity <= p.minThreshold);
+  const outOfStockProducts = products.filter((p) => (Number(p.quantity) || 0) <= 0);
+  const criticalStockProducts = products.filter(
+    (p) => (Number(p.quantity) || 0) > 0 && (Number(p.quantity) || 0) <= (Number(p.minThreshold) || 0)
+  );
   const lowStockCount = outOfStockProducts.length + criticalStockProducts.length;
 
   // Movements in the last 7 days or total
   const recentMovements = movements.slice(0, 6);
-  const totalIn = movements.filter((m) => m.type === 'IN').reduce((acc, m) => acc + m.quantityDelta, 0);
-  const totalOut = movements.filter((m) => m.type === 'OUT').reduce((acc, m) => acc + Math.abs(m.quantityDelta), 0);
+  const totalIn = movements.filter((m) => m.type === 'IN').reduce((acc, m) => acc + Math.abs(Number(m.quantityDelta) || 0), 0);
+  const totalOut = movements.filter((m) => m.type === 'OUT').reduce((acc, m) => acc + Math.abs(Number(m.quantityDelta) || 0), 0);
 
-  // Group by category
-  const categories = Array.from(new Set(products.map((p) => p.category)));
+  // Group by category with verified mathematics
+  const categories = Array.from(new Set(products.map((p) => p.category?.trim() || 'Général')));
   const categoryStats = categories.map((cat) => {
-    const prods = products.filter((p) => p.category === cat);
-    const value = prods.reduce((acc, p) => acc + p.quantity * p.costPrice, 0);
-    const units = prods.reduce((acc, p) => acc + p.quantity, 0);
-    return { name: cat, count: prods.length, value, units };
+    const prods = products.filter((p) => (p.category?.trim() || 'Général') === cat);
+    const costVal = prods.reduce(
+      (acc, p) => acc + (Math.max(0, Number(p.quantity) || 0) * Math.max(0, Number(p.costPrice) || 0)),
+      0
+    );
+    const saleVal = prods.reduce(
+      (acc, p) => acc + (Math.max(0, Number(p.quantity) || 0) * Math.max(0, Number(p.salePrice) || 0)),
+      0
+    );
+    const units = prods.reduce((acc, p) => acc + Math.max(0, Number(p.quantity) || 0), 0);
+    const profit = Math.max(0, saleVal - costVal);
+    return { name: cat, count: prods.length, costVal, saleVal, units, profit };
   });
 
   return (
@@ -81,22 +102,32 @@ export const DashboardView: React.FC = () => {
 
       {/* 4 Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Valorisation */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Valeur Totale du Stock</span>
-            <TrendingUp className="w-4 h-4 text-blue-600" />
+        {/* Card 1: Valorisation Financière du Stock */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+              <span>Valeur Marchande (Prix Vente)</span>
+              <TrendingUp className="w-4 h-4 text-blue-600" />
+            </div>
+            <div className="mt-2.5">
+              <span className="text-2xl font-bold text-slate-900 font-mono tabular-nums">
+                {Math.round(totalSaleValue).toLocaleString('fr-FR')} FCFA
+              </span>
+            </div>
           </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-slate-900 font-mono tabular-nums">
-              {Math.round(totalStockValue).toLocaleString('fr-FR')} FCFA
-            </span>
-          </div>
-          <div className="mt-2 text-xs text-slate-500 flex items-center justify-between pt-2 border-t border-slate-100">
-            <span>Potentiel de Vente :</span>
-            <span className="font-mono tabular-nums font-semibold text-slate-700">
-              {Math.round(totalRetailValue).toLocaleString('fr-FR')} FCFA
-            </span>
+          <div className="mt-3 text-xs text-slate-500 space-y-1 pt-2 border-t border-slate-100 font-mono">
+            <div className="flex items-center justify-between">
+              <span className="font-sans text-[11px] text-slate-500">Coût d'Achat Réel :</span>
+              <span className="font-semibold text-slate-700">
+                {Math.round(totalCostValue).toLocaleString('fr-FR')} FCFA
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-emerald-700 font-semibold">
+              <span className="font-sans text-[11px]">Bénéfice estimé :</span>
+              <span>
+                +{Math.round(totalProfitExpected).toLocaleString('fr-FR')} F ({marginPercentage.toFixed(0)}%)
+              </span>
+            </div>
           </div>
         </div>
 
@@ -334,43 +365,59 @@ export const DashboardView: React.FC = () => {
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/75 text-slate-500 font-semibold uppercase tracking-wider">
                 <th className="py-3 px-6">Catégorie</th>
-                <th className="py-3 px-6 text-right">Références</th>
-                <th className="py-3 px-6 text-right">Volume d'Unités</th>
-                <th className="py-3 px-6 text-right">Valeur du Stock</th>
-                <th className="py-3 px-6 text-right">Part dans le stock</th>
+                <th className="py-3 px-4 text-right">Articles</th>
+                <th className="py-3 px-4 text-right">Unités</th>
+                <th className="py-3 px-4 text-right">Valeur d'Achat</th>
+                <th className="py-3 px-4 text-right">Valeur de Vente</th>
+                <th className="py-3 px-4 text-right text-emerald-700">Marge Brute</th>
+                <th className="py-3 px-6 text-right">Part Vente</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {categoryStats.map((cat) => {
-                const percentage = totalStockValue > 0 ? (cat.value / totalStockValue) * 100 : 0;
-                return (
-                  <tr key={cat.name} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3 px-6 font-medium text-slate-900">{cat.name}</td>
-                    <td className="py-3 px-6 text-right font-mono tabular-nums text-slate-600">
-                      {cat.count}
-                    </td>
-                    <td className="py-3 px-6 text-right font-mono tabular-nums text-slate-600">
-                      {cat.units}
-                    </td>
-                    <td className="py-3 px-6 text-right font-mono tabular-nums font-semibold text-slate-900">
-                      {Math.round(cat.value).toLocaleString('fr-FR')} FCFA
-                    </td>
-                    <td className="py-3 px-6 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <div className="w-16 bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                          <div
-                            className="bg-blue-600 h-full rounded-full"
-                            style={{ width: `${Math.min(100, percentage)}%` }}
-                          />
+              {categoryStats.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-10 text-center text-slate-400">
+                    Aucun article dans le catalogue. Cliquez sur « Ajouter une référence » pour enregistrer vos produits.
+                  </td>
+                </tr>
+              ) : (
+                categoryStats.map((cat) => {
+                  const percentage = totalSaleValue > 0 ? (cat.saleVal / totalSaleValue) * 100 : 0;
+                  return (
+                    <tr key={cat.name} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3 px-6 font-medium text-slate-900">{cat.name}</td>
+                      <td className="py-3 px-4 text-right font-mono tabular-nums text-slate-600">
+                        {cat.count}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono tabular-nums text-slate-600">
+                        {cat.units}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono tabular-nums text-slate-700">
+                        {Math.round(cat.costVal).toLocaleString('fr-FR')} F
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono tabular-nums font-bold text-slate-900">
+                        {Math.round(cat.saleVal).toLocaleString('fr-FR')} F
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono tabular-nums font-semibold text-emerald-700">
+                        +{Math.round(cat.profit).toLocaleString('fr-FR')} F
+                      </td>
+                      <td className="py-3 px-6 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="w-16 bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                            <div
+                              className="bg-blue-600 h-full rounded-full"
+                              style={{ width: `${Math.min(100, percentage)}%` }}
+                            />
+                          </div>
+                          <span className="font-mono tabular-nums text-slate-500 text-[11px] w-10 text-right">
+                            {percentage.toFixed(1)}%
+                          </span>
                         </div>
-                        <span className="font-mono tabular-nums text-slate-500 text-[11px] w-10 text-right">
-                          {percentage.toFixed(1)}%
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
