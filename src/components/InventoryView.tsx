@@ -13,6 +13,7 @@ import {
   Table as TableIcon,
   Columns3,
   SlidersVertical,
+  RotateCcw,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { Product } from '../types';
@@ -36,6 +37,8 @@ export const InventoryView: React.FC = () => {
     openProductModal,
     openConfirmModal,
     deleteProduct,
+    clearAllProducts,
+    repairInflatedPrices,
     setActiveTab,
   } = useStock();
 
@@ -75,6 +78,16 @@ export const InventoryView: React.FC = () => {
       () => deleteProduct(product.id),
       true,
       'Supprimer définitivement'
+    );
+  };
+
+  const handleClearAll = () => {
+    openConfirmModal(
+      'Vider complètement le stock ?',
+      'Cette action supprimera tous les articles actuellement enregistrés pour remettre votre catalogue à zéro (0 FCFA). Vous pourrez ensuite ajouter vos vrais articles sans aucune anomalie de calcul. Êtes-vous certain ?',
+      () => clearAllProducts(),
+      true,
+      'Oui, vider tout le stock (0 F)'
     );
   };
 
@@ -140,6 +153,17 @@ export const InventoryView: React.FC = () => {
               <span>Kanban</span>
             </button>
           </div>
+
+          {products.length > 0 && (
+            <button
+              onClick={handleClearAll}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg shadow-2xs transition-colors whitespace-nowrap"
+              title="Supprimer tous les articles du catalogue pour remettre les valeurs à 0"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Vider le stock (0 F)</span>
+            </button>
+          )}
 
           <button
             onClick={() => openProductModal()}

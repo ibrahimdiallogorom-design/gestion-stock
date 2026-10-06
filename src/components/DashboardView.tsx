@@ -21,6 +21,9 @@ export const DashboardView: React.FC = () => {
     setStockFilter,
     openMovementModal,
     openProductModal,
+    repairInflatedPrices,
+    clearAllProducts,
+    openConfirmModal,
   } = useStock();
 
   // Strict, verified financial calculations
@@ -99,6 +102,47 @@ export const DashboardView: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Anomaly Detection & Quick Fix Banner */}
+      {totalSaleValue > 5000000 && (
+        <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 text-amber-900 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-100 rounded-lg shrink-0">
+              <AlertTriangle className="w-5 h-5 text-amber-700" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-amber-950">
+                Montant total anormal détecté : {Math.round(totalSaleValue).toLocaleString('fr-FR')} FCFA
+              </p>
+              <p className="text-xs text-amber-800 mt-0.5">
+                Certains articles enregistrés précédemment ont pu conserver des prix multipliés. Vous pouvez soit corriger les prix gonflés, soit remettre le stock à 0 pour saisir vos vrais articles.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 w-full md:w-auto">
+            <button
+              onClick={() => repairInflatedPrices()}
+              className="flex-1 md:flex-initial px-3.5 py-2 text-xs font-semibold bg-white text-slate-800 border border-slate-300 hover:bg-slate-50 rounded-lg shadow-2xs transition-colors"
+            >
+              Corriger les prix (÷ 650)
+            </button>
+            <button
+              onClick={() => {
+                openConfirmModal(
+                  'Vider tout le stock ?',
+                  'Cette action supprimera tous les articles actuellement enregistrés pour remettre votre catalogue à zéro (0 FCFA). Vous pourrez ensuite saisir vos articles exacts sans anomalie.',
+                  () => clearAllProducts(),
+                  true,
+                  'Vider le stock (0 F)'
+                );
+              }}
+              className="flex-1 md:flex-initial px-3.5 py-2 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-2xs transition-colors"
+            >
+              Vider le stock (0 F)
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 4 Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -115,6 +115,7 @@ interface StockContextType {
     customerName?: string
   ) => Promise<{ success: boolean; ticketNumber: string; error?: string }>;
   clearAllProducts: () => void;
+  repairInflatedPrices: () => void;
   // Global Application Authentication & User Accounts
   activeAppUser: AppUser | null;
   appUsers: AppUser[];
@@ -155,14 +156,27 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const sanitized = parsed.filter(
             (p) => !p.id.startsWith('prod-00') && !p.id.startsWith('prod-010')
           );
-          // Clean products: ensure numeric safety without any artificial price multipliers
-          const cleanProducts = sanitized.map((p) => ({
-            ...p,
-            quantity: Number(p.quantity) || 0,
-            minThreshold: Number(p.minThreshold) || 0,
-            costPrice: Number(p.costPrice) || 0,
-            salePrice: Number(p.salePrice) || 0,
-          }));
+          // Clean products: heal any prices that were artificially multiplied by 650
+          const cleanProducts = sanitized.map((p) => {
+            let cost = Number(p.costPrice) || 0;
+            let sale = Number(p.salePrice) || 0;
+
+            // Auto-heal prices that were inflated by the 650 bug
+            while (cost >= 650 && cost % 650 === 0 && cost > 50000) {
+              cost = Math.round(cost / 650);
+            }
+            while (sale >= 650 && sale % 650 === 0 && sale > 50000) {
+              sale = Math.round(sale / 650);
+            }
+
+            return {
+              ...p,
+              quantity: Math.max(0, Number(p.quantity) || 0),
+              minThreshold: Math.max(0, Number(p.minThreshold) || 0),
+              costPrice: Math.max(0, cost),
+              salePrice: Math.max(0, sale),
+            };
+          });
           localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(cleanProducts));
           return cleanProducts;
         }
@@ -777,6 +791,26 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify([]));
   };
 
+  const repairInflatedPrices = () => {
+    const fixed = products.map((p) => {
+      let cost = Number(p.costPrice) || 0;
+      let sale = Number(p.salePrice) || 0;
+      while (cost >= 650 && cost % 650 === 0 && cost > 50000) {
+        cost = Math.round(cost / 650);
+      }
+      while (sale >= 650 && sale % 650 === 0 && sale > 50000) {
+        sale = Math.round(sale / 650);
+      }
+      return {
+        ...p,
+        costPrice: Math.max(0, cost),
+        salePrice: Math.max(0, sale),
+      };
+    });
+    setProducts(fixed);
+    localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(fixed));
+  };
+
   const processSale = async (
     items: CartItem[],
     paymentMethod: PaymentMethod,
@@ -1078,6 +1112,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setCashierName,
         processSale,
         clearAllProducts,
+        repairInflatedPrices,
         // Modals
         movementModal,
         openMovementModal,

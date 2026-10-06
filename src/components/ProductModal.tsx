@@ -11,10 +11,10 @@ export const ProductModal: React.FC = () => {
   const [sku, setSku] = useState('');
   const [name, setName] = useState('');
   const [category, setCategory] = useState('Mode & Textile');
-  const [quantity, setQuantity] = useState<number>(10);
-  const [minThreshold, setMinThreshold] = useState<number>(5);
-  const [costPrice, setCostPrice] = useState<number>(10.0);
-  const [salePrice, setSalePrice] = useState<number>(25.0);
+  const [quantity, setQuantity] = useState<number>(1);
+  const [minThreshold, setMinThreshold] = useState<number>(2);
+  const [costPrice, setCostPrice] = useState<number>(0);
+  const [salePrice, setSalePrice] = useState<number>(0);
   const [supplier, setSupplier] = useState('');
   const [location, setLocation] = useState('Rayon principal');
   const [error, setError] = useState<string | null>(null);
@@ -41,10 +41,10 @@ export const ProductModal: React.FC = () => {
         setSku(`${prefix}-${num}`);
         setName('');
         setCategory(existingCategories[0] || 'Mode & Textile');
-        setQuantity(10);
-        setMinThreshold(5);
-        setCostPrice(12.0);
-        setSalePrice(29.9);
+        setQuantity(1);
+        setMinThreshold(2);
+        setCostPrice(0);
+        setSalePrice(0);
         setSupplier('Fournisseur Direct');
         setLocation('Rayon A-01');
       }
@@ -244,10 +244,11 @@ export const ProductModal: React.FC = () => {
               </label>
               <input
                 type="number"
-                step="100"
+                step="any"
                 min="0"
                 value={costPrice}
-                onChange={(e) => setCostPrice(Number(e.target.value))}
+                onChange={(e) => setCostPrice(parseFloat(e.target.value) || 0)}
+                placeholder="Ex: 750"
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 font-mono tabular-nums text-slate-900"
               />
             </div>
@@ -258,10 +259,11 @@ export const ProductModal: React.FC = () => {
               </label>
               <input
                 type="number"
-                step="100"
+                step="any"
                 min="0"
                 value={salePrice}
-                onChange={(e) => setSalePrice(Number(e.target.value))}
+                onChange={(e) => setSalePrice(parseFloat(e.target.value) || 0)}
+                placeholder="Ex: 1250"
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 font-mono tabular-nums text-slate-900"
               />
             </div>

@@ -568,7 +568,7 @@ export const CashierView: React.FC = () => {
                   <div className="flex gap-2">
                     <input
                       type="number"
-                      step="500"
+                      step="any"
                       min={cartTotal}
                       value={tenderedInput}
                       onChange={(e) => setTenderedInput(e.target.value)}
@@ -625,7 +625,7 @@ export const CashierView: React.FC = () => {
                     </div>
                     <input
                       type="number"
-                      step="500"
+                      step="any"
                       min="0"
                       max={cartTotal}
                       value={acompteInput}
@@ -694,7 +694,7 @@ export const CashierView: React.FC = () => {
                     </div>
                     <input
                       type="number"
-                      step="500"
+                      step="any"
                       min="0"
                       max={cartTotal}
                       value={acompteInput}
