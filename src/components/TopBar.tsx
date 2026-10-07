@@ -158,15 +158,14 @@ export const TopBar: React.FC = () => {
           <span className="hidden sm:inline">Rapports</span>
         </button>
 
-        {/* Installer l'App / Télécharger APK Modal Button */}
+        {/* APPS Modal Button */}
         <button
           onClick={openInstallModal}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xs"
-          title="Installer l'application sur votre téléphone ou télécharger l'APK pour WhatsApp et Xender"
+          title="Installer l'application sur votre téléphone ou partager l'accès"
         >
           <Smartphone className="w-3.5 h-3.5 text-white" />
-          <span className="hidden sm:inline">Installer l'App</span>
-          <span className="sm:hidden">App</span>
+          <span>APPS</span>
         </button>
 
         {/* Direct Link to Design System & Theme Inspector (Admin only) */}

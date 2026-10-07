@@ -142,14 +142,6 @@ const AppContent: React.FC = () => {
               <Users className="w-4 h-4" />
               <span>Compte</span>
             </button>
-            <button
-              onClick={openInstallModal}
-              className="flex flex-col items-center py-1 px-1.5 text-[10px] text-indigo-600 hover:text-indigo-700 font-bold"
-              title="Installer l'application sur le téléphone ou télécharger l'APK"
-            >
-              <Smartphone className="w-4 h-4" />
-              <span>Installer</span>
-            </button>
           </>
         ) : (
           <>
@@ -197,12 +189,13 @@ const AppContent: React.FC = () => {
               <span>Compte</span>
             </button>
             <button
-              onClick={openInstallModal}
-              className="flex flex-col items-center py-1 px-1.5 text-[10px] text-indigo-600 hover:text-indigo-700 font-bold"
-              title="Installer l'application sur le téléphone ou télécharger l'APK"
+              onClick={() => setActiveTab('settings')}
+              className={`flex flex-col items-center py-1 px-1.5 text-[10px] ${
+                activeTab === 'settings' ? 'text-blue-600 font-bold' : 'text-slate-500'
+              }`}
             >
-              <Smartphone className="w-4 h-4" />
-              <span>Installer</span>
+              <Settings className="w-4 h-4" />
+              <span>Paramètres</span>
             </button>
           </>
         )}
