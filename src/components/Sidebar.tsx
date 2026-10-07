@@ -183,10 +183,9 @@ export const Sidebar: React.FC = () => {
         <div className="p-4 border-b border-slate-200 shrink-0 space-y-2.5">
           <div className="flex items-center gap-3">
             <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-xs"
-              style={{ backgroundColor: currentTheme.accentColor }}
+              className="w-10 h-10 rounded-xl flex items-center justify-center p-1 shadow-sm bg-white border border-slate-200 overflow-hidden shrink-0"
             >
-              <Boxes className="w-5 h-5" />
+              <img src="./icon.png" alt="Logo Vision Tech" className="w-full h-full object-contain" />
             </div>
             <div className="min-w-0">
               <span className="text-sm font-bold tracking-tight text-slate-900 block leading-tight truncate">

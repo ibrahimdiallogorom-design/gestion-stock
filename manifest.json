@@ -1,6 +1,6 @@
 {
-  "name": "Boutique Moussa Vision - Gestion de Stock",
-  "short_name": "StockFlow",
+  "name": "Boutique VisionTech - Gestion de Stock",
+  "short_name": "VisionTech",
   "description": "Application de gestion de stock, encaissement caisse et multi-boutiques avec synchronisation Cloud automatique",
   "start_url": "./",
   "scope": "./",

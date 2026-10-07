@@ -55,10 +55,9 @@ export const LoginScreen: React.FC = () => {
       </div>
 
       <div className="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-3xl shadow-2xl p-6 sm:p-8 backdrop-blur-xl relative z-10 space-y-6">
-        {/* Brand & Security Header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-lg shadow-emerald-500/10 mb-1">
-            <Boxes className="w-7 h-7" />
+          <div className="inline-flex items-center justify-center w-24 h-24 rounded-2xl bg-white border border-emerald-500/30 shadow-xl shadow-emerald-500/10 mb-2 p-1.5 overflow-hidden">
+            <img src="./icon.png" alt="Logo Vision Tech" className="w-full h-full object-contain" />
           </div>
 
           <h1 className="text-2xl font-extrabold tracking-tight text-white">
