@@ -14,6 +14,7 @@ import {
   User,
   Receipt,
   Users,
+  Cloud,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { THEME_CONFIGS } from './ThemeClasses';
@@ -33,6 +34,9 @@ export const TopBar: React.FC = () => {
     activeAppUser,
     logoutAppUser,
     openSwitchAccountModal,
+    cloudStatus,
+    cloudStatusMessage,
+    forceSyncCloud,
   } = useStock();
 
   const currentTheme = THEME_CONFIGS[theme];
@@ -81,6 +85,32 @@ export const TopBar: React.FC = () => {
             </span>
           </span>
         )}
+
+        {/* Real-time Cloud Firestore Multi-Device Live Indicator */}
+        <button
+          type="button"
+          onClick={forceSyncCloud}
+          className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all ${
+            cloudStatus === 'connected'
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+              : cloudStatus === 'connecting'
+              ? 'bg-blue-50 text-blue-800 border-blue-200 animate-pulse'
+              : 'bg-slate-100 text-slate-700 border-slate-200'
+          }`}
+          title="Synchronisation Cloud en direct active. Cliquez pour forcer une synchronisation instantanée."
+        >
+          <span
+            className={`w-2 h-2 rounded-full ${
+              cloudStatus === 'connected'
+                ? 'bg-emerald-500 animate-pulse'
+                : cloudStatus === 'connecting'
+                ? 'bg-blue-500 animate-spin'
+                : 'bg-slate-400'
+            }`}
+          />
+          <Cloud className="w-3.5 h-3.5 text-blue-600" />
+          <span>{cloudStatus === 'connected' ? 'Cloud Synchro En Direct' : cloudStatusMessage}</span>
+        </button>
       </div>
 
       {/* Action Zone */}
@@ -100,7 +130,9 @@ export const TopBar: React.FC = () => {
           {isCashierUnlocked ? (
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Caisse ouverte" />
           ) : (
-            <Lock className="w-3 h-3 text-slate-400" title="Protégée par code PIN" />
+            <span title="Protégée par code PIN" className="inline-flex items-center">
+              <Lock className="w-3 h-3 text-slate-400" />
+            </span>
           )}
         </button>
 

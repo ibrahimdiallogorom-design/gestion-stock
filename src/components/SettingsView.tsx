@@ -21,6 +21,8 @@ import {
   Pencil,
   Trash2,
   Shield,
+  Cloud,
+  RefreshCw,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { THEME_CONFIGS } from './ThemeClasses';
@@ -49,6 +51,9 @@ export const SettingsView: React.FC = () => {
     updateAppUser,
     createAppUser,
     deleteAppUser,
+    cloudStatus,
+    cloudStatusMessage,
+    forceSyncCloud,
   } = useStock();
 
   const [storeName, setStoreName] = useState('Boutique VisionTech');
@@ -235,6 +240,68 @@ export const SettingsView: React.FC = () => {
           <span className="font-medium">Paramètres enregistrés avec succès.</span>
         </div>
       )}
+
+      {/* Cloud Sync Status & Multi-Device Settings */}
+      <div className="bg-gradient-to-br from-blue-900 to-indigo-950 text-white rounded-2xl p-6 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-blue-300">
+              <Cloud className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white">
+                Synchronisation Cloud Multi-Appareils
+              </h2>
+              <p className="text-xs text-blue-200">
+                Vos comptes, catalogues et ventes sont accessibles partout et de n'importe où.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 ${
+              cloudStatus === 'connected'
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${
+                cloudStatus === 'connected' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+              }`} />
+              {cloudStatus === 'connected' ? 'En direct' : cloudStatusMessage}
+            </span>
+
+            <button
+              type="button"
+              onClick={forceSyncCloud}
+              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 active:bg-white/30 text-white rounded-xl text-xs font-semibold border border-white/20 transition-all flex items-center gap-1.5"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Forcer Synchro</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1">
+          <div className="p-3 bg-white/5 rounded-xl border border-white/10 space-y-1">
+            <span className="text-blue-300 font-semibold block">📱 Multi-Téléphones</span>
+            <p className="text-slate-300 text-[11px]">
+              Chaque modification de compte ou de mot de passe est envoyée au Cloud et reconnue immédiatement sur vos autres téléphones.
+            </p>
+          </div>
+          <div className="p-3 bg-white/5 rounded-xl border border-white/10 space-y-1">
+            <span className="text-blue-300 font-semibold block">🔄 Temps Réel</span>
+            <p className="text-slate-300 text-[11px]">
+              Quand le magasin central distribue des produits, les caissiers les reçoivent en direct sur leurs terminaux sans recharger la page.
+            </p>
+          </div>
+          <div className="p-3 bg-white/5 rounded-xl border border-white/10 space-y-1">
+            <span className="text-blue-300 font-semibold block">🛡️ Sauvegarde Sécurisée</span>
+            <p className="text-slate-300 text-[11px]">
+              En cas de perte de téléphone ou de changement d'appareil, connectez-vous avec vos identifiants pour retrouver l'intégralité de votre boutique.
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* 1. General Store Settings */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-5">

@@ -19,6 +19,7 @@ import {
 import { INITIAL_PRODUCTS, INITIAL_MOVEMENTS, INITIAL_SUPPLIERS } from '../data/initialData';
 import { initAuth, googleSignIn, logout, getAccessToken } from '../services/firebaseAuth';
 import { pushDataToSheets, pullDataFromSheets, createSpreadsheetWithTemplate, extractSpreadsheetId } from '../services/googleSheets';
+import { initCloudSync, pushToCloud, CloudSyncStatus, getDeviceId } from '../services/cloudSync';
 import { User } from 'firebase/auth';
 
 interface StockContextType {
@@ -148,6 +149,10 @@ interface StockContextType {
   openSwitchAccountModal: () => void;
   closeSwitchAccountModal: () => void;
   switchAccountFast: (userId: string) => { success: boolean; message?: string };
+  // Real-time Cloud Sync (Firestore)
+  cloudStatus: CloudSyncStatus;
+  cloudStatusMessage: string;
+  forceSyncCloud: () => Promise<void>;
 }
 
 const StockContext = createContext<StockContextType | undefined>(undefined);
@@ -469,6 +474,85 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem(STORAGE_KEYS.SHEETS_CONFIG, JSON.stringify(sheetsSync));
   }, [sheetsSync]);
 
+  // Cloud Sync Status states
+  const [cloudStatus, setCloudStatus] = useState<CloudSyncStatus>('connecting');
+  const [cloudStatusMessage, setCloudStatusMessage] = useState<string>('Connexion Cloud...');
+
+  // Initialize Real-time Multi-Device Cloud Sync via Firebase Firestore
+  useEffect(() => {
+    const unsubCloud = initCloudSync({
+      onRemoteData: (remote) => {
+        const myDeviceId = getDeviceId();
+        // If the update came from another device or on initial load
+        if (remote.lastDeviceId !== myDeviceId) {
+          if (remote.appUsers && Array.isArray(remote.appUsers) && remote.appUsers.length > 0) {
+            setAppUsers(remote.appUsers);
+            localStorage.setItem(STORAGE_KEYS.APP_USERS, JSON.stringify(remote.appUsers));
+            // Keep active user synchronized if currently logged in
+            setActiveAppUser((current) => {
+              if (!current) return null;
+              const matching = remote.appUsers!.find((u) => u.id === current.id || u.username.toLowerCase() === current.username.toLowerCase());
+              if (matching) {
+                localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(matching));
+                return matching;
+              }
+              return current;
+            });
+          }
+          if (remote.products && Array.isArray(remote.products) && remote.products.length > 0) {
+            setProducts(remote.products);
+            localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(remote.products));
+          }
+          if (remote.movements && Array.isArray(remote.movements)) {
+            setMovements(remote.movements);
+            localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(remote.movements));
+          }
+          if (remote.cashierPin) {
+            setCashierPinState(remote.cashierPin);
+            localStorage.setItem(STORAGE_KEYS.CASHIER_PIN, remote.cashierPin);
+          }
+          if (remote.cashierName) {
+            setCashierNameState(remote.cashierName);
+            localStorage.setItem(STORAGE_KEYS.CASHIER_NAME, remote.cashierName);
+          }
+        }
+
+        // If cloud does not have users yet, seed cloud from this local device!
+        if (!remote.appUsers || remote.appUsers.length === 0) {
+          pushToCloud({
+            appUsers,
+            products,
+            movements,
+            cashierPin,
+            cashierName,
+            storeName: 'Boutique VisionTech',
+          });
+        }
+      },
+      onStatusChange: (status, details) => {
+        setCloudStatus(status);
+        if (details) setCloudStatusMessage(details);
+      },
+    });
+
+    return () => unsubCloud();
+  }, []);
+
+  const forceSyncCloud = async () => {
+    setCloudStatus('connecting');
+    setCloudStatusMessage('Synchronisation Cloud en cours...');
+    await pushToCloud({
+      appUsers,
+      products,
+      movements,
+      cashierPin,
+      cashierName,
+      storeName: 'Boutique VisionTech',
+    });
+    setCloudStatus('connected');
+    setCloudStatusMessage('Données synchronisées dans le Cloud');
+  };
+
   // Init Firebase Auth on mount
   useEffect(() => {
     const unsubscribe = initAuth(
@@ -695,6 +779,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     setProducts(updatedProducts);
     setMovements(updatedMovements);
+    pushToCloud({ products: updatedProducts, movements: updatedMovements });
 
     // Auto-sync if configured and token available
     if (sheetsSync.autoSync && sheetsSync.spreadsheetId && hasGoogleToken) {
@@ -748,6 +833,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     setProducts(updatedProducts);
+    pushToCloud({ products: updatedProducts, movements: updatedMovements });
 
     if (sheetsSync.autoSync && sheetsSync.spreadsheetId && hasGoogleToken) {
       const token = await getAccessToken();
@@ -765,6 +851,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       p.id === id ? { ...p, ...updates, lastUpdated: now } : p
     );
     setProducts(updatedProducts);
+    pushToCloud({ products: updatedProducts });
 
     if (sheetsSync.autoSync && sheetsSync.spreadsheetId && hasGoogleToken) {
       const token = await getAccessToken();
@@ -779,6 +866,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const deleteProduct = async (id: string) => {
     const updatedProducts = products.filter((p) => p.id !== id);
     setProducts(updatedProducts);
+    pushToCloud({ products: updatedProducts });
 
     if (sheetsSync.autoSync && sheetsSync.spreadsheetId && hasGoogleToken) {
       const token = await getAccessToken();
@@ -840,6 +928,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return u;
       });
       localStorage.setItem(STORAGE_KEYS.APP_USERS, JSON.stringify(updated));
+      pushToCloud({ cashierPin: cleanPin, appUsers: updated });
       return updated;
     });
 
@@ -867,6 +956,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return u;
       });
       localStorage.setItem(STORAGE_KEYS.APP_USERS, JSON.stringify(updated));
+      pushToCloud({ cashierName: clean, appUsers: updated });
       return updated;
     });
 
@@ -882,6 +972,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setMovements([]);
     localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify([]));
+    pushToCloud({ products: [], movements: [] });
   };
 
   const repairInflatedPrices = () => {
@@ -902,6 +993,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
     setProducts(fixed);
     localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(fixed));
+    pushToCloud({ products: fixed });
   };
 
   const distributeProduct = async (
@@ -971,6 +1063,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const updatedMovements = [movement, ...movements];
     setMovements(updatedMovements);
+    pushToCloud({ products: updatedProducts, movements: updatedMovements });
 
     if (sheetsSync.autoSync && sheetsSync.spreadsheetId && hasGoogleToken) {
       const token = await getAccessToken();
@@ -1047,6 +1140,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const updatedMovements = [movement, ...movements];
     setMovements(updatedMovements);
+    pushToCloud({ products: updatedProducts, movements: updatedMovements });
 
     return {
       success: true,
@@ -1158,6 +1252,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setProducts(updatedProducts);
     const updatedMovements = [...newMovements, ...movements];
     setMovements(updatedMovements);
+    pushToCloud({ products: updatedProducts, movements: updatedMovements });
 
     setCashierSession((prev) => ({
       ...prev,
@@ -1229,6 +1324,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const updated = appUsers.map((u) => (u.id === id ? { ...u, ...updates } : u));
     setAppUsers(updated);
     localStorage.setItem(STORAGE_KEYS.APP_USERS, JSON.stringify(updated));
+    pushToCloud({ appUsers: updated });
 
     if (activeAppUser && activeAppUser.id === id) {
       const refreshed = { ...activeAppUser, ...updates };
@@ -1255,6 +1351,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const nextUsers = [...appUsers, newUser];
     setAppUsers(nextUsers);
     localStorage.setItem(STORAGE_KEYS.APP_USERS, JSON.stringify(nextUsers));
+    pushToCloud({ appUsers: nextUsers });
     return { success: true, message: 'Utilisateur créé avec succès.' };
   };
 
@@ -1265,6 +1362,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const nextUsers = appUsers.filter((u) => u.id !== id);
     setAppUsers(nextUsers);
     localStorage.setItem(STORAGE_KEYS.APP_USERS, JSON.stringify(nextUsers));
+    pushToCloud({ appUsers: nextUsers });
     if (activeAppUser?.id === id) {
       logoutAppUser();
     }
@@ -1400,6 +1498,10 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setCategoryFilter,
         stockFilter,
         setStockFilter,
+        // Real-time Cloud Sync
+        cloudStatus,
+        cloudStatusMessage,
+        forceSyncCloud,
       }}
     >
       {children}

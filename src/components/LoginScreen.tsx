@@ -10,11 +10,12 @@ import {
   ArrowRight,
   ShieldAlert,
   Store,
+  Cloud,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 
 export const LoginScreen: React.FC = () => {
-  const { loginAppUser, appUsers } = useStock();
+  const { loginAppUser, appUsers, cloudStatus, cloudStatusMessage } = useStock();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -67,9 +68,22 @@ export const LoginScreen: React.FC = () => {
             Plateforme sécurisée de gestion de stock, encaissement & comptabilité.
           </p>
 
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-800/80 border border-slate-700/60 rounded-full text-[11px] text-emerald-400 font-medium mt-1">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Accès Protégé & Chiffré</span>
+          <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-800/80 border border-slate-700/60 rounded-full text-[11px] text-emerald-400 font-medium">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Accès Protégé</span>
+            </div>
+
+            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium border transition-all ${
+              cloudStatus === 'connected'
+                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                : cloudStatus === 'connecting'
+                ? 'bg-blue-950/40 border-blue-500/40 text-blue-300 animate-pulse'
+                : 'bg-slate-800/80 border-slate-700/60 text-slate-400'
+            }`}>
+              <Cloud className="w-3.5 h-3.5" />
+              <span>{cloudStatus === 'connected' ? 'Cloud Synchro Partout' : cloudStatusMessage}</span>
+            </div>
           </div>
         </div>
 
@@ -181,8 +195,8 @@ export const LoginScreen: React.FC = () => {
             ))}
           </div>
 
-          <p className="text-[10px] text-slate-500 text-center pt-1 leading-relaxed">
-            Vos identifiants personnalisés sont enregistrés localement sur cet appareil.
+          <p className="text-[10px] text-slate-400 text-center pt-1 leading-relaxed">
+            ☁️ <strong>Synchronisation Cloud :</strong> Les comptes configurés sur un téléphone sont reconnus et utilisables sur tous vos téléphones et ordinateurs.
           </p>
         </div>
       </div>

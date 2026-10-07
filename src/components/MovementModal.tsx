@@ -111,6 +111,11 @@ export const MovementModal: React.FC = () => {
       'Retour de prêt ou démonstration',
       'Retour fournisseur suite à refus',
     ],
+    TRANSFER: [
+      'Dotation stock vendeur / caisse',
+      'Retour stock central magasin',
+      'Transfert inter-boutique',
+    ],
   };
 
   return (
