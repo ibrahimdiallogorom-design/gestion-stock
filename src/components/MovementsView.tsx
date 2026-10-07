@@ -13,12 +13,26 @@ import { useStock } from '../context/StockContext';
 import { MovementType } from '../types';
 
 export const MovementsView: React.FC = () => {
-  const { movements, openMovementModal } = useStock();
+  const { movements, openMovementModal, activeAppUser } = useStock();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<MovementType | 'all'>('all');
 
+  const isCashier = activeAppUser?.role === 'CASHIER';
+
   const filteredMovements = useMemo(() => {
     return movements.filter((m) => {
+      // Cloisonnement strict Caissier : uniquement ses propres mouvements/ventes
+      if (isCashier && activeAppUser) {
+        const myName = (activeAppUser.fullName || '').toLowerCase();
+        const myUser = (activeAppUser.username || '').toLowerCase();
+        const op = (m.operator || '').toLowerCase();
+        const matchesMe =
+          (myName && op.includes(myName)) ||
+          (myUser && op.includes(myUser)) ||
+          m.targetUserId === activeAppUser.id;
+        if (!matchesMe) return false;
+      }
+
       const matchSearch =
         m.productName.toLowerCase().includes(search.toLowerCase()) ||
         m.productSku.toLowerCase().includes(search.toLowerCase()) ||
@@ -29,7 +43,7 @@ export const MovementsView: React.FC = () => {
 
       return matchSearch && matchType;
     });
-  }, [movements, search, typeFilter]);
+  }, [movements, search, typeFilter, isCashier, activeAppUser]);
 
   const exportCsv = () => {
     const headers = [
@@ -81,10 +95,12 @@ export const MovementsView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Grand Livre des Mouvements de Stock
+            {isCashier ? 'Mes Opérations & Historique Ventes' : 'Grand Livre des Mouvements de Stock'}
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Traçabilité complète et inaltérable de toutes les entrées, sorties, retours et inventaires.
+            {isCashier
+              ? `Historique de vos ventes et réceptions pour ${activeAppUser?.storeName || 'votre boutique'}.`
+              : 'Traçabilité complète et inaltérable de toutes les entrées, sorties, retours et inventaires.'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -95,13 +111,15 @@ export const MovementsView: React.FC = () => {
             <Download className="w-4 h-4 text-slate-500" />
             <span>Exporter CSV</span>
           </button>
-          <button
-            onClick={() => openMovementModal()}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs shadow-blue-600/20 transition-colors whitespace-nowrap"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Consigner une transaction</span>
-          </button>
+          {!isCashier && (
+            <button
+              onClick={() => openMovementModal()}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs shadow-blue-600/20 transition-colors whitespace-nowrap"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Consigner une transaction</span>
+            </button>
+          )}
         </div>
       </div>
 

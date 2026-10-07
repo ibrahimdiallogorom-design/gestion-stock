@@ -13,6 +13,10 @@ import {
   Store,
   Building2,
   Share2,
+  Receipt,
+  CheckCircle2,
+  ShieldCheck,
+  Tag,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 
@@ -125,6 +129,221 @@ export const DashboardView: React.FC = () => {
       return { cashier, units, costVal, saleVal };
     });
   }, [cashiers, products]);
+
+  if (isCashier) {
+    const myAssignedProducts = products.filter(
+      (p) => (p.distributedQuantities?.[activeAppUser?.id || ''] || 0) > 0
+    );
+    const myTotalAssignedUnits = myAssignedProducts.reduce(
+      (acc, p) => acc + (p.distributedQuantities?.[activeAppUser?.id || ''] || 0),
+      0
+    );
+    const myTotalSaleValue = myAssignedProducts.reduce(
+      (acc, p) =>
+        acc +
+        (p.distributedQuantities?.[activeAppUser?.id || ''] || 0) * (Number(p.salePrice) || 0),
+      0
+    );
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const mySalesToday = movements.filter((m) => {
+      const isToday = m.createdAt.startsWith(todayStr);
+      const isSale =
+        m.type === 'OUT' && (m.ticketNumber || m.reason.toLowerCase().includes('vente'));
+      const op = (m.operator || '').toLowerCase();
+      const isMe =
+        op.includes(activeAppUser?.fullName?.toLowerCase() || '') ||
+        op.includes(activeAppUser?.username?.toLowerCase() || '') ||
+        m.targetUserId === activeAppUser?.id;
+      return isToday && isSale && isMe;
+    });
+
+    const myTodaySalesAmount = mySalesToday.reduce(
+      (sum, m) => sum + (m.saleAmount || Math.abs(m.quantityDelta) * (m.unitPrice || 0)),
+      0
+    );
+    const myTicketsCount = new Set(mySalesToday.map((m) => m.ticketNumber || m.id)).size;
+
+    return (
+      <div className="p-4 sm:p-8 space-y-6 max-w-7xl mx-auto">
+        {/* Header Caissier */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                <Store className="w-3 h-3" />
+                {activeAppUser?.storeName || 'Ma Boutique'}
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                Session Vendeur / Caissier
+              </span>
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              Bienvenue, {activeAppUser?.fullName || activeAppUser?.username}
+            </h1>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Suivi en temps réel de votre stock en boutique et de vos encaissements du jour.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setActiveTab('caisse')}
+              className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm shadow-emerald-600/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              <span>Ouvrir la Caisse / Vendre</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 3 Metric Cards pour Caissier (Prix de Vente Uniquement, 0 Prix d'Achat) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+              <span>Articles en Boutique</span>
+              <div className="p-2 bg-blue-50 rounded-lg">
+                <Boxes className="w-4 h-4 text-blue-600" />
+              </div>
+            </div>
+            <div className="mt-2.5">
+              <span className="text-3xl font-bold text-slate-900 font-mono tabular-nums">
+                {myTotalAssignedUnits}
+              </span>
+              <span className="text-xs text-slate-500 ml-2 font-medium">
+                unités ({myAssignedProducts.length} références)
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-slate-400">
+              Marchandises reçues du Grand Magasin
+            </p>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+              <span>Valeur de mon Stock (Prix de Vente)</span>
+              <div className="p-2 bg-emerald-50 rounded-lg">
+                <Tag className="w-4 h-4 text-emerald-600" />
+              </div>
+            </div>
+            <div className="mt-2.5">
+              <span className="text-2xl sm:text-3xl font-bold text-emerald-700 font-mono tabular-nums">
+                {Math.round(myTotalSaleValue).toLocaleString('fr-FR')} FCFA
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-slate-400">
+              Chiffre d'affaires potentiel de votre boutique
+            </p>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+              <span>Mes Ventes du Jour</span>
+              <div className="p-2 bg-purple-50 rounded-lg">
+                <Receipt className="w-4 h-4 text-purple-600" />
+              </div>
+            </div>
+            <div className="mt-2.5">
+              <span className="text-2xl sm:text-3xl font-bold text-slate-900 font-mono tabular-nums">
+                {Math.round(myTodaySalesAmount).toLocaleString('fr-FR')} FCFA
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-slate-500 font-medium">
+              {myTicketsCount} ticket(s) encaissé(s) aujourd'hui
+            </p>
+          </div>
+        </div>
+
+        {/* Notice de confidentialité */}
+        <div className="flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600">
+          <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+          <span>
+            <strong>Confidentialité garantie :</strong> Seuls les produits alloués à votre boutique vous sont présentés avec leurs prix de vente officiels. Les prix d'achat, marges et données administratives globales demeurent strictement confidentiels.
+          </span>
+        </div>
+
+        {/* Tableau des articles disponibles en boutique */}
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+          <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">
+                Catalogue de Ma Boutique ({myAssignedProducts.length})
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Liste des produits actuellement disponibles pour vente immédiate.
+              </p>
+            </div>
+            <button
+              onClick={() => setActiveTab('inventory')}
+              className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline"
+            >
+              Voir la liste détaillée &rarr;
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm border-collapse">
+              <thead>
+                <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-medium text-xs">
+                  <th className="py-3 px-4">Référence & Article</th>
+                  <th className="py-3 px-4">Catégorie</th>
+                  <th className="py-3 px-4 text-right">Quantité Disponible</th>
+                  <th className="py-3 px-4 text-right">Prix de Vente</th>
+                  <th className="py-3 px-4 text-right">Valeur Totale</th>
+                  <th className="py-3 px-4 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {myAssignedProducts.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center text-slate-400">
+                      <Boxes className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                      Aucun produit n'a encore été distribué à votre boutique par l'administrateur.
+                    </td>
+                  </tr>
+                ) : (
+                  myAssignedProducts.map((p) => {
+                    const q = p.distributedQuantities?.[activeAppUser?.id || ''] || 0;
+                    const val = q * (p.salePrice || 0);
+                    return (
+                      <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="py-3 px-4">
+                          <div className="font-semibold text-slate-900">{p.name}</div>
+                          <div className="text-xs text-slate-400 font-mono">{p.sku}</div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-700 font-medium">
+                            {p.category || 'Général'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
+                          {q}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-semibold text-emerald-700">
+                          {Math.round(p.salePrice).toLocaleString('fr-FR')} FCFA
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
+                          {Math.round(val).toLocaleString('fr-FR')} FCFA
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <button
+                            onClick={() => setActiveTab('caisse')}
+                            className="px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold transition-colors"
+                          >
+                            Vendre
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto">

@@ -99,9 +99,14 @@ export const CashierView: React.FC = () => {
     return ['all', ...Array.from(new Set([...STANDARD_CATEGORIES, ...products.map((p) => p.category)].filter(Boolean)))];
   }, [products]);
 
-  // Filtered products for quick touch selection
+  // Filtered products for quick touch selection: Cashier only sees articles given to their boutique
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
+      // For a cashier, strictly filter to articles distributed to their cashier account
+      if (isCashier && myUserId) {
+        const myQty = p.distributedQuantities?.[myUserId] || 0;
+        if (myQty <= 0) return false;
+      }
       const matchSearch =
         p.name.toLowerCase().includes(search.toLowerCase()) ||
         p.sku.toLowerCase().includes(search.toLowerCase()) ||
@@ -109,7 +114,7 @@ export const CashierView: React.FC = () => {
       const matchCat = selectedCategory === 'all' || p.category === selectedCategory;
       return matchSearch && matchCat;
     });
-  }, [products, search, selectedCategory]);
+  }, [products, search, selectedCategory, isCashier, myUserId]);
 
   // Cart operations
   const addToCart = (product: Product) => {

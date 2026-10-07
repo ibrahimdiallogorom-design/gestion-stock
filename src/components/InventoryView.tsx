@@ -48,12 +48,28 @@ export const InventoryView: React.FC = () => {
     setActiveTab,
   } = useStock();
 
+  const isCashier = activeAppUser?.role === 'CASHIER';
+  const myUserId = activeAppUser?.id;
+
+  // Filtrage strict : Un caissier ne voit QUE les articles distribués à sa caisse, avec sa propre quantité
+  const scopedProducts = useMemo(() => {
+    if (isCashier && myUserId) {
+      return products
+        .filter((p) => (p.distributedQuantities?.[myUserId] || 0) > 0)
+        .map((p) => ({
+          ...p,
+          quantity: p.distributedQuantities?.[myUserId] || 0,
+        }));
+    }
+    return products;
+  }, [products, isCashier, myUserId]);
+
   const categories = useMemo(() => {
-    return ['all', ...Array.from(new Set([...STANDARD_CATEGORIES, ...products.map((p) => p.category)].filter(Boolean)))];
-  }, [products]);
+    return ['all', ...Array.from(new Set([...STANDARD_CATEGORIES, ...scopedProducts.map((p) => p.category)].filter(Boolean)))];
+  }, [scopedProducts]);
 
   const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
+    return scopedProducts.filter((p) => {
       // Search
       const matchSearch =
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -75,7 +91,7 @@ export const InventoryView: React.FC = () => {
 
       return matchSearch && matchCategory && matchStatus;
     });
-  }, [products, searchQuery, categoryFilter, stockFilter]);
+  }, [scopedProducts, searchQuery, categoryFilter, stockFilter]);
 
   const handleDelete = (product: Product) => {
     openConfirmModal(
@@ -114,10 +130,12 @@ export const InventoryView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Catalogue & Gestion des Stocks
+            {isCashier ? `Stock de ma Boutique (${activeAppUser?.fullName || 'Caisse'})` : 'Catalogue & Gestion des Stocks'}
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Visualisez vos articles, surveillez les seuils de réapprovisionnement et effectuez des ajustements rapides.
+            {isCashier
+              ? `Articles dotés et disponibles pour votre caisse. Prix de vente uniquement.`
+              : 'Visualisez vos articles, surveillez les seuils de réapprovisionnement et effectuez des ajustements rapides.'}
           </p>
         </div>
 
@@ -160,7 +178,8 @@ export const InventoryView: React.FC = () => {
             </button>
           </div>
 
-          {products.length > 0 && (
+          {/* Admin-only buttons */}
+          {!isCashier && products.length > 0 && (
             <button
               onClick={handleClearAll}
               className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg shadow-2xs transition-colors whitespace-nowrap"
@@ -171,22 +190,37 @@ export const InventoryView: React.FC = () => {
             </button>
           )}
 
-          <button
-            onClick={() => openDistributionModal()}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg shadow-2xs transition-colors whitespace-nowrap"
-            title="Distribuer des produits du Grand Magasin vers les vendeurs et sous-boutiques"
-          >
-            <Share2 className="w-4 h-4" />
-            <span>Distribuer du stock</span>
-          </button>
+          {!isCashier && (
+            <button
+              onClick={() => openDistributionModal()}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg shadow-2xs transition-colors whitespace-nowrap"
+              title="Distribuer des produits du Grand Magasin vers les vendeurs et sous-boutiques"
+            >
+              <Share2 className="w-4 h-4" />
+              <span>Distribuer du stock</span>
+            </button>
+          )}
 
-          <button
-            onClick={() => openProductModal()}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs shadow-blue-600/20 transition-colors whitespace-nowrap"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Ajouter une référence</span>
-          </button>
+          {!isCashier && (
+            <button
+              onClick={() => openProductModal()}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs shadow-blue-600/20 transition-colors whitespace-nowrap"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Ajouter une référence</span>
+            </button>
+          )}
+
+          {/* Cashier direct shortcut to POS */}
+          {isCashier && (
+            <button
+              onClick={() => setActiveTab('caisse')}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs shadow-emerald-600/20 transition-colors whitespace-nowrap"
+            >
+              <Store className="w-4 h-4" />
+              <span>Ouvrir la Caisse</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -321,22 +355,28 @@ export const InventoryView: React.FC = () => {
                 <tr className="border-b border-slate-200 bg-slate-50/75 text-[11px] text-slate-500 font-semibold uppercase tracking-wider">
                   <th className="py-3 px-4">Référence & Article</th>
                   <th className="py-3 px-4">Catégorie</th>
-                  <th className="py-3 px-4 text-right">Stock Actuel</th>
+                  <th className="py-3 px-4 text-right">{isCashier ? 'Stock en Boutique' : 'Stock Actuel'}</th>
                   <th className="py-3 px-4 text-right">Seuil Min.</th>
-                  <th className="py-3 px-4 text-right">Prix d'Achat</th>
+                  {!isCashier && <th className="py-3 px-4 text-right">Prix d'Achat</th>}
                   <th className="py-3 px-4 text-right">Prix de Vente</th>
-                  <th className="py-3 px-4">Fournisseur</th>
-                  <th className="py-3 px-4 text-center">Actions Rapides</th>
+                  {!isCashier && <th className="py-3 px-4">Fournisseur</th>}
+                  <th className="py-3 px-4 text-center">{isCashier ? 'Vente' : 'Actions Rapides'}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
                 {filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-400">
+                    <td colSpan={isCashier ? 6 : 8} className="py-12 text-center text-slate-400">
                       <Package className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-                      <p className="font-medium text-slate-600">Aucun produit ne correspond à ces critères.</p>
+                      <p className="font-medium text-slate-600">
+                        {isCashier
+                          ? 'Aucun article distribué à votre caisse pour le moment.'
+                          : 'Aucun produit ne correspond à ces critères.'}
+                      </p>
                       <p className="text-xs text-slate-400 mt-1">
-                        Essayez de réinitialiser vos filtres ou effectuez une recherche différente.
+                        {isCashier
+                          ? 'Demandez à l’administrateur de vous doter du stock depuis le Grand Magasin.'
+                          : 'Essayez de réinitialiser vos filtres ou effectuez une recherche différente.'}
                       </p>
                     </td>
                   </tr>
@@ -378,9 +418,11 @@ export const InventoryView: React.FC = () => {
                           >
                             {product.quantity}
                           </div>
-                          <div className="text-[10px] text-slate-500 font-mono">
-                            Dépôt: {product.centralQuantity !== undefined ? product.centralQuantity : product.quantity} · Caisses: {Object.values(product.distributedQuantities || {}).reduce((a, b) => a + (Number(b) || 0), 0)}
-                          </div>
+                          {!isCashier && (
+                            <div className="text-[10px] text-slate-500 font-mono">
+                              Dépôt: {product.centralQuantity !== undefined ? product.centralQuantity : product.quantity} · Caisses: {Object.values(product.distributedQuantities || {}).reduce((a, b) => a + (Number(b) || 0), 0)}
+                            </div>
+                          )}
                         </td>
 
                         {/* Min Threshold */}
@@ -388,61 +430,78 @@ export const InventoryView: React.FC = () => {
                           {product.minThreshold}
                         </td>
 
-                        {/* Cost Price */}
-                        <td className={`${getRowPadding()} text-right font-mono tabular-nums text-slate-600`}>
-                          {Math.round(product.costPrice).toLocaleString('fr-FR')} F
-                        </td>
+                        {/* Cost Price: Strictly hidden for Cashier */}
+                        {!isCashier && (
+                          <td className={`${getRowPadding()} text-right font-mono tabular-nums text-slate-600`}>
+                            {Math.round(product.costPrice).toLocaleString('fr-FR')} F
+                          </td>
+                        )}
 
-                        {/* Sale Price */}
+                        {/* Sale Price: Visible to all */}
                         <td className={`${getRowPadding()} text-right font-mono tabular-nums font-semibold text-slate-800`}>
-                          {Math.round(product.salePrice).toLocaleString('fr-FR')} F
+                          {Math.round(product.salePrice).toLocaleString('fr-FR')} FCFA
                         </td>
 
-                        {/* Supplier */}
-                        <td className={`${getRowPadding()} text-slate-500 truncate max-w-[140px]`}>
-                          {product.supplier}
-                        </td>
+                        {/* Supplier: Admin only */}
+                        {!isCashier && (
+                          <td className={`${getRowPadding()} text-slate-500 truncate max-w-[140px]`}>
+                            {product.supplier}
+                          </td>
+                        )}
 
                         {/* Actions */}
                         <td className={getRowPadding()}>
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() => openDistributionModal(product.id)}
-                              title="Distribuer aux vendeurs (Dotation)"
-                              className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
-                            >
-                              <Share2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => openMovementModal(product.id, 'IN')}
-                              title="Entrée de stock"
-                              className="p-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-md transition-colors"
-                            >
-                              <ArrowDownRight className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => openMovementModal(product.id, 'OUT')}
-                              disabled={product.quantity <= 0}
-                              title="Sortie de stock"
-                              className="p-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-md transition-colors disabled:opacity-30 disabled:pointer-events-none"
-                            >
-                              <ArrowUpRight className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => openProductModal(product)}
-                              title="Modifier les informations"
-                              className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(product)}
-                              title="Supprimer la référence"
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
+                          {isCashier ? (
+                            <div className="flex items-center justify-center">
+                              <button
+                                onClick={() => setActiveTab('caisse')}
+                                disabled={product.quantity <= 0}
+                                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-30 disabled:pointer-events-none shadow-2xs"
+                              >
+                                <Store className="w-3.5 h-3.5" />
+                                <span>Vendre</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={() => openDistributionModal(product.id)}
+                                title="Distribuer aux vendeurs (Dotation)"
+                                className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+                              >
+                                <Share2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => openMovementModal(product.id, 'IN')}
+                                title="Entrée de stock"
+                                className="p-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-md transition-colors"
+                              >
+                                <ArrowDownRight className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => openMovementModal(product.id, 'OUT')}
+                                disabled={product.quantity <= 0}
+                                title="Sortie de stock"
+                                className="p-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-md transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                              >
+                                <ArrowUpRight className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => openProductModal(product)}
+                                title="Modifier les informations"
+                                className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(product)}
+                                title="Supprimer la référence"
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );

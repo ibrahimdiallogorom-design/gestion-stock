@@ -69,6 +69,8 @@ export const DailyReportsView: React.FC = () => {
     return Array.from(cashierSet);
   }, [appUsers, movements]);
 
+  const isCashier = activeAppUser?.role === 'CASHIER';
+
   // Extract and aggregate sales movements
   // A movement is a sale if type === 'OUT' and has ticketNumber or reason starts with 'Vente'
   const salesMovements = useMemo(() => {
@@ -76,20 +78,32 @@ export const DailyReportsView: React.FC = () => {
       const isSale = m.type === 'OUT' && (m.ticketNumber || m.reason.toLowerCase().includes('vente'));
       if (!isSale) return false;
 
+      // Cloisonnement strict Caissier : uniquement ses propres ventes
+      if (isCashier && activeAppUser) {
+        const myName = (activeAppUser.fullName || '').toLowerCase();
+        const myUser = (activeAppUser.username || '').toLowerCase();
+        const op = (m.operator || '').toLowerCase();
+        const matchesMe =
+          (myName && op.includes(myName)) ||
+          (myUser && op.includes(myUser)) ||
+          m.targetUserId === activeAppUser.id;
+        if (!matchesMe) return false;
+      }
+
       // Filter by Date
       if (selectedDate !== 'ALL') {
         const mDate = m.createdAt.split('T')[0];
         if (mDate !== selectedDate) return false;
       }
 
-      // Filter by Store
-      if (selectedStore !== 'ALL') {
+      // Filter by Store (seulement pour l'administrateur)
+      if (!isCashier && selectedStore !== 'ALL') {
         const store = m.storeName || 'Boutique VisionTech Centrale';
         if (store !== selectedStore) return false;
       }
 
-      // Filter by Cashier
-      if (selectedCashier !== 'ALL') {
+      // Filter by Cashier (seulement pour l'administrateur)
+      if (!isCashier && selectedCashier !== 'ALL') {
         if (m.operator !== selectedCashier) return false;
       }
 
@@ -100,7 +114,7 @@ export const DailyReportsView: React.FC = () => {
 
       return true;
     });
-  }, [movements, selectedDate, selectedStore, selectedCashier, selectedPaymentMethod]);
+  }, [movements, selectedDate, selectedStore, selectedCashier, selectedPaymentMethod, isCashier, activeAppUser]);
 
   // Group individual sales movements into distinct tickets
   const dailyTickets = useMemo(() => {
@@ -288,10 +302,14 @@ export const DailyReportsView: React.FC = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-                Rapport Journalier & Caisses (Z de Caisse)
+                {isCashier
+                  ? 'Mon Journal des Ventes (Z de Caisse Personnel)'
+                  : 'Rapport Journalier & Caisses (Z de Caisse)'}
               </h1>
               <p className="text-xs text-slate-500">
-                Suivi multi-boutiques en temps réel : visualisez les encaissements de chaque magasin à distance.
+                {isCashier
+                  ? `Consultation de vos encaissements et tickets du jour pour ${activeAppUser?.storeName || 'votre boutique'}.`
+                  : 'Suivi multi-boutiques en temps réel : visualisez les encaissements de chaque magasin à distance.'}
               </p>
             </div>
           </div>
@@ -309,7 +327,7 @@ export const DailyReportsView: React.FC = () => {
           </button>
 
           <button
-            onClick={() => handlePrintZ('ALL')}
+            onClick={() => handlePrintZ(isCashier ? (activeAppUser?.storeName || 'Ma Boutique') : 'ALL')}
             className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs transition-colors"
           >
             <Printer className="w-4 h-4" />
@@ -384,43 +402,58 @@ export const DailyReportsView: React.FC = () => {
             </div>
           </div>
 
-          {/* Store Selector */}
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1">
-              Boutique / Point de Vente
-            </label>
-            <select
-              value={selectedStore}
-              onChange={(e) => setSelectedStore(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-slate-900 font-medium"
-            >
-              <option value="ALL">Toutes les Boutiques (Consolidation)</option>
-              {availableStores.map((st) => (
-                <option key={st} value={st}>
-                  {st}
-                </option>
-              ))}
-            </select>
-          </div>
+          {isCashier ? (
+            <div className="sm:col-span-2 bg-emerald-50/70 border border-emerald-200/80 rounded-lg p-2.5 flex items-center gap-2.5 text-xs text-emerald-900">
+              <User className="w-4 h-4 text-emerald-600 shrink-0" />
+              <div>
+                <span className="font-bold">{activeAppUser?.fullName || activeAppUser?.username}</span>
+                <span className="text-emerald-700 ml-1">({activeAppUser?.storeName || 'Ma Boutique'})</span>
+                <p className="text-[11px] text-emerald-600 mt-0.5">
+                  Rapports restreints à vos propres encaissements en boutique.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Store Selector */}
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">
+                  Boutique / Point de Vente
+                </label>
+                <select
+                  value={selectedStore}
+                  onChange={(e) => setSelectedStore(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-slate-900 font-medium"
+                >
+                  <option value="ALL">Toutes les Boutiques (Consolidation)</option>
+                  {availableStores.map((st) => (
+                    <option key={st} value={st}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          {/* Cashier Selector */}
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1">
-              Caissier / Opérateur
-            </label>
-            <select
-              value={selectedCashier}
-              onChange={(e) => setSelectedCashier(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-slate-900 font-medium"
-            >
-              <option value="ALL">Tous les Caissiers</option>
-              {availableCashiers.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
+              {/* Cashier Selector */}
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">
+                  Caissier / Opérateur
+                </label>
+                <select
+                  value={selectedCashier}
+                  onChange={(e) => setSelectedCashier(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-slate-900 font-medium"
+                >
+                  <option value="ALL">Tous les Caissiers</option>
+                  {availableCashiers.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
 
           {/* Payment Method Selector */}
           <div>

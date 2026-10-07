@@ -9,6 +9,7 @@ import {
   Layers,
   Sparkles,
   Share2,
+  ShoppingCart,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { Product } from '../types';
@@ -26,9 +27,27 @@ export const CardsGridView: React.FC = () => {
     recordMovement,
     openDistributionModal,
     theme,
+    activeAppUser,
+    setActiveTab,
   } = useStock();
 
-  const filteredProducts = products.filter((p) => {
+  const isCashier = activeAppUser?.role === 'CASHIER';
+  const myUserId = activeAppUser?.id;
+
+  // Filtrage strict : Un caissier ne voit QUE les articles distribués à sa caisse, avec sa propre quantité
+  const scopedProducts = React.useMemo(() => {
+    if (isCashier && myUserId) {
+      return products
+        .filter((p) => (p.distributedQuantities?.[myUserId] || 0) > 0)
+        .map((p) => ({
+          ...p,
+          quantity: p.distributedQuantities?.[myUserId] || 0,
+        }));
+    }
+    return products;
+  }, [products, isCashier, myUserId]);
+
+  const filteredProducts = scopedProducts.filter((p) => {
     const matchSearch =
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -265,72 +284,94 @@ export const CardsGridView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Financial Summary */}
-                <div className="grid grid-cols-2 gap-2 text-xs pt-1">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block">Prix d'Achat</span>
-                    <span className="font-mono tabular-nums text-slate-700 font-medium">
-                      {Math.round(p.costPrice).toLocaleString('fr-FR')} F
+                {/* Financial Summary: Strictly Sale Price only for Cashier */}
+                {isCashier ? (
+                  <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+                    <span className="text-[11px] font-medium text-slate-500">Prix de Vente :</span>
+                    <span className="font-mono text-sm font-bold text-slate-900">
+                      {Math.round(p.salePrice).toLocaleString('fr-FR')} FCFA
                     </span>
                   </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-slate-400 block">Prix de Vente</span>
-                    <span className="font-mono tabular-nums font-bold text-slate-900">
-                      {Math.round(p.salePrice).toLocaleString('fr-FR')} F
-                    </span>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Prix d'Achat</span>
+                      <span className="font-mono tabular-nums text-slate-700 font-medium">
+                        {Math.round(p.costPrice).toLocaleString('fr-FR')} F
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-400 block">Prix de Vente</span>
+                      <span className="font-mono tabular-nums font-bold text-slate-900">
+                        {Math.round(p.salePrice).toLocaleString('fr-FR')} F
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
-            {/* Interactive Footer & Stepper */}
-            <div className="p-3 bg-slate-50/75 border-t border-slate-100 flex items-center justify-between">
-              {/* Stepper Buttons for Quick Store Cashier / Clerk Adjustments */}
-              <div className="flex items-center bg-white rounded-lg border border-slate-200 p-0.5 shadow-2xs">
+            {/* Interactive Footer */}
+            <div className="p-3 bg-slate-50/75 border-t border-slate-100">
+              {isCashier ? (
                 <button
-                  onClick={(e) => handleQuickSubtract(p, e)}
+                  onClick={() => setActiveTab('caisse')}
                   disabled={p.quantity <= 0}
-                  title="Vente / Sortie de 1 unité"
-                  className="w-7 h-7 flex items-center justify-center text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-30 disabled:pointer-events-none shadow-2xs"
                 >
-                  -
+                  <ShoppingCart className="w-4 h-4" />
+                  <span>Vendre en Caisse ({p.quantity} dispo)</span>
                 </button>
-                <span className="w-8 text-center font-mono tabular-nums text-xs font-bold text-slate-800">
-                  {p.quantity}
-                </span>
-                <button
-                  onClick={(e) => handleQuickAdd(p, e)}
-                  title="Réception / Entrée de 1 unité"
-                  className="w-7 h-7 flex items-center justify-center text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors"
-                >
-                  +
-                </button>
-              </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  {/* Stepper Buttons for Quick Store Adjustments */}
+                  <div className="flex items-center bg-white rounded-lg border border-slate-200 p-0.5 shadow-2xs">
+                    <button
+                      onClick={(e) => handleQuickSubtract(p, e)}
+                      disabled={p.quantity <= 0}
+                      title="Vente / Sortie de 1 unité"
+                      className="w-7 h-7 flex items-center justify-center text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                    >
+                      -
+                    </button>
+                    <span className="w-8 text-center font-mono tabular-nums text-xs font-bold text-slate-800">
+                      {p.quantity}
+                    </span>
+                    <button
+                      onClick={(e) => handleQuickAdd(p, e)}
+                      title="Réception / Entrée de 1 unité"
+                      className="w-7 h-7 flex items-center justify-center text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors"
+                    >
+                      +
+                    </button>
+                  </div>
 
-              {/* Action Icons */}
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => openMovementModal(p.id, 'IN')}
-                  title="Nouveau mouvement détaillé"
-                  className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-white rounded-md transition-colors"
-                >
-                  <ArrowDownRight className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => openDistributionModal(p.id)}
-                  title="Distribuer aux vendeurs (Dotation)"
-                  className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-white rounded-md transition-colors"
-                >
-                  <Share2 className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => openProductModal(p)}
-                  title="Modifier la fiche"
-                  className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-white rounded-md transition-colors"
-                >
-                  <Edit2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
+                  {/* Action Icons */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => openMovementModal(p.id, 'IN')}
+                      title="Nouveau mouvement détaillé"
+                      className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-white rounded-md transition-colors"
+                    >
+                      <ArrowDownRight className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => openDistributionModal(p.id)}
+                      title="Distribuer aux vendeurs (Dotation)"
+                      className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-white rounded-md transition-colors"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => openProductModal(p)}
+                      title="Modifier la fiche"
+                      className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-white rounded-md transition-colors"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         );

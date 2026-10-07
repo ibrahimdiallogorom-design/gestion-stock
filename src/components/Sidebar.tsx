@@ -35,13 +35,69 @@ export const Sidebar: React.FC = () => {
     openSwitchAccountModal,
   } = useStock();
 
+  const isCashier = activeAppUser?.role === 'CASHIER';
+  const myUserId = activeAppUser?.id;
+
+  // Calcul spécifique pour le caissier : uniquement son stock doté
+  const myAssignedProducts = products.filter(
+    (p) => (p.distributedQuantities?.[myUserId || ''] || 0) > 0
+  );
+  const myTotalUnits = myAssignedProducts.reduce(
+    (acc, p) => acc + (p.distributedQuantities?.[myUserId || ''] || 0),
+    0
+  );
+
   const totalProducts = products.length;
   const lowStockCount = products.filter((p) => p.quantity > 0 && p.quantity <= p.minThreshold).length;
   const outOfStockCount = products.filter((p) => p.quantity === 0).length;
 
   const currentTheme = THEME_CONFIGS[theme];
 
-  const navItems: {
+  // Menu Caissier : Strictement restreint à ses prérogatives
+  const cashierNavItems: {
+    id: ViewTab;
+    label: string;
+    icon: React.ReactNode;
+    badge?: number | string;
+    badgeColor?: string;
+  }[] = [
+    {
+      id: 'caisse',
+      label: 'Caisse & Vente',
+      icon: <ShoppingCart className="w-4 h-4" />,
+      badge: isCashierUnlocked ? 'Ouverte' : 'Code 🔒',
+      badgeColor: isCashierUnlocked
+        ? 'text-emerald-700 bg-emerald-50 font-medium'
+        : 'text-amber-800 bg-amber-50 font-medium',
+    },
+    {
+      id: 'inventory',
+      label: 'Stock de ma Boutique',
+      icon: <Boxes className="w-4 h-4" />,
+      badge: myTotalUnits > 0 ? `${myTotalUnits} art.` : '0 art.',
+      badgeColor: 'text-blue-700 bg-blue-50 font-medium',
+    },
+    {
+      id: 'reports',
+      label: 'Mes Rapports & Z Caisse',
+      icon: <Receipt className="w-4 h-4" />,
+      badge: 'Z Caisse',
+      badgeColor: 'text-emerald-700 bg-emerald-50 font-bold',
+    },
+    {
+      id: 'dashboard',
+      label: 'Mon Tableau de Bord',
+      icon: <LayoutDashboard className="w-4 h-4" />,
+    },
+    {
+      id: 'movements',
+      label: 'Mes Mouvements',
+      icon: <ArrowLeftRight className="w-4 h-4" />,
+    },
+  ];
+
+  // Menu Administrateur : Accès complet
+  const adminNavItems: {
     id: ViewTab;
     label: string;
     icon: React.ReactNode;
@@ -113,6 +169,8 @@ export const Sidebar: React.FC = () => {
       icon: <Settings className="w-4 h-4" />,
     },
   ];
+
+  const navItems = isCashier ? cashierNavItems : adminNavItems;
 
   return (
     <aside className="hidden md:flex w-64 bg-white border-r border-slate-200 flex-col justify-between shrink-0 select-none h-full overflow-hidden">
