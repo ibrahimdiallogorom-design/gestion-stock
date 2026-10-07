@@ -214,6 +214,24 @@ export const CardsGridView: React.FC = () => {
     );
   };
 
+  if (filteredProducts.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center space-y-3">
+        <Package className="w-12 h-12 mx-auto text-slate-300" />
+        <h3 className="text-sm font-bold text-slate-700">
+          {isCashier
+            ? 'Aucun article octroyé à votre boutique pour le moment'
+            : 'Aucun produit ne correspond à ces critères'}
+        </h3>
+        <p className="text-xs text-slate-500 max-w-sm mx-auto">
+          {isCashier
+            ? 'Le Grand Magasin ne vous a pas encore attribué de stock. Les articles alloués apparaîtront automatiquement ici.'
+            : 'Essayez de réinitialiser vos filtres ou effectuez une recherche différente.'}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
       {filteredProducts.map((p) => {

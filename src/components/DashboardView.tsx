@@ -159,7 +159,7 @@ export const DashboardView: React.FC = () => {
     });
 
     const myTodaySalesAmount = mySalesToday.reduce(
-      (sum, m) => sum + (m.saleAmount || Math.abs(m.quantityDelta) * (m.unitPrice || 0)),
+      (sum, m) => sum + (m.saleAmount || 0),
       0
     );
     const myTicketsCount = new Set(mySalesToday.map((m) => m.ticketNumber || m.id)).size;

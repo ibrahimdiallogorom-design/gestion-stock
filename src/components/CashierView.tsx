@@ -20,6 +20,7 @@ import {
   FileText,
   BadgePercent,
   Store,
+  Package,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { Product, CartItem, PaymentMethod, STANDARD_CATEGORIES } from '../types';
@@ -50,6 +51,7 @@ export const CashierView: React.FC = () => {
     cashierSession,
     processSale,
     activeAppUser,
+    appUsers,
   } = useStock();
 
   // If cashier terminal is locked, display the secure lock screen
@@ -57,30 +59,53 @@ export const CashierView: React.FC = () => {
     return <CashierLockScreen />;
   }
 
-  const isCashier = activeAppUser?.role === 'CASHIER';
-  const myUserId = activeAppUser?.id;
+  const isRoleCashier = activeAppUser?.role === 'CASHIER';
+  const cashiers = useMemo(() => appUsers.filter((u) => u.role === 'CASHIER'), [appUsers]);
 
+  // Determine which boutique cashier this POS terminal represents:
+  // - If Cashier: strictly locked to activeAppUser.id
+  // - If Admin: can choose which boutique register they are managing, defaulting to the first cashier (Moussa Vision)
+  const [selectedBoutiqueId, setSelectedBoutiqueId] = useState<string>(() => {
+    if (isRoleCashier && activeAppUser?.id) return activeAppUser.id;
+    return cashiers[0]?.id || 'user-caissier-moussa';
+  });
+
+  const effectiveCashier = useMemo(() => {
+    if (isRoleCashier && activeAppUser) return activeAppUser;
+    const found = cashiers.find((c) => c.id === selectedBoutiqueId);
+    return found || cashiers[0] || null;
+  }, [isRoleCashier, activeAppUser, cashiers, selectedBoutiqueId]);
+
+  const effectiveCashierId = effectiveCashier?.id;
+
+  // Strict available stock: ONLY articles octroyés à cette boutique
   const getAvailableStock = (prod: Product) => {
-    if (isCashier && myUserId && prod.distributedQuantities?.[myUserId] !== undefined) {
-      return prod.distributedQuantities[myUserId] || 0;
+    if (effectiveCashierId && prod.distributedQuantities?.[effectiveCashierId] !== undefined) {
+      return prod.distributedQuantities[effectiveCashierId] || 0;
     }
-    return prod.quantity;
+    return 0;
   };
 
-  // Compute total stock assigned to this cashier
+  // Compute total stock assigned to this cashier boutique
   const cashierInventoryStats = useMemo(() => {
-    if (!isCashier || !myUserId) return null;
+    if (!effectiveCashierId) return null;
     let units = 0;
     let value = 0;
     products.forEach((p) => {
-      const q = p.distributedQuantities?.[myUserId] || 0;
+      const q = p.distributedQuantities?.[effectiveCashierId] || 0;
       if (q > 0) {
         units += q;
         value += q * p.salePrice;
       }
     });
     return { units, value };
-  }, [isCashier, myUserId, products]);
+  }, [effectiveCashierId, products]);
+
+  // Count total articles allocated to this boutique
+  const totalAllocatedArticlesCount = useMemo(() => {
+    if (!effectiveCashierId) return 0;
+    return products.filter((p) => (p.distributedQuantities?.[effectiveCashierId] || 0) > 0).length;
+  }, [effectiveCashierId, products]);
 
   // POS State
   const [search, setSearch] = useState('');
@@ -94,18 +119,23 @@ export const CashierView: React.FC = () => {
   const [saleError, setSaleError] = useState<string | null>(null);
   const [lastReceipt, setLastReceipt] = useState<LastSaleReceipt | null>(null);
 
-  // Available categories
+  // Available categories: strictly only categories of articles allocated to this boutique
   const categories = useMemo(() => {
-    return ['all', ...Array.from(new Set([...STANDARD_CATEGORIES, ...products.map((p) => p.category)].filter(Boolean)))];
-  }, [products]);
+    const allocatedProds = effectiveCashierId
+      ? products.filter((p) => (p.distributedQuantities?.[effectiveCashierId] || 0) > 0)
+      : products;
+    const cats = Array.from(new Set(allocatedProds.map((p) => p.category).filter(Boolean)));
+    return ['all', ...cats];
+  }, [products, effectiveCashierId]);
 
-  // Filtered products for quick touch selection: Cashier only sees articles given to their boutique
+  // Filtered products for quick touch selection:
+  // STRICT RULE: Cashier boutique ONLY sees articles granted to their boutique!
+  // Any article with 0 allocated or not distributed is COMPLETELY HIDDEN!
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
-      // For a cashier, strictly filter to articles distributed to their cashier account
-      if (isCashier && myUserId) {
-        const myQty = p.distributedQuantities?.[myUserId] || 0;
-        if (myQty <= 0) return false;
+      if (effectiveCashierId) {
+        const myQty = p.distributedQuantities?.[effectiveCashierId] || 0;
+        if (myQty <= 0) return false; // Strictly hidden!
       }
       const matchSearch =
         p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -114,13 +144,13 @@ export const CashierView: React.FC = () => {
       const matchCat = selectedCategory === 'all' || p.category === selectedCategory;
       return matchSearch && matchCat;
     });
-  }, [products, search, selectedCategory, isCashier, myUserId]);
+  }, [products, search, selectedCategory, effectiveCashierId]);
 
   // Cart operations
   const addToCart = (product: Product) => {
     const available = getAvailableStock(product);
     if (available <= 0) {
-      setSaleError(`Rupture de stock pour "${product.name}" (${isCashier ? 'en caisse' : 'en stock'}).`);
+      setSaleError(`Rupture de stock pour "${product.name}" (${isRoleCashier ? 'en caisse' : 'en stock'}).`);
       return;
     }
     setSaleError(null);
@@ -129,7 +159,7 @@ export const CashierView: React.FC = () => {
       const existing = prev.find((item) => item.product.id === product.id);
       if (existing) {
         if (existing.quantity >= available) {
-          setSaleError(`Stock maximal atteint pour "${product.name}" (${available} disponible${isCashier ? ' dans votre caisse' : ''}).`);
+          setSaleError(`Stock maximal atteint pour "${product.name}" (${available} disponible${isRoleCashier ? ' dans votre caisse' : ''}).`);
           return prev;
         }
         return prev.map((item) =>
@@ -232,7 +262,8 @@ export const CashierView: React.FC = () => {
         paymentMethod === 'CASH' ? tenderedAmount : undefined,
         acompteToSave,
         remainingToSave,
-        customerToSave
+        customerToSave,
+        effectiveCashierId
       );
 
       if (result.success) {
@@ -275,21 +306,40 @@ export const CashierView: React.FC = () => {
                 Poste de Caisse Ouvert
               </h1>
               <span className="text-xs px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-semibold">
-                {cashierName}
+                {effectiveCashier?.storeName || effectiveCashier?.fullName || cashierName}
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Terminal de vente et encaissement en direct — Stock décrémenté automatiquement.
+              Articles cloisonnés : seuls les produits octroyés à cette boutique sont disponibles à la vente.
             </p>
           </div>
         </div>
 
-        {/* Session Metrics & Lock Button */}
+        {/* Session Metrics & Boutique Selector / Lock Button */}
         <div className="flex flex-wrap items-center gap-3">
+          {/* Admin Boutique Selector if multiple stores exist */}
+          {!isRoleCashier && cashiers.length > 0 && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900">
+              <Store className="w-4 h-4 text-blue-600" />
+              <span className="font-semibold">Boutique active :</span>
+              <select
+                value={effectiveCashierId || ''}
+                onChange={(e) => setSelectedBoutiqueId(e.target.value)}
+                className="bg-white border border-blue-300 rounded-lg px-2 py-1 font-bold text-slate-800 focus:outline-none text-xs"
+              >
+                {cashiers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.storeName || c.fullName} ({c.username})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {cashierInventoryStats && (
             <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-900">
               <Store className="w-4 h-4 text-indigo-600" />
-              <span>Stock en caisse : <strong>{cashierInventoryStats.units} pcs</strong></span>
+              <span>Stock boutique : <strong>{cashierInventoryStats.units} pcs</strong></span>
               <span className="text-indigo-300">|</span>
               <span className="font-mono font-bold text-indigo-700">
                 {formatFCFA(cashierInventoryStats.value)}
@@ -402,7 +452,7 @@ export const CashierView: React.FC = () => {
                           : 'bg-emerald-100 text-emerald-800'
                       }`}
                     >
-                      {inStock ? `${liveQty} ${isCashier ? 'en caisse' : 'dispo'}` : 'Rupture'}
+                      {inStock ? `${liveQty} en caisse` : 'Rupture'}
                     </span>
                   </div>
                 </button>
@@ -413,14 +463,27 @@ export const CashierView: React.FC = () => {
           {products.length === 0 ? (
             <div className="p-10 text-center bg-white border border-slate-200 rounded-2xl text-slate-400 text-xs space-y-2">
               <ShoppingCart className="w-10 h-10 text-slate-300 mx-auto" />
-              <p className="font-bold text-slate-700 text-sm">Le catalogue est actuellement vide</p>
+              <p className="font-bold text-slate-700 text-sm">Le catalogue général est actuellement vide</p>
               <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
                 Tous les produits fictifs ont été supprimés. Rendez-vous dans l'onglet <strong>Inventaire</strong> pour ajouter vos articles réels.
               </p>
             </div>
+          ) : totalAllocatedArticlesCount === 0 ? (
+            <div className="p-10 text-center bg-white border border-dashed border-amber-300 rounded-2xl text-slate-500 text-xs space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto">
+                <Package className="w-6 h-6" />
+              </div>
+              <p className="font-bold text-slate-800 text-sm">
+                Aucun article n'a encore été octroyé à cette boutique
+              </p>
+              <p className="text-[12px] text-slate-500 max-w-md mx-auto">
+                Le Grand Magasin Central n'a pas encore alloué de stock à <strong>{effectiveCashier?.storeName || effectiveCashier?.fullName || 'cette boutique'}</strong>.
+                Seuls les articles expressément distribués à cette caisse sont autorisés à être affichés et vendus.
+              </p>
+            </div>
           ) : filteredProducts.length === 0 ? (
             <div className="p-8 text-center bg-white border border-slate-200 rounded-2xl text-slate-400 text-xs">
-              Aucun produit ne correspond à votre recherche.
+              Aucun article de votre boutique ne correspond à votre recherche.
             </div>
           ) : null}
         </div>
