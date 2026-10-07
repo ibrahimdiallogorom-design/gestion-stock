@@ -344,6 +344,15 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       createdAt: '2026-01-01T00:00:00Z',
     },
     {
+      id: 'user-caissier-moussa',
+      username: 'Moussavision',
+      fullName: 'Moussa VisionTech (Caissier)',
+      role: 'CASHIER',
+      password: '1234',
+      storeName: 'Boutique VisionTech Centrale',
+      createdAt: '2026-01-01T00:00:00Z',
+    },
+    {
       id: 'user-caissier-1',
       username: 'caissier',
       fullName: 'Caissier VisionTech',
@@ -1278,11 +1287,24 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const trimmedUser = username.trim().toLowerCase();
     const trimmedPass = password.trim();
 
-    const found = appUsers.find(
-      (u) =>
-        u.username.trim().toLowerCase() === trimmedUser &&
-        u.password.trim() === trimmedPass
-    );
+    const found = appUsers.find((u) => {
+      const matchUser = u.username.trim().toLowerCase() === trimmedUser;
+      const matchFull = u.fullName.trim().toLowerCase() === trimmedUser;
+      const matchCashierName =
+        cashierName &&
+        cashierName.trim().toLowerCase() === trimmedUser &&
+        u.role === 'CASHIER';
+      const matchClean =
+        u.username.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() ===
+        trimmedUser.replace(/[^a-zA-Z0-9]/g, '');
+
+      const isNameMatched = matchUser || matchFull || matchCashierName || matchClean;
+      const isPassMatched =
+        u.password.trim() === trimmedPass ||
+        (u.role === 'CASHIER' && trimmedPass === cashierPin.trim());
+
+      return isNameMatched && isPassMatched;
+    });
 
     if (!found) {
       return {
