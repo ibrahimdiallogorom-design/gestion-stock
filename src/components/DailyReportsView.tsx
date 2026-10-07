@@ -49,12 +49,16 @@ export const DailyReportsView: React.FC = () => {
       if (u.storeName) storeSet.add(u.storeName);
     });
     movements.forEach((m) => {
-      if (m.storeName) storeSet.add(m.storeName);
+      if (
+        m.storeName &&
+        !m.storeName.includes('Gorom-Gorom') &&
+        !m.storeName.includes('Ouagadougou') &&
+        !m.storeName.includes('VisionTech Centrale')
+      ) {
+        storeSet.add(m.storeName);
+      }
     });
-    // Ensure default boutiques are listed
-    storeSet.add('Boutique VisionTech Centrale');
-    storeSet.add('Boutique Ouagadougou');
-    storeSet.add('Boutique Gorom-Gorom');
+    storeSet.add('Boutique Moussa Vision');
     return Array.from(storeSet);
   }, [appUsers, movements]);
 
@@ -63,8 +67,18 @@ export const DailyReportsView: React.FC = () => {
     appUsers.forEach((u) => {
       if (u.role === 'CASHIER') cashierSet.add(u.fullName || u.username);
     });
+    const FICTITIOUS_NAMES = [
+      'caissier',
+      'caisse_ouaga',
+      'caisse_gorom',
+      'caissier visiontech',
+      'caissier ouagadougou',
+      'caissier gorom-gorom',
+    ];
     movements.forEach((m) => {
-      if (m.operator) cashierSet.add(m.operator);
+      if (m.operator && !FICTITIOUS_NAMES.includes(m.operator.toLowerCase())) {
+        cashierSet.add(m.operator);
+      }
     });
     return Array.from(cashierSet);
   }, [appUsers, movements]);
@@ -98,7 +112,7 @@ export const DailyReportsView: React.FC = () => {
 
       // Filter by Store (seulement pour l'administrateur)
       if (!isCashier && selectedStore !== 'ALL') {
-        const store = m.storeName || 'Boutique VisionTech Centrale';
+        const store = m.storeName || 'Boutique Moussa Vision';
         if (store !== selectedStore) return false;
       }
 
@@ -134,7 +148,7 @@ export const DailyReportsView: React.FC = () => {
     salesMovements.forEach((m) => {
       const ticketId = m.ticketNumber || m.id;
       const amount = m.saleAmount || (Math.abs(m.quantityDelta) * 50); // fallback reasonable estimate
-      const store = m.storeName || 'Boutique VisionTech Centrale';
+      const store = m.storeName || 'Boutique Moussa Vision';
       const cashier = m.operator || 'Caissier';
       const payment: PaymentMethod = m.paymentMethod || 'CASH';
 

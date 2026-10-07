@@ -93,7 +93,7 @@ export const SettingsView: React.FC = () => {
     setEditFullName(user.fullName);
     setEditPassword(user.password);
     setEditRole(user.role);
-    setEditStoreName(user.storeName || storeName || 'Boutique VisionTech Centrale');
+    setEditStoreName(user.storeName || storeName || 'Boutique Moussa Vision');
     setUserMsg(null);
   };
 
@@ -109,7 +109,7 @@ export const SettingsView: React.FC = () => {
       fullName: editFullName.trim() || editUsername.trim(),
       password: editPassword.trim(),
       role: editRole,
-      storeName: editStoreName.trim() || storeName || 'Boutique VisionTech Centrale',
+      storeName: editStoreName.trim() || storeName || 'Boutique Moussa Vision',
     });
     if (!res.success) {
       setUserMsg({ text: res.message || 'Erreur lors de la mise à jour.', isError: true });
@@ -131,7 +131,7 @@ export const SettingsView: React.FC = () => {
       fullName: newFullName.trim() || newUsername.trim(),
       password: newPassword.trim(),
       role: newRole,
-      storeName: newStoreName.trim() || storeName || 'Boutique VisionTech Centrale',
+      storeName: newStoreName.trim() || storeName || 'Boutique Moussa Vision',
     });
     if (!res.success) {
       setUserMsg({ text: res.message || 'Erreur lors de la création.', isError: true });
@@ -592,7 +592,7 @@ export const SettingsView: React.FC = () => {
                   type="text"
                   value={newStoreName}
                   onChange={(e) => setNewStoreName(e.target.value)}
-                  placeholder="Ex: Boutique VisionTech Centrale, Boutique Ouagadougou, Boutique Gorom-Gorom..."
+                  placeholder="Ex: Boutique Moussa Vision, Boutique Annexe, etc."
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-slate-900"
                 />
               </div>
@@ -657,7 +657,7 @@ export const SettingsView: React.FC = () => {
                           </span>
                         </div>
                         <span className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5 flex-wrap">
-                          <span className="font-semibold text-slate-700">🏪 {user.storeName || storeName || 'Boutique VisionTech Centrale'}</span>
+                          <span className="font-semibold text-slate-700">🏪 {user.storeName || storeName || 'Boutique Moussa Vision'}</span>
                           <span className="text-slate-300">•</span>
                           <span>Mot de passe : <strong className="font-mono text-slate-600">{user.password}</strong></span>
                         </span>
@@ -752,7 +752,7 @@ export const SettingsView: React.FC = () => {
                           type="text"
                           value={editStoreName}
                           onChange={(e) => setEditStoreName(e.target.value)}
-                          placeholder="Ex: Boutique VisionTech Centrale, Boutique Ouagadougou, etc."
+                          placeholder="Ex: Boutique Moussa Vision, Boutique Annexe, etc."
                           className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-slate-900"
                         />
                       </div>

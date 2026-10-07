@@ -137,6 +137,15 @@ interface StockContextType {
     quantity: number,
     notes?: string
   ) => Promise<{ success: boolean; message: string }>;
+  setBoutiqueQuantity: (
+    productId: string,
+    targetUserId: string,
+    newQuantity: number
+  ) => Promise<{ success: boolean; message: string }>;
+  removeFromBoutique: (
+    productId: string,
+    targetUserId: string
+  ) => Promise<{ success: boolean; message: string }>;
   distributionModal: {
     isOpen: boolean;
     productId?: string;
@@ -202,10 +211,16 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               sale = Math.round(sale / 650);
             }
 
-            const distributed = p.distributedQuantities || {};
+            const distributed = { ...(p.distributedQuantities || {}) };
+            // Purge allocations to fictitious deleted cashiers and return to central stock
+            const FICTITIOUS_IDS = ['user-caissier-1', 'user-caissier-2', 'user-caissier-3'];
+            FICTITIOUS_IDS.forEach((fid) => {
+              delete distributed[fid];
+            });
+
             const sumDist = Object.values(distributed).reduce((a, b) => a + (Number(b) || 0), 0);
             const totalQty = Math.max(0, Number(p.quantity) || 0);
-            const centralQty = p.centralQuantity !== undefined ? Math.max(0, Number(p.centralQuantity) || 0) : Math.max(0, totalQty - sumDist);
+            const centralQty = Math.max(0, totalQty - sumDist);
 
             return {
               ...p,
@@ -340,7 +355,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     totalSalesAmount: 0,
   });
 
-  // Global Multi-User Authentication state
+  // Global Multi-User Authentication state - Seule la boutique Moussa Vision est conservée
   const DEFAULT_APP_USERS: AppUser[] = [
     {
       id: 'user-admin',
@@ -348,43 +363,16 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       fullName: 'Administrateur Gérant',
       role: 'ADMIN',
       password: 'admin',
-      storeName: 'Boutique VisionTech Centrale',
+      storeName: 'Boutique Moussa Vision',
       createdAt: '2026-01-01T00:00:00Z',
     },
     {
       id: 'user-caissier-moussa',
       username: 'Moussavision',
-      fullName: 'Moussa VisionTech (Caissier)',
+      fullName: 'Moussa Vision (Caissier)',
       role: 'CASHIER',
       password: '1234',
-      storeName: 'Boutique VisionTech Centrale',
-      createdAt: '2026-01-01T00:00:00Z',
-    },
-    {
-      id: 'user-caissier-1',
-      username: 'caissier',
-      fullName: 'Caissier VisionTech',
-      role: 'CASHIER',
-      password: '1234',
-      storeName: 'Boutique VisionTech Centrale',
-      createdAt: '2026-01-01T00:00:00Z',
-    },
-    {
-      id: 'user-caissier-2',
-      username: 'caisse_ouaga',
-      fullName: 'Caissier Ouagadougou',
-      role: 'CASHIER',
-      password: '1234',
-      storeName: 'Boutique Ouagadougou',
-      createdAt: '2026-01-01T00:00:00Z',
-    },
-    {
-      id: 'user-caissier-3',
-      username: 'caisse_gorom',
-      fullName: 'Caissier Gorom-Gorom',
-      role: 'CASHIER',
-      password: '1234',
-      storeName: 'Boutique Gorom-Gorom',
+      storeName: 'Boutique Moussa Vision',
       createdAt: '2026-01-01T00:00:00Z',
     },
   ];
@@ -395,20 +383,43 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (saved) {
         const parsed: AppUser[] = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Keep user modifications intact, dedup by username
-          const seen = new Set<string>();
-          const deduped: AppUser[] = [];
-          for (let i = parsed.length - 1; i >= 0; i--) {
-            const u = parsed[i];
-            const key = (u.username || '').trim().toLowerCase();
-            if (key && !seen.has(key)) {
-              seen.add(key);
-              deduped.unshift(u);
-            }
+          // PURGE STRICTE DES BOUTIQUES ET COMPTES FICTIFS (caissier, caisse_ouaga, caisse_gorom)
+          const FICTITIOUS_IDS = new Set(['user-caissier-1', 'user-caissier-2', 'user-caissier-3']);
+          const FICTITIOUS_USERNAMES = new Set(['caissier', 'caisse_ouaga', 'caisse_gorom']);
+
+          const filtered = parsed
+            .filter((u) => {
+              const uLower = (u.username || '').trim().toLowerCase();
+              return !FICTITIOUS_IDS.has(u.id) && !FICTITIOUS_USERNAMES.has(uLower);
+            })
+            .map((u) => {
+              if (u.id === 'user-admin') {
+                return { ...u, storeName: 'Boutique Moussa Vision' };
+              }
+              if (u.id === 'user-caissier-moussa' || (u.username || '').toLowerCase() === 'moussavision') {
+                return { ...u, storeName: 'Boutique Moussa Vision', fullName: 'Moussa Vision (Caissier)' };
+              }
+              return u;
+            });
+
+          // S'assurer que le compte Moussa Vision est bien présent
+          const hasMoussa = filtered.some(
+            (u) => (u.username || '').toLowerCase() === 'moussavision'
+          );
+          if (!hasMoussa) {
+            filtered.push({
+              id: 'user-caissier-moussa',
+              username: 'Moussavision',
+              fullName: 'Moussa Vision (Caissier)',
+              role: 'CASHIER',
+              password: '1234',
+              storeName: 'Boutique Moussa Vision',
+              createdAt: '2026-01-01T00:00:00Z',
+            });
           }
-          const finalUsers = deduped.length > 0 ? deduped : parsed;
-          localStorage.setItem(STORAGE_KEYS.APP_USERS, JSON.stringify(finalUsers));
-          return finalUsers;
+
+          localStorage.setItem(STORAGE_KEYS.APP_USERS, JSON.stringify(filtered));
+          return filtered;
         }
       }
     } catch (e) {}
@@ -418,7 +429,15 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [activeAppUser, setActiveAppUser] = useState<AppUser | null>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.ACTIVE_USER);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const u = JSON.parse(saved);
+        const lower = (u.username || '').toLowerCase();
+        if (['caissier', 'caisse_ouaga', 'caisse_gorom'].includes(lower) || ['user-caissier-1', 'user-caissier-2', 'user-caissier-3'].includes(u.id)) {
+          localStorage.removeItem(STORAGE_KEYS.ACTIVE_USER);
+          return null;
+        }
+        return u;
+      }
     } catch (e) {}
     return null; // Null by default on any fresh device or browser!
   });
@@ -1289,6 +1308,81 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   };
 
+  const setBoutiqueQuantity = async (
+    productId: string,
+    targetUserId: string,
+    newQuantity: number
+  ): Promise<{ success: boolean; message: string }> => {
+    const prod = products.find((p) => p.id === productId);
+    if (!prod) return { success: false, message: 'Article introuvable.' };
+
+    const currentHeld = prod.distributedQuantities?.[targetUserId] || 0;
+    const cleanQty = Math.max(0, Math.floor(Number(newQuantity) || 0));
+
+    if (cleanQty === currentHeld) {
+      return { success: true, message: 'La quantité est déjà identique.' };
+    }
+
+    if (cleanQty > currentHeld) {
+      const delta = cleanQty - currentHeld;
+      const centralStock = prod.centralQuantity !== undefined ? prod.centralQuantity : prod.quantity;
+      if (delta > centralStock) {
+        return {
+          success: false,
+          message: `Stock insuffisant au Grand Magasin (disponible: ${centralStock} pièces).`,
+        };
+      }
+      return await distributeProduct(productId, targetUserId, delta, 'Ajustement de dotation');
+    } else {
+      const delta = currentHeld - cleanQty;
+      return await recallProduct(productId, targetUserId, delta, 'Ajustement de dotation');
+    }
+  };
+
+  const removeFromBoutique = async (
+    productId: string,
+    targetUserId: string
+  ): Promise<{ success: boolean; message: string }> => {
+    const prod = products.find((p) => p.id === productId);
+    if (!prod) return { success: false, message: 'Article introuvable.' };
+
+    const currentHeld = prod.distributedQuantities?.[targetUserId] || 0;
+    if (currentHeld > 0) {
+      const recallRes = await recallProduct(
+        productId,
+        targetUserId,
+        currentHeld,
+        'Retrait total de l’article de la boutique'
+      );
+      if (!recallRes.success) return recallRes;
+    }
+
+    // Cleanse entry from distributedQuantities
+    const now = new Date().toISOString();
+    const newDistributed = { ...(prod.distributedQuantities || {}) };
+    delete newDistributed[targetUserId];
+
+    const currentCentral = prod.centralQuantity !== undefined ? prod.centralQuantity : prod.quantity;
+    const sumDist = Object.values(newDistributed).reduce((a, b) => a + (Number(b) || 0), 0);
+    const newTotal = currentCentral + sumDist;
+
+    const updatedProduct: Product = {
+      ...prod,
+      distributedQuantities: newDistributed,
+      quantity: newTotal,
+      lastUpdated: now,
+    };
+
+    const updatedProducts = products.map((p) => (p.id === productId ? updatedProduct : p));
+    setProducts(updatedProducts);
+    pushToCloud({ products: updatedProducts });
+
+    return {
+      success: true,
+      message: `L'article "${prod.name}" a été entièrement retiré de la boutique.`,
+    };
+  };
+
   const processSale = async (
     items: CartItem[],
     paymentMethod: PaymentMethod,
@@ -1372,7 +1466,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         operator: activeAppUser?.fullName || cashierName,
         notes: `Règlement ${paymentLabel}${paymentMethod === 'ACOMPTE' ? ` (Acompte payé: ${acompteAmount ?? 0} F, Restant: ${remainingAmount ?? 0} F)` : paymentMethod === 'CREDIT' ? ` (Crédit restant: ${remainingAmount ?? totalAmount} F)` : ''}${customerName ? ` - Client: ${customerName}` : ''} - Ticket ${ticketNumber}`,
         createdAt: now,
-        storeName: activeAppUser?.storeName || 'Boutique VisionTech Centrale',
+        storeName: activeAppUser?.storeName || 'Boutique Moussa Vision',
         ticketNumber: ticketNumber,
         saleAmount: subtotal,
         paymentMethod: paymentMethod,
@@ -1633,6 +1727,8 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         // Multi-Store & Stock Distribution
         distributeProduct,
         recallProduct,
+        setBoutiqueQuantity,
+        removeFromBoutique,
         distributionModal,
         openDistributionModal,
         closeDistributionModal,

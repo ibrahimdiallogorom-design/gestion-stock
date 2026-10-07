@@ -22,6 +22,8 @@ export const DistributionModal: React.FC = () => {
 
   const cashiers = appUsers.filter((u) => u.role === 'CASHIER');
 
+  const [isConfirming, setIsConfirming] = useState(false);
+
   useEffect(() => {
     if (distributionModal.isOpen) {
       if (distributionModal.productId) {
@@ -41,6 +43,7 @@ export const DistributionModal: React.FC = () => {
       setNotes('');
       setStatusMessage(null);
       setIsSubmitting(false);
+      setIsConfirming(false);
     }
   }, [distributionModal.isOpen, distributionModal.productId, distributionModal.defaultTargetUserId, products]);
 
@@ -62,7 +65,7 @@ export const DistributionModal: React.FC = () => {
   const costTotal = (currentProduct?.costPrice || 0) * (Number(quantity) || 0);
   const saleTotal = (currentProduct?.salePrice || 0) * (Number(quantity) || 0);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handlePreSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setStatusMessage(null);
 
@@ -72,7 +75,7 @@ export const DistributionModal: React.FC = () => {
     }
 
     if (!targetUserId) {
-      setStatusMessage({ type: 'error', text: 'Veuillez sélectionner un vendeur ou caissier.' });
+      setStatusMessage({ type: 'error', text: 'Veuillez sélectionner une boutique ou un caissier.' });
       return;
     }
 
@@ -89,32 +92,41 @@ export const DistributionModal: React.FC = () => {
       return;
     }
 
+    // Go to confirmation step
+    setIsConfirming(true);
+  };
+
+  const handleExecuteTransfer = async () => {
     setIsSubmitting(true);
+    setStatusMessage(null);
 
     try {
       if (actionType === 'DISTRIBUTE') {
         const res = await distributeProduct(selectedProductId, targetUserId, quantity, notes);
         if (res.success) {
-          setStatusMessage({ type: 'success', text: res.message });
+          setStatusMessage({ type: 'success', text: `Marchandises octroyées avec succès ! ${res.message}` });
           setTimeout(() => {
             closeDistributionModal();
-          }, 1200);
+          }, 1500);
         } else {
           setStatusMessage({ type: 'error', text: res.message });
+          setIsConfirming(false);
         }
       } else {
         const res = await recallProduct(selectedProductId, targetUserId, quantity, notes);
         if (res.success) {
-          setStatusMessage({ type: 'success', text: res.message });
+          setStatusMessage({ type: 'success', text: `Marchandises rapatriées avec succès ! ${res.message}` });
           setTimeout(() => {
             closeDistributionModal();
-          }, 1200);
+          }, 1500);
         } else {
           setStatusMessage({ type: 'error', text: res.message });
+          setIsConfirming(false);
         }
       }
     } catch (err: any) {
       setStatusMessage({ type: 'error', text: err?.message || 'Une erreur est survenue.' });
+      setIsConfirming(false);
     } finally {
       setIsSubmitting(false);
     }
@@ -178,8 +190,83 @@ export const DistributionModal: React.FC = () => {
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        {/* Form Body or Confirmation Step */}
+        {isConfirming ? (
+          <div className="p-6 space-y-5 animate-in zoom-in-95 duration-150">
+            <div className="p-4 bg-emerald-50 border-2 border-emerald-500 rounded-2xl space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-100 text-emerald-800 rounded-xl">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-emerald-950">
+                    {actionType === 'DISTRIBUTE' ? 'Confirmation d’Octroi de Marchandises' : 'Confirmation de Rapatriement'}
+                  </h4>
+                  <p className="text-xs text-emerald-800 mt-0.5">
+                    Veuillez cliquer sur <strong>"Confirmer"</strong> pour valider l'affectation de ces marchandises.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3.5 bg-white rounded-xl border border-emerald-200 text-xs space-y-2 font-medium">
+                <div className="flex justify-between items-center text-slate-700">
+                  <span className="text-slate-500">Article :</span>
+                  <span className="font-bold text-slate-900">{currentProduct?.name} ({currentProduct?.sku})</span>
+                </div>
+                <div className="flex justify-between items-center text-slate-700">
+                  <span className="text-slate-500">Boutique bénéficiaire :</span>
+                  <span className="font-bold text-emerald-700">{currentCashier?.storeName || currentCashier?.fullName}</span>
+                </div>
+                <div className="flex justify-between items-center text-slate-700">
+                  <span className="text-slate-500">Quantité {actionType === 'DISTRIBUTE' ? 'offerte' : 'rapatriée'} :</span>
+                  <span className="font-bold font-mono text-base text-slate-900">{quantity} unité(s)</span>
+                </div>
+                <div className="flex justify-between items-center text-slate-700 border-t border-slate-100 pt-2">
+                  <span className="text-slate-500">Valeur marchande :</span>
+                  <span className="font-bold font-mono text-emerald-700 text-sm">{saleTotal.toLocaleString('fr-FR')} FCFA</span>
+                </div>
+              </div>
+            </div>
+
+            {statusMessage && (
+              <div
+                className={`p-3 rounded-xl text-xs flex items-center gap-2 font-medium ${
+                  statusMessage.type === 'success'
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                    : 'bg-rose-50 text-rose-800 border border-rose-200'
+                }`}
+              >
+                {statusMessage.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                )}
+                <span>{statusMessage.text}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => setIsConfirming(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl"
+              >
+                &larr; Modifier la saisie
+              </button>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={handleExecuteTransfer}
+                className="px-6 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md shadow-emerald-600/30 flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{isSubmitting ? 'Enregistrement...' : 'Confirmer'}</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handlePreSubmit} className="p-5 space-y-4">
           {statusMessage && (
             <div
               className={`p-3 rounded-xl text-xs flex items-center gap-2 font-medium ${
@@ -360,17 +447,18 @@ export const DistributionModal: React.FC = () => {
               {actionType === 'DISTRIBUTE' ? (
                 <>
                   <Share2 className="w-4 h-4" />
-                  <span>Confirmer la Dotation</span>
+                  <span>Étape suivante : Confirmer l'octroi &rarr;</span>
                 </>
               ) : (
                 <>
                   <ArrowLeft className="w-4 h-4" />
-                  <span>Confirmer le Retour</span>
+                  <span>Étape suivante : Confirmer le retour &rarr;</span>
                 </>
               )}
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   );
