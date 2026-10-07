@@ -145,40 +145,44 @@ export const LoginScreen: React.FC = () => {
 
         {/* Quick Credentials Helper (Touch buttons for fast connection) */}
         <div className="pt-2 border-t border-slate-800 space-y-2.5">
-          <span className="text-[11px] font-semibold text-slate-400 block text-center">
-            Comptes configurés par défaut :
-          </span>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-slate-400">
+              Comptes configurés sur cette boutique ({appUsers.length}) :
+            </span>
+            <span className="text-[10px] text-slate-500">
+              Toucher pour pré-remplir
+            </span>
+          </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickSelect('admin', 'admin')}
-              className="p-2.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-left transition-colors"
-            >
-              <div className="flex items-center gap-1.5 font-bold text-white text-xs">
-                <span>👑 Gérant</span>
-              </div>
-              <div className="text-[10px] text-slate-400 mt-0.5 font-mono truncate">
-                admin / admin
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickSelect('caissier', '1234')}
-              className="p-2.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-left transition-colors"
-            >
-              <div className="flex items-center gap-1.5 font-bold text-white text-xs">
-                <span>🛒 Caissier</span>
-              </div>
-              <div className="text-[10px] text-slate-400 mt-0.5 font-mono truncate">
-                caissier / 1234
-              </div>
-            </button>
+          <div className="grid grid-cols-2 gap-2 max-h-44 overflow-y-auto pr-0.5">
+            {appUsers.map((user) => (
+              <button
+                key={user.id}
+                type="button"
+                onClick={() => handleQuickSelect(user.username, user.password)}
+                className="p-2.5 bg-slate-800/60 hover:bg-slate-800 hover:border-emerald-500/50 border border-slate-700/80 rounded-xl text-left transition-all group"
+                title={`Se connecter en tant que ${user.fullName} (@${user.username})`}
+              >
+                <div className="flex items-center justify-between gap-1">
+                  <span className="font-bold text-white text-xs truncate">
+                    {user.role === 'ADMIN' ? '👑 Gérant' : '🛒 Caisse'}
+                  </span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 font-mono">
+                    {user.role === 'ADMIN' ? 'Admin' : 'Caisse'}
+                  </span>
+                </div>
+                <div className="text-[11px] text-emerald-400 font-mono font-semibold truncate mt-1">
+                  @{user.username}
+                </div>
+                <div className="text-[10px] text-slate-400 truncate mt-0.5">
+                  {user.fullName || user.storeName}
+                </div>
+              </button>
+            ))}
           </div>
 
           <p className="text-[10px] text-slate-500 text-center pt-1 leading-relaxed">
-            Sur un nouveau téléphone ou navigateur, l'application reste verrouillée tant que le nom d’utilisateur et le mot de passe ne sont pas renseignés.
+            Vos identifiants personnalisés sont enregistrés localement sur cet appareil.
           </p>
         </div>
       </div>

@@ -373,15 +373,20 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (saved) {
         const parsed: AppUser[] = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Ensure multi-store defaults exist in saved list if absent
-          const existingUsernames = new Set(parsed.map((u) => u.username.toLowerCase()));
-          const missingDefaults = DEFAULT_APP_USERS.filter((d) => !existingUsernames.has(d.username.toLowerCase()));
-          if (missingDefaults.length > 0) {
-            const merged = [...parsed, ...missingDefaults];
-            localStorage.setItem(STORAGE_KEYS.APP_USERS, JSON.stringify(merged));
-            return merged;
+          // Keep user modifications intact, dedup by username
+          const seen = new Set<string>();
+          const deduped: AppUser[] = [];
+          for (let i = parsed.length - 1; i >= 0; i--) {
+            const u = parsed[i];
+            const key = (u.username || '').trim().toLowerCase();
+            if (key && !seen.has(key)) {
+              seen.add(key);
+              deduped.unshift(u);
+            }
           }
-          return parsed;
+          const finalUsers = deduped.length > 0 ? deduped : parsed;
+          localStorage.setItem(STORAGE_KEYS.APP_USERS, JSON.stringify(finalUsers));
+          return finalUsers;
         }
       }
     } catch (e) {}
@@ -825,7 +830,26 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const cleanPin = newPin.trim();
     setCashierPinState(cleanPin);
     localStorage.setItem(STORAGE_KEYS.CASHIER_PIN, cleanPin);
-    return { success: true, message: 'Code d\'accès caissier modifié avec succès !' };
+
+    // Synchroniser automatiquement avec les comptes utilisateurs (appUsers)
+    setAppUsers((prevUsers) => {
+      const updated = prevUsers.map((u) => {
+        if (activeAppUser?.id === u.id || (activeAppUser?.role === 'CASHIER' && u.id === activeAppUser.id) || (u.role === 'CASHIER' && u.username === 'caissier')) {
+          return { ...u, password: cleanPin };
+        }
+        return u;
+      });
+      localStorage.setItem(STORAGE_KEYS.APP_USERS, JSON.stringify(updated));
+      return updated;
+    });
+
+    if (activeAppUser && (activeAppUser.role === 'CASHIER' || activeAppUser.username === 'caissier')) {
+      const refreshed = { ...activeAppUser, password: cleanPin };
+      setActiveAppUser(refreshed);
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(refreshed));
+    }
+
+    return { success: true, message: 'Code d’accès caisse et mot de passe de connexion synchronisés avec succès !' };
   };
 
   const setCashierName = (name: string) => {
@@ -833,6 +857,24 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setCashierNameState(clean);
     localStorage.setItem(STORAGE_KEYS.CASHIER_NAME, clean);
     setCashierSession((prev) => ({ ...prev, cashierName: clean }));
+
+    // Synchroniser automatiquement avec appUsers
+    setAppUsers((prevUsers) => {
+      const updated = prevUsers.map((u) => {
+        if (activeAppUser?.id === u.id || (u.role === 'CASHIER' && u.username === 'caissier')) {
+          return { ...u, fullName: clean };
+        }
+        return u;
+      });
+      localStorage.setItem(STORAGE_KEYS.APP_USERS, JSON.stringify(updated));
+      return updated;
+    });
+
+    if (activeAppUser && (activeAppUser.role === 'CASHIER' || activeAppUser.username === 'caissier')) {
+      const refreshed = { ...activeAppUser, fullName: clean };
+      setActiveAppUser(refreshed);
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(refreshed));
+    }
   };
 
   const clearAllProducts = () => {
@@ -1143,8 +1185,8 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const found = appUsers.find(
       (u) =>
-        u.username.toLowerCase() === trimmedUser &&
-        (u.password === trimmedPass || (trimmedUser === 'admin' && (trimmedPass === 'admin' || trimmedPass === 'admin1234')))
+        u.username.trim().toLowerCase() === trimmedUser &&
+        u.password.trim() === trimmedPass
     );
 
     if (!found) {

@@ -108,9 +108,9 @@ export const SettingsView: React.FC = () => {
     if (!res.success) {
       setUserMsg({ text: res.message || 'Erreur lors de la mise à jour.', isError: true });
     } else {
-      setUserMsg({ text: 'Compte utilisateur et identifiant mis à jour avec succès !' });
+      setUserMsg({ text: `Compte mis à jour avec succès ! Nouvel identifiant : @${editUsername.trim()} (Mot de passe enregistré).` });
       setEditingUserId(null);
-      setTimeout(() => setUserMsg(null), 3500);
+      setTimeout(() => setUserMsg(null), 5000);
     }
   };
 
@@ -344,6 +344,32 @@ export const SettingsView: React.FC = () => {
         <p className="text-xs text-slate-500">
           Gérez ici les identifiants et mots de passe. Vous pouvez modifier le nom d'utilisateur d'un compte (ex: renommer la caisse pour une boutique d'encaissement spécifique), changer les mots de passe et créer des accès pour vos collaborateurs.
         </p>
+
+        {activeAppUser && (
+          <div className="p-3.5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-blue-950">Mon Compte Actuel : {activeAppUser.fullName}</span>
+                <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full font-semibold text-[10px]">
+                  {activeAppUser.role === 'ADMIN' ? '👑 Gérant' : '🛒 Caissier'}
+                </span>
+              </div>
+              <p className="text-blue-700 text-[11px]">
+                Identifiant de connexion : <strong className="font-mono bg-white/70 px-1.5 py-0.5 rounded border border-blue-200 text-slate-800">@{activeAppUser.username}</strong>
+                {' • '}
+                Mot de passe : <strong className="font-mono bg-white/70 px-1.5 py-0.5 rounded border border-blue-200 text-slate-800">{activeAppUser.password}</strong>
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => startEditUser(activeAppUser)}
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-xs flex items-center justify-center gap-1.5 transition-colors shrink-0"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              <span>Modifier mes identifiants</span>
+            </button>
+          </div>
+        )}
 
         {userMsg && (
           <div
@@ -662,6 +688,16 @@ export const SettingsView: React.FC = () => {
         <p className="text-xs text-slate-500">
           Protégez l'accès au terminal d'encaissement et à la validation des ventes. Seul le caissier autorisé possédant le code secret peut se connecter et manipuler la caisse.
         </p>
+
+        <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-start gap-2.5">
+          <KeyRound className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <span className="font-bold block">Synchronisation directe avec la connexion :</span>
+            <span className="text-slate-600 block">
+              La modification de ce code ou du nom met à jour automatiquement le mot de passe et l'identité du compte caissier pour l'écran de connexion.
+            </span>
+          </div>
+        </div>
 
         {pinSuccessMsg && (
           <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center gap-2">
