@@ -16,6 +16,8 @@ import {
   Users,
   Store,
   Share2,
+  Smartphone,
+  Download,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { ViewTab } from '../types';
@@ -33,6 +35,7 @@ export const Sidebar: React.FC = () => {
     activeAppUser,
     logoutAppUser,
     openSwitchAccountModal,
+    openInstallModal,
   } = useStock();
 
   const isCashier = activeAppUser?.role === 'CASHIER';
@@ -306,6 +309,20 @@ export const Sidebar: React.FC = () => {
 
       {/* Bottom Zone: Status & Theme Shortcut */}
       <div className="p-3 border-t border-slate-200 bg-slate-50/60 space-y-2">
+        {/* Install Mobile App / Download APK Button */}
+        <button
+          onClick={openInstallModal}
+          className="w-full flex items-center justify-between p-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold transition-all shadow-xs"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <Smartphone className="w-4 h-4 text-white shrink-0" />
+            <span className="text-xs truncate">Installer l'App / APK</span>
+          </div>
+          <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded text-white font-mono shrink-0">
+            1 Clic
+          </span>
+        </button>
+
         {/* Theme pill */}
         <button
           onClick={() => setActiveTab('design_system')}

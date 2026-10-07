@@ -18,6 +18,7 @@ import { CashierView } from './components/CashierView';
 import { DailyReportsView } from './components/DailyReportsView';
 import { DistributionView } from './components/DistributionView';
 import { SwitchAccountModal } from './components/SwitchAccountModal';
+import { InstallAppModal } from './components/InstallAppModal';
 import { LoginScreen } from './components/LoginScreen';
 import { MovementModal } from './components/MovementModal';
 import { ProductModal } from './components/ProductModal';
@@ -33,10 +34,20 @@ import {
   ShoppingCart,
   Receipt,
   Users,
+  Smartphone,
 } from 'lucide-react';
 
 const AppContent: React.FC = () => {
-  const { activeTab, setActiveTab, theme, activeAppUser, openSwitchAccountModal } = useStock();
+  const {
+    activeTab,
+    setActiveTab,
+    theme,
+    activeAppUser,
+    openSwitchAccountModal,
+    isInstallModalOpen,
+    openInstallModal,
+    closeInstallModal,
+  } = useStock();
   const currentTheme = THEME_CONFIGS[theme];
 
   // If user is not authenticated, show Login Screen on ANY device/phone!
@@ -131,6 +142,14 @@ const AppContent: React.FC = () => {
               <Users className="w-4 h-4" />
               <span>Compte</span>
             </button>
+            <button
+              onClick={openInstallModal}
+              className="flex flex-col items-center py-1 px-1.5 text-[10px] text-indigo-600 hover:text-indigo-700 font-bold"
+              title="Installer l'application sur le téléphone ou télécharger l'APK"
+            >
+              <Smartphone className="w-4 h-4" />
+              <span>Installer</span>
+            </button>
           </>
         ) : (
           <>
@@ -178,13 +197,12 @@ const AppContent: React.FC = () => {
               <span>Compte</span>
             </button>
             <button
-              onClick={() => setActiveTab('settings')}
-              className={`flex flex-col items-center py-1 px-1.5 text-[10px] ${
-                activeTab === 'settings' ? 'text-blue-600 font-bold' : 'text-slate-500'
-              }`}
+              onClick={openInstallModal}
+              className="flex flex-col items-center py-1 px-1.5 text-[10px] text-indigo-600 hover:text-indigo-700 font-bold"
+              title="Installer l'application sur le téléphone ou télécharger l'APK"
             >
-              <Settings className="w-4 h-4" />
-              <span>Paramètres</span>
+              <Smartphone className="w-4 h-4" />
+              <span>Installer</span>
             </button>
           </>
         )}
@@ -196,6 +214,7 @@ const AppContent: React.FC = () => {
       <ConfirmModal />
       <SwitchAccountModal />
       <DistributionModal />
+      <InstallAppModal isOpen={isInstallModalOpen} onClose={closeInstallModal} />
     </div>
   );
 };

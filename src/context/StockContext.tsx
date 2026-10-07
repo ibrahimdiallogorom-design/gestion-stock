@@ -166,6 +166,9 @@ interface StockContextType {
   openSwitchAccountModal: () => void;
   closeSwitchAccountModal: () => void;
   switchAccountFast: (userId: string) => { success: boolean; message?: string };
+  isInstallModalOpen: boolean;
+  openInstallModal: () => void;
+  closeInstallModal: () => void;
   // Real-time Cloud Sync (Firestore)
   cloudStatus: CloudSyncStatus;
   cloudStatusMessage: string;
@@ -447,6 +450,11 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isSwitchAccountOpen, setIsSwitchAccountOpen] = useState(false);
   const openSwitchAccountModal = () => setIsSwitchAccountOpen(true);
   const closeSwitchAccountModal = () => setIsSwitchAccountOpen(false);
+
+  // Install PWA & Download APK Modal state
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const openInstallModal = () => setIsInstallModalOpen(true);
+  const closeInstallModal = () => setIsInstallModalOpen(false);
 
   // Modals
   const [movementModal, setMovementModal] = useState<{
@@ -1819,6 +1827,9 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         openSwitchAccountModal,
         closeSwitchAccountModal,
         switchAccountFast,
+        isInstallModalOpen,
+        openInstallModal,
+        closeInstallModal,
         // Cashier security & POS
         isCashierUnlocked,
         cashierPin,

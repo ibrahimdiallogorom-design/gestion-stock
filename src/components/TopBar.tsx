@@ -15,6 +15,7 @@ import {
   Receipt,
   Users,
   Cloud,
+  Smartphone,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { THEME_CONFIGS } from './ThemeClasses';
@@ -37,6 +38,7 @@ export const TopBar: React.FC = () => {
     cloudStatus,
     cloudStatusMessage,
     forceSyncCloud,
+    openInstallModal,
   } = useStock();
 
   const currentTheme = THEME_CONFIGS[theme];
@@ -154,6 +156,17 @@ export const TopBar: React.FC = () => {
         >
           <Receipt className="w-3.5 h-3.5 text-blue-600" />
           <span className="hidden sm:inline">Rapports</span>
+        </button>
+
+        {/* Installer l'App / Télécharger APK Modal Button */}
+        <button
+          onClick={openInstallModal}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xs"
+          title="Installer l'application sur votre téléphone ou télécharger l'APK pour WhatsApp et Xender"
+        >
+          <Smartphone className="w-3.5 h-3.5 text-white" />
+          <span className="hidden sm:inline">Installer l'App</span>
+          <span className="sm:hidden">App</span>
         </button>
 
         {/* Direct Link to Design System & Theme Inspector (Admin only) */}
