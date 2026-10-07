@@ -117,11 +117,14 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
                   1
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 text-sm">
-                    Installation Directe sur votre Téléphone (1 Clic)
+                  <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                    Installation Directe sur Téléphone (1 Clic)
+                    <span className="text-[10px] bg-blue-200 text-blue-900 px-2 py-0.5 rounded-full font-bold">
+                      ⭐ RECOMMANDÉ • 100% À JOUR
+                    </span>
                   </h3>
                   <p className="text-slate-600 text-[11px]">
-                    Crée l'icône sur l'écran d'accueil sans passer par le Play Store. Lancement plein écran immédiat avec Cloud en temps réel.
+                    Installe l'icône Vision Tech sur votre écran d'accueil. Lancement plein écran immédiat avec la boutique actuelle et synchronisation Cloud automatique.
                   </p>
                 </div>
               </div>
@@ -138,7 +141,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
                 className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 text-xs"
               >
                 <Smartphone className="w-4 h-4" />
-                <span>Installer le Raccourci sur mon Téléphone</span>
+                <span>Installer la Boutique Vision Tech sur mon Téléphone</span>
               </button>
             )}
 
@@ -152,7 +155,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
             )}
           </div>
 
-          {/* Method 2: Download APK File for WhatsApp / Xender */}
+          {/* Method 2: Share link via WhatsApp to Caissiers */}
           <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 space-y-3">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-sm">
@@ -160,33 +163,32 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
               </div>
               <div>
                 <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                  Télécharger le Fichier APK (Pour WhatsApp & Xender)
+                  Partager l'App aux Caissiers par WhatsApp
                   <span className="text-[10px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono font-semibold">
-                    18 MB
+                    Instantané
                   </span>
                 </h3>
                 <p className="text-slate-600 text-[11px]">
-                  Fichier d'installation autonome Android à partager par WhatsApp, Xender ou Bluetooth à vos caissiers.
+                  Envoyez l'accès direct en 1 clic par WhatsApp. Vos caissiers auront immédiatement la dernière version sur leur téléphone sans fichier lourd.
                 </p>
               </div>
             </div>
 
-            <a
-              href="./GestionStock.apk"
-              download="GestionStock.apk"
-              className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 text-xs no-underline"
+            <button
+              onClick={handleShareWhatsApp}
+              className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 text-xs"
             >
-              <Download className="w-4 h-4" />
-              <span>Télécharger GestionStock.apk</span>
-            </a>
+              <Share2 className="w-4 h-4" />
+              <span>Envoyer le Lien d'Installation par WhatsApp</span>
+            </button>
 
             <div className="p-2.5 bg-white border border-emerald-200/80 rounded-xl text-[11px] text-slate-600 space-y-1">
               <p className="font-semibold text-slate-800">
-                📲 Comment envoyer par WhatsApp ou Xender :
+                📲 Comment équiper vos caissiers par WhatsApp :
               </p>
-              <p>• Téléchargez le fichier APK sur votre téléphone en cliquant sur le bouton vert ci-dessus.</p>
-              <p>• Allez sur WhatsApp ou Xender, envoyez le fichier <strong>GestionStock.apk</strong> à votre caissier.</p>
-              <p>• Le caissier clique sur le fichier reçu pour l'installer sur son smartphone Android et accéder directement au Cloud.</p>
+              <p>• Cliquez sur le bouton vert ci-dessus pour envoyer l'accès à votre caissier.</p>
+              <p>• Le caissier ouvre le lien sur son smartphone, puis clique sur <strong>"Installer"</strong>.</p>
+              <p>• L'icône officielle Vision Tech s'installe directement sur son téléphone avec la boutique en direct et synchronisée au Cloud !</p>
             </div>
           </div>
 
