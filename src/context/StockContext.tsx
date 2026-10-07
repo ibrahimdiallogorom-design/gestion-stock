@@ -19,7 +19,14 @@ import {
 import { INITIAL_PRODUCTS, INITIAL_MOVEMENTS, INITIAL_SUPPLIERS } from '../data/initialData';
 import { initAuth, googleSignIn, logout, getAccessToken } from '../services/firebaseAuth';
 import { pushDataToSheets, pullDataFromSheets, createSpreadsheetWithTemplate, extractSpreadsheetId } from '../services/googleSheets';
-import { initCloudSync, pushToCloud, CloudSyncStatus, getDeviceId } from '../services/cloudSync';
+import {
+  initCloudSync,
+  pushToCloud,
+  forcePushToCloud,
+  pullFromCloud,
+  CloudSyncStatus,
+  getDeviceId,
+} from '../services/cloudSync';
 import { User } from 'firebase/auth';
 
 interface StockContextType {
@@ -153,6 +160,7 @@ interface StockContextType {
   cloudStatus: CloudSyncStatus;
   cloudStatusMessage: string;
   forceSyncCloud: () => Promise<void>;
+  pullLatestFromCloud: () => Promise<{ success: boolean; message: string }>;
 }
 
 const StockContext = createContext<StockContextType | undefined>(undefined);
@@ -491,47 +499,122 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     const unsubCloud = initCloudSync({
       onRemoteData: (remote) => {
-        const myDeviceId = getDeviceId();
-        // If the update came from another device or on initial load
-        if (remote.lastDeviceId !== myDeviceId) {
-          if (remote.appUsers && Array.isArray(remote.appUsers) && remote.appUsers.length > 0) {
-            setAppUsers(remote.appUsers);
-            localStorage.setItem(STORAGE_KEYS.APP_USERS, JSON.stringify(remote.appUsers));
-            // Keep active user synchronized if currently logged in
-            setActiveAppUser((current) => {
-              if (!current) return null;
-              const matching = remote.appUsers!.find((u) => u.id === current.id || u.username.toLowerCase() === current.username.toLowerCase());
-              if (matching) {
-                localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(matching));
-                return matching;
-              }
-              return current;
-            });
-          }
-          if (remote.products && Array.isArray(remote.products) && remote.products.length > 0) {
-            setProducts(remote.products);
-            localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(remote.products));
-          }
-          if (remote.movements && Array.isArray(remote.movements)) {
-            setMovements(remote.movements);
-            localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(remote.movements));
-          }
-          if (remote.cashierPin) {
-            setCashierPinState(remote.cashierPin);
-            localStorage.setItem(STORAGE_KEYS.CASHIER_PIN, remote.cashierPin);
-          }
-          if (remote.cashierName) {
-            setCashierNameState(remote.cashierName);
-            localStorage.setItem(STORAGE_KEYS.CASHIER_NAME, remote.cashierName);
-          }
+        // 1. App Users Synchronization
+        if (remote.appUsers && Array.isArray(remote.appUsers) && remote.appUsers.length > 0) {
+          setAppUsers(remote.appUsers);
+          localStorage.setItem(STORAGE_KEYS.APP_USERS, JSON.stringify(remote.appUsers));
+          // Keep active user synchronized if currently logged in
+          setActiveAppUser((current) => {
+            if (!current) return null;
+            const matching = remote.appUsers!.find(
+              (u) => u.id === current.id || u.username.toLowerCase() === current.username.toLowerCase()
+            );
+            if (matching) {
+              localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(matching));
+              return matching;
+            }
+            return current;
+          });
         }
 
-        // If cloud does not have users yet, seed cloud from this local device!
+        // 2. Products Reconciliation & Multi-Device Sync
+        const localProdsJson = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
+        let localProds: Product[] = [];
+        try {
+          if (localProdsJson) localProds = JSON.parse(localProdsJson);
+        } catch (e) {}
+
+        const remoteProds = Array.isArray(remote.products) ? remote.products : [];
+
+        if (remoteProds.length > 0) {
+          // Merge local and remote products intelligently
+          const prodMap = new Map<string, Product>();
+          remoteProds.forEach((p) => prodMap.set(p.id, p));
+
+          let localHadNewerOrUnsynced = false;
+          localProds.forEach((lp) => {
+            if (!prodMap.has(lp.id)) {
+              prodMap.set(lp.id, lp);
+              localHadNewerOrUnsynced = true;
+            } else {
+              const remoteP = prodMap.get(lp.id)!;
+              const localTime = new Date(lp.lastUpdated || 0).getTime();
+              const remoteTime = new Date(remoteP.lastUpdated || 0).getTime();
+              if (localTime > remoteTime) {
+                prodMap.set(lp.id, lp);
+                localHadNewerOrUnsynced = true;
+              }
+            }
+          });
+
+          const mergedProducts = Array.from(prodMap.values());
+          setProducts(mergedProducts);
+          localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(mergedProducts));
+
+          // If this device had articles not yet in the cloud, upload them to the cloud!
+          if (localHadNewerOrUnsynced) {
+            pushToCloud({ products: mergedProducts });
+          }
+        } else if (localProds.length > 0) {
+          // The cloud was empty, but THIS phone has existing products in local storage!
+          // Instantly send all phone products to the Cloud so the computer can see them!
+          forcePushToCloud({ products: localProds });
+        } else {
+          setProducts([]);
+        }
+
+        // 3. Stock Movements Reconciliation
+        const localMovsJson = localStorage.getItem(STORAGE_KEYS.MOVEMENTS);
+        let localMovs: StockMovement[] = [];
+        try {
+          if (localMovsJson) localMovs = JSON.parse(localMovsJson);
+        } catch (e) {}
+
+        const remoteMovs = Array.isArray(remote.movements) ? remote.movements : [];
+
+        if (remoteMovs.length > 0) {
+          const movMap = new Map<string, StockMovement>();
+          remoteMovs.forEach((m) => movMap.set(m.id, m));
+
+          let localHadUnsyncedMovs = false;
+          localMovs.forEach((lm) => {
+            if (!movMap.has(lm.id)) {
+              movMap.set(lm.id, lm);
+              localHadUnsyncedMovs = true;
+            }
+          });
+
+          const mergedMovements = Array.from(movMap.values()).sort(
+            (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+          );
+          setMovements(mergedMovements);
+          localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(mergedMovements));
+
+          if (localHadUnsyncedMovs) {
+            pushToCloud({ movements: mergedMovements });
+          }
+        } else if (localMovs.length > 0) {
+          forcePushToCloud({ movements: localMovs });
+        } else {
+          setMovements([]);
+        }
+
+        // 4. Cashier Security & Name
+        if (remote.cashierPin) {
+          setCashierPinState(remote.cashierPin);
+          localStorage.setItem(STORAGE_KEYS.CASHIER_PIN, remote.cashierPin);
+        }
+        if (remote.cashierName) {
+          setCashierNameState(remote.cashierName);
+          localStorage.setItem(STORAGE_KEYS.CASHIER_NAME, remote.cashierName);
+        }
+
+        // 5. Initial Seed if cloud document is missing users
         if (!remote.appUsers || remote.appUsers.length === 0) {
-          pushToCloud({
+          forcePushToCloud({
             appUsers,
-            products,
-            movements,
+            products: localProds.length > 0 ? localProds : products,
+            movements: localMovs.length > 0 ? localMovs : movements,
             cashierPin,
             cashierName,
             storeName: 'Boutique VisionTech',
@@ -550,16 +633,65 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const forceSyncCloud = async () => {
     setCloudStatus('connecting');
     setCloudStatusMessage('Synchronisation Cloud en cours...');
-    await pushToCloud({
-      appUsers,
-      products,
-      movements,
-      cashierPin,
-      cashierName,
-      storeName: 'Boutique VisionTech',
-    });
-    setCloudStatus('connected');
-    setCloudStatusMessage('Données synchronisées dans le Cloud');
+    try {
+      await forcePushToCloud({
+        appUsers,
+        products,
+        movements,
+        cashierPin,
+        cashierName,
+        storeName: 'Boutique VisionTech',
+      });
+      setCloudStatus('connected');
+      setCloudStatusMessage('Catalogue et stock synchronisés dans le Cloud');
+    } catch (e: any) {
+      setCloudStatus('error');
+      setCloudStatusMessage('Erreur de synchronisation');
+    }
+  };
+
+  const pullLatestFromCloud = async (): Promise<{ success: boolean; message: string }> => {
+    try {
+      setCloudStatus('connecting');
+      setCloudStatusMessage('Téléchargement depuis le Cloud...');
+      const data = await pullFromCloud();
+      if (!data) {
+        setCloudStatus('connected');
+        return { success: false, message: 'Aucune donnée trouvée sur le Cloud.' };
+      }
+
+      if (data.products && Array.isArray(data.products)) {
+        setProducts(data.products);
+        localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(data.products));
+      }
+      if (data.movements && Array.isArray(data.movements)) {
+        setMovements(data.movements);
+        localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(data.movements));
+      }
+      if (data.appUsers && Array.isArray(data.appUsers) && data.appUsers.length > 0) {
+        setAppUsers(data.appUsers);
+        localStorage.setItem(STORAGE_KEYS.APP_USERS, JSON.stringify(data.appUsers));
+      }
+      if (data.cashierPin) {
+        setCashierPinState(data.cashierPin);
+        localStorage.setItem(STORAGE_KEYS.CASHIER_PIN, data.cashierPin);
+      }
+      if (data.cashierName) {
+        setCashierNameState(data.cashierName);
+        localStorage.setItem(STORAGE_KEYS.CASHIER_NAME, data.cashierName);
+      }
+
+      setCloudStatus('connected');
+      setCloudStatusMessage('Données Cloud à jour');
+      return {
+        success: true,
+        message: `${data.products?.length || 0} article(s) et ${data.movements?.length || 0} mouvement(s) chargés depuis le Cloud !`,
+      };
+    } catch (err: any) {
+      setCloudStatus('error');
+      setCloudStatusMessage('Erreur de récupération Cloud');
+      return { success: false, message: 'Erreur lors du téléchargement des données Cloud.' };
+    }
   };
 
   // Init Firebase Auth on mount
@@ -1524,6 +1656,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         cloudStatus,
         cloudStatusMessage,
         forceSyncCloud,
+        pullLatestFromCloud,
       }}
     >
       {children}

@@ -90,7 +90,7 @@ export const TopBar: React.FC = () => {
         <button
           type="button"
           onClick={forceSyncCloud}
-          className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all ${
+          className={`inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-semibold border transition-all ${
             cloudStatus === 'connected'
               ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
               : cloudStatus === 'connecting'
@@ -100,7 +100,7 @@ export const TopBar: React.FC = () => {
           title="Synchronisation Cloud en direct active. Cliquez pour forcer une synchronisation instantanée."
         >
           <span
-            className={`w-2 h-2 rounded-full ${
+            className={`w-2 h-2 rounded-full shrink-0 ${
               cloudStatus === 'connected'
                 ? 'bg-emerald-500 animate-pulse'
                 : cloudStatus === 'connecting'
@@ -108,8 +108,13 @@ export const TopBar: React.FC = () => {
                 : 'bg-slate-400'
             }`}
           />
-          <Cloud className="w-3.5 h-3.5 text-blue-600" />
-          <span>{cloudStatus === 'connected' ? 'Cloud Synchro En Direct' : cloudStatusMessage}</span>
+          <Cloud className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+          <span className="hidden sm:inline">
+            {cloudStatus === 'connected' ? 'Cloud Synchro En Direct' : cloudStatusMessage}
+          </span>
+          <span className="sm:hidden">
+            {cloudStatus === 'connected' ? 'Cloud En Direct' : 'Synchro...'}
+          </span>
         </button>
       </div>
 

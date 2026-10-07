@@ -1,4 +1,4 @@
-import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
+import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import {
   getAuth,
   signInWithEmailAndPassword,
@@ -8,6 +8,7 @@ import {
 import {
   getFirestore,
   doc,
+  getDoc,
   setDoc,
   onSnapshot,
   Firestore,
@@ -60,7 +61,7 @@ function getCloudServices() {
   return { auth: cloudAuth!, db: cloudDb! };
 }
 
-// Generate or retrieve persistent local device ID to avoid echo loops
+// Generate or retrieve persistent local device ID
 const DEVICE_ID_KEY = 'stockflow_device_uuid_v1';
 export function getDeviceId(): string {
   try {
@@ -75,31 +76,40 @@ export function getDeviceId(): string {
   }
 }
 
-// Ensure background session authentication for Firestore security rules
+// Ensure background session authentication for Firestore security rules (with singleton lock)
+let authPromise: Promise<void> | null = null;
+
 async function ensureCloudAuth(auth: Auth): Promise<void> {
   if (auth.currentUser) return;
+  if (authPromise) return authPromise;
 
-  try {
-    await signInWithEmailAndPassword(
-      auth,
-      CLOUD_CREDENTIALS.email,
-      CLOUD_CREDENTIALS.password
-    );
-  } catch (err: any) {
-    if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-      try {
-        await createUserWithEmailAndPassword(
-          auth,
-          CLOUD_CREDENTIALS.email,
-          CLOUD_CREDENTIALS.password
-        );
-      } catch (createErr) {
-        console.warn('Cloud Auth create fallback warning:', createErr);
+  authPromise = (async () => {
+    try {
+      await signInWithEmailAndPassword(
+        auth,
+        CLOUD_CREDENTIALS.email,
+        CLOUD_CREDENTIALS.password
+      );
+    } catch (err: any) {
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+        try {
+          await createUserWithEmailAndPassword(
+            auth,
+            CLOUD_CREDENTIALS.email,
+            CLOUD_CREDENTIALS.password
+          );
+        } catch (createErr) {
+          console.warn('Cloud Auth create fallback warning:', createErr);
+        }
+      } else {
+        console.warn('Cloud Auth sign-in warning:', err);
       }
-    } else {
-      console.warn('Cloud Auth sign-in warning:', err);
+    } finally {
+      authPromise = null;
     }
-  }
+  })();
+
+  return authPromise;
 }
 
 /**
@@ -193,6 +203,54 @@ export async function pushToCloud(partialData: Partial<CloudStoreData>): Promise
         console.warn('Cloud sync push warning (retrying later):', err);
         resolve();
       }
-    }, 400); // 400ms debounce
+    }, 100); // 100ms ultra-fast sync
   });
 }
+
+/**
+ * Envoi immédiat forcé sans aucun délai de temporisation (debounce bypass).
+ */
+export async function forcePushToCloud(partialData: Partial<CloudStoreData>): Promise<void> {
+  if (pushTimer) {
+    clearTimeout(pushTimer);
+    pushTimer = null;
+  }
+  const deviceId = getDeviceId();
+  const dataToSave = {
+    ...pendingPushData,
+    ...partialData,
+    lastDeviceId: deviceId,
+    updatedAt: new Date().toISOString(),
+  };
+  pendingPushData = {};
+
+  try {
+    const { auth, db } = getCloudServices();
+    await ensureCloudAuth(auth);
+    const storeDocRef = doc(db, 'stores', STORE_DOC_ID);
+    await setDoc(storeDocRef, dataToSave, { merge: true });
+  } catch (err) {
+    console.error('forcePushToCloud error:', err);
+    throw err;
+  }
+}
+
+/**
+ * Récupère directement l'état le plus frais depuis le Cloud Firestore.
+ */
+export async function pullFromCloud(): Promise<CloudStoreData | null> {
+  try {
+    const { auth, db } = getCloudServices();
+    await ensureCloudAuth(auth);
+    const storeDocRef = doc(db, 'stores', STORE_DOC_ID);
+    const snap = await getDoc(storeDocRef);
+    if (snap.exists()) {
+      return snap.data() as CloudStoreData;
+    }
+    return null;
+  } catch (err) {
+    console.error('pullFromCloud error:', err);
+    throw err;
+  }
+}
+
