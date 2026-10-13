@@ -137,8 +137,8 @@ export const DistributionModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full max-h-[92vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="p-5 bg-gradient-to-r from-slate-900 to-blue-950 text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -360,12 +360,10 @@ export const DistributionModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Quantity Input with Quick Controls and Scrollable Strip */}
-          <div className="space-y-3 bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/80">
+          {/* Quantity Input with Saisie Libre (Fermeture du défilement) */}
+          <div className="space-y-2 bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/80">
             <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
-              <span className="flex items-center gap-1.5">
-                <span>Quantité à {actionType === 'DISTRIBUTE' ? 'attribuer' : 'réintégrer'}</span>
-              </span>
+              <span>Quantité à {actionType === 'DISTRIBUTE' ? 'attribuer' : 'réintégrer'}</span>
               <span className="text-[11px] text-slate-500 font-normal">
                 Dispo : <strong className="text-slate-900 font-mono font-bold">{maxQuantity}</strong> unité(s)
               </span>
@@ -396,7 +394,6 @@ export const DistributionModal: React.FC = () => {
                       setQuantity('');
                       return;
                     }
-                    // Filter out non-digits
                     const clean = raw.replace(/[^0-9]/g, '');
                     if (clean === '') {
                       setQuantity('');
@@ -430,81 +427,16 @@ export const DistributionModal: React.FC = () => {
               </button>
             </div>
 
-            {/* Curseur de défilement (Slider) */}
-            {maxQuantity > 0 && (
-              <div className="space-y-1 pt-1">
-                <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium">
-                  <span>0</span>
-                  <span className="font-mono text-blue-700 font-bold">
-                    Glisser : {numericQuantity} / {maxQuantity}
-                  </span>
-                  <span>{maxQuantity}</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max={maxQuantity}
-                  value={numericQuantity}
-                  onChange={(e) => setQuantity(Number(e.target.value))}
-                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                />
-              </div>
-            )}
-
-            {/* Roulette / Bande de défilement horizontal des chiffres */}
-            {maxQuantity > 0 && (
-              <div className="space-y-1 pt-1">
-                <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider flex items-center justify-between">
-                  <span>Défilement des chiffres (cliquez pour choisir) :</span>
-                  {numericQuantity > 0 && (
-                    <span className="text-blue-600 font-bold font-mono">Choisi : {numericQuantity}</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-0.5 scrollbar-thin scroll-smooth border border-slate-200 bg-white rounded-lg p-1">
-                  {Array.from({ length: Math.min(maxQuantity + 1, 101) }, (_, i) => i).map((num) => {
-                    const isSelected = numericQuantity === num && quantity !== '';
-                    return (
-                      <button
-                        key={num}
-                        type="button"
-                        onClick={() => setQuantity(num)}
-                        className={`h-8 min-w-[34px] px-2 rounded-md font-mono text-xs font-bold transition-all shrink-0 flex items-center justify-center ${
-                          isSelected
-                            ? 'bg-blue-600 text-white shadow-sm scale-105 ring-2 ring-blue-300'
-                            : 'bg-slate-50 text-slate-700 hover:bg-slate-200 border border-slate-200/80'
-                        }`}
-                      >
-                        {num}
-                      </button>
-                    );
-                  })}
-                  {maxQuantity > 100 && (
-                    <button
-                      type="button"
-                      onClick={() => setQuantity(maxQuantity)}
-                      className={`h-8 px-2.5 rounded-md font-mono text-xs font-bold transition-all shrink-0 flex items-center justify-center ${
-                        numericQuantity === maxQuantity
-                          ? 'bg-blue-600 text-white shadow-sm'
-                          : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
-                      }`}
-                    >
-                      Max ({maxQuantity})
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Raccourcis rapides */}
+            {/* Raccourcis Rapides */}
             <div className="flex gap-1.5 pt-1">
               <button
                 type="button"
                 onClick={() => setQuantity(0)}
-                className="py-1 px-2 text-[11px] font-mono bg-slate-200/70 hover:bg-slate-300 rounded-lg text-slate-700 font-medium"
+                className="py-1 px-2.5 text-[11px] font-mono bg-slate-200/70 hover:bg-slate-300 rounded-lg text-slate-700 font-medium"
               >
-                Zéro (0)
+                0
               </button>
-              {[5, 10, 20].map((step) => (
+              {[1, 5, 10, 20].map((step) => (
                 <button
                   key={step}
                   type="button"
@@ -559,35 +491,30 @@ export const DistributionModal: React.FC = () => {
             />
           </div>
 
-          {/* Submit Buttons */}
-          <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100">
+          {/* Submit Buttons (Toujours bien visibles en bas) */}
+          <div className="pt-3 flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 -mx-5 -mb-5 p-4 rounded-b-2xl">
             <button
               type="button"
               onClick={closeDistributionModal}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
+              className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded-xl transition-colors"
             >
               Annuler
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || maxQuantity <= 0}
-              className={`px-5 py-2 text-xs font-bold text-white rounded-xl shadow-xs transition-colors flex items-center gap-1.5 ${
+              disabled={isSubmitting || maxQuantity <= 0 || numericQuantity <= 0}
+              className={`px-6 py-2.5 text-xs font-bold text-white rounded-xl shadow-md transition-all flex items-center gap-2 ${
                 actionType === 'DISTRIBUTE'
-                  ? 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300'
-                  : 'bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300'
+                  ? 'bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300'
+                  : 'bg-amber-600 hover:bg-amber-700 disabled:bg-slate-300'
               }`}
             >
-              {actionType === 'DISTRIBUTE' ? (
-                <>
-                  <Share2 className="w-4 h-4" />
-                  <span>Étape suivante : Confirmer l'octroi &rarr;</span>
-                </>
-              ) : (
-                <>
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>Étape suivante : Confirmer le retour &rarr;</span>
-                </>
-              )}
+              <CheckCircle2 className="w-4 h-4" />
+              <span>
+                {actionType === 'DISTRIBUTE'
+                  ? `Valider la quantité (${numericQuantity} pcs)`
+                  : `Valider le retour (${numericQuantity} pcs)`}
+              </span>
             </button>
           </div>
         </form>
