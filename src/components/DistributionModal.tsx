@@ -196,68 +196,70 @@ export const DistributionModal: React.FC = () => {
 
         {/* Form Body or Confirmation Step */}
         {isConfirming ? (
-          <div className="p-6 space-y-5 animate-in zoom-in-95 duration-150">
-            <div className="p-4 bg-emerald-50 border-2 border-emerald-500 rounded-2xl space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-emerald-100 text-emerald-800 rounded-xl">
-                  <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+              <div className="p-4 bg-emerald-50 border-2 border-emerald-500 rounded-2xl space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-emerald-100 text-emerald-800 rounded-xl">
+                    <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-emerald-950">
+                      {actionType === 'DISTRIBUTE' ? 'Confirmation d’Octroi de Marchandises' : 'Confirmation de Rapatriement'}
+                    </h4>
+                    <p className="text-xs text-emerald-800 mt-0.5">
+                      Veuillez cliquer sur <strong>"Confirmer définitivement"</strong> ci-dessous pour valider.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="text-sm font-bold text-emerald-950">
-                    {actionType === 'DISTRIBUTE' ? 'Confirmation d’Octroi de Marchandises' : 'Confirmation de Rapatriement'}
-                  </h4>
-                  <p className="text-xs text-emerald-800 mt-0.5">
-                    Veuillez cliquer sur <strong>"Confirmer"</strong> pour valider l'affectation de ces marchandises.
-                  </p>
+
+                <div className="p-3.5 bg-white rounded-xl border border-emerald-200 text-xs space-y-2 font-medium">
+                  <div className="flex justify-between items-center text-slate-700">
+                    <span className="text-slate-500">Article :</span>
+                    <span className="font-bold text-slate-900">{currentProduct?.name} ({currentProduct?.sku})</span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-700">
+                    <span className="text-slate-500">Boutique bénéficiaire :</span>
+                    <span className="font-bold text-emerald-700">{currentCashier?.storeName || currentCashier?.fullName}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-700">
+                    <span className="text-slate-500">Quantité {actionType === 'DISTRIBUTE' ? 'offerte' : 'rapatriée'} :</span>
+                    <span className="font-bold font-mono text-base text-slate-900">{numericQuantity} unité(s)</span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-700 border-t border-slate-100 pt-2">
+                    <span className="text-slate-500">Valeur marchande :</span>
+                    <span className="font-bold font-mono text-emerald-700 text-sm">{saleTotal.toLocaleString('fr-FR')} FCFA</span>
+                  </div>
+                  <div className="p-2 bg-emerald-50 rounded-lg text-[11px] text-emerald-800">
+                    ℹ️ <strong>Règle de gestion :</strong> Le grand total reste conservé dans la boutique centrale ({currentProduct?.quantity} pièces). La déduction de stock interviendra lors des ventes en caisse.
+                  </div>
                 </div>
               </div>
 
-              <div className="p-3.5 bg-white rounded-xl border border-emerald-200 text-xs space-y-2 font-medium">
-                <div className="flex justify-between items-center text-slate-700">
-                  <span className="text-slate-500">Article :</span>
-                  <span className="font-bold text-slate-900">{currentProduct?.name} ({currentProduct?.sku})</span>
+              {statusMessage && (
+                <div
+                  className={`p-3 rounded-xl text-xs flex items-center gap-2 font-medium ${
+                    statusMessage.type === 'success'
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                      : 'bg-rose-50 text-rose-800 border border-rose-200'
+                  }`}
+                >
+                  {statusMessage.type === 'success' ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  )}
+                  <span>{statusMessage.text}</span>
                 </div>
-                <div className="flex justify-between items-center text-slate-700">
-                  <span className="text-slate-500">Boutique bénéficiaire :</span>
-                  <span className="font-bold text-emerald-700">{currentCashier?.storeName || currentCashier?.fullName}</span>
-                </div>
-                <div className="flex justify-between items-center text-slate-700">
-                  <span className="text-slate-500">Quantité {actionType === 'DISTRIBUTE' ? 'offerte' : 'rapatriée'} :</span>
-                  <span className="font-bold font-mono text-base text-slate-900">{numericQuantity} unité(s)</span>
-                </div>
-                <div className="flex justify-between items-center text-slate-700 border-t border-slate-100 pt-2">
-                  <span className="text-slate-500">Valeur marchande :</span>
-                  <span className="font-bold font-mono text-emerald-700 text-sm">{saleTotal.toLocaleString('fr-FR')} FCFA</span>
-                </div>
-                <div className="p-2 bg-emerald-50 rounded-lg text-[11px] text-emerald-800">
-                  ℹ️ <strong>Règle de gestion :</strong> Le grand total reste conservé dans la boutique centrale ({currentProduct?.quantity} pièces). La déduction de stock interviendra lors des ventes en caisse.
-                </div>
-              </div>
+              )}
             </div>
 
-            {statusMessage && (
-              <div
-                className={`p-3 rounded-xl text-xs flex items-center gap-2 font-medium ${
-                  statusMessage.type === 'success'
-                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                    : 'bg-rose-50 text-rose-800 border border-rose-200'
-                }`}
-              >
-                {statusMessage.type === 'success' ? (
-                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-                )}
-                <span>{statusMessage.text}</span>
-              </div>
-            )}
-
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="shrink-0 p-3.5 sm:p-4 bg-slate-100 border-t border-slate-200 flex items-center justify-between gap-3 shadow-md z-20">
               <button
                 type="button"
                 disabled={isSubmitting}
                 onClick={() => setIsConfirming(false)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl"
+                className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
               >
                 &larr; Modifier la saisie
               </button>
@@ -265,15 +267,16 @@ export const DistributionModal: React.FC = () => {
                 type="button"
                 disabled={isSubmitting}
                 onClick={handleExecuteTransfer}
-                className="px-6 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md shadow-emerald-600/30 flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                className="px-6 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md shadow-emerald-600/30 flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span>{isSubmitting ? 'Enregistrement...' : 'Confirmer'}</span>
+                <span>{isSubmitting ? 'Enregistrement...' : 'Confirmer définitivement'}</span>
               </button>
             </div>
           </div>
         ) : (
-          <form onSubmit={handlePreSubmit} className="p-5 space-y-4">
+          <form onSubmit={handlePreSubmit} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5">
           {statusMessage && (
             <div
               className={`p-3 rounded-xl text-xs flex items-center gap-2 font-medium ${
@@ -491,22 +494,24 @@ export const DistributionModal: React.FC = () => {
             />
           </div>
 
-          {/* Submit Buttons (Toujours bien visibles en bas) */}
-          <div className="pt-3 flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 -mx-5 -mb-5 p-4 rounded-b-2xl">
+          </div>
+
+          {/* Sticky Validation Footer (Ancré et Toujours Visible en Bas) */}
+          <div className="shrink-0 p-3.5 sm:p-4 bg-slate-100 border-t border-slate-200 flex items-center justify-between gap-3 shadow-md z-20">
             <button
               type="button"
               onClick={closeDistributionModal}
-              className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded-xl transition-colors"
+              className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
             >
               Annuler
             </button>
             <button
               type="submit"
               disabled={isSubmitting || maxQuantity <= 0 || numericQuantity <= 0}
-              className={`px-6 py-2.5 text-xs font-bold text-white rounded-xl shadow-md transition-all flex items-center gap-2 ${
+              className={`px-6 py-2.5 text-xs font-bold text-white rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer ${
                 actionType === 'DISTRIBUTE'
-                  ? 'bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300'
-                  : 'bg-amber-600 hover:bg-amber-700 disabled:bg-slate-300'
+                  ? 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-slate-300 disabled:cursor-not-allowed'
+                  : 'bg-amber-600 hover:bg-amber-700 active:bg-amber-800 disabled:bg-slate-300 disabled:cursor-not-allowed'
               }`}
             >
               <CheckCircle2 className="w-4 h-4" />

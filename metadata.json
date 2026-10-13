@@ -1,0 +1,1 @@
+{"name":"StockFlow - Gestion de Stock","description":"Application de gestion de stock multi-produits avec suivi des mouvements et synchronisation bidirectionnelle Google Sheets.","requestFramePermissions":[],"majorCapabilities":["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]}
