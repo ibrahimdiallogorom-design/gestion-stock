@@ -119,6 +119,31 @@ export const TopBar: React.FC = () => {
             {cloudStatus === 'connected' ? 'Cloud En Direct' : 'Synchro...'}
           </span>
         </button>
+
+        {/* Force Refresh & Purge Cache */}
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              if ('caches' in window) {
+                const keys = await caches.keys();
+                await Promise.all(keys.map((k) => caches.delete(k)));
+              }
+              if ('serviceWorker' in navigator) {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                for (const r of regs) await r.unregister();
+              }
+            } catch (err) {
+              console.warn('Cache purge error:', err);
+            }
+            window.location.reload();
+          }}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-semibold border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-950 transition-colors shadow-2xs"
+          title="Forcer le rechargement de la dernière version du code (vider le cache PWA et rafraîchir)"
+        >
+          <RefreshCw className="w-3 h-3 text-slate-600" />
+          <span className="hidden sm:inline">Actualiser l'App</span>
+        </button>
       </div>
 
       {/* Action Zone */}
