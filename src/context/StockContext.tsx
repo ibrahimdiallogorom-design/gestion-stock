@@ -124,6 +124,7 @@ interface StockContextType {
     sellerUserId?: string
   ) => Promise<{ success: boolean; ticketNumber: string; error?: string }>;
   clearAllProducts: () => void;
+  clearAllMovements: () => Promise<void>;
   repairInflatedPrices: () => void;
   // Multi-Store & Stock Distribution
   distributeProduct: (
@@ -222,9 +223,9 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               delete distributed[fid];
             });
 
-            const sumDist = Object.values(distributed).reduce((a, b) => a + (Number(b) || 0), 0);
             const totalQty = Math.max(0, Number(p.quantity) || 0);
-            const centralQty = Math.max(0, totalQty - sumDist);
+            // Le stock de la boutique centrale reste toujours le grand total
+            const centralQty = totalQty;
 
             return {
               ...p,
@@ -623,11 +624,10 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             changed = true;
           }
 
-          if (changed) {
+          const totalQty = Math.max(0, Number(p.quantity) || 0);
+          const centralQty = totalQty; // Le stock central conserve le grand total
+          if (changed || p.centralQuantity !== centralQty) {
             hadFictitiousDist = true;
-            const sumDist = Object.values(dist).reduce((a, b) => a + (Number(b) || 0), 0);
-            const totalQty = Math.max(0, Number(p.quantity) || 0);
-            const centralQty = Math.max(0, totalQty - sumDist);
             return {
               ...p,
               quantity: totalQty,
@@ -635,7 +635,12 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               distributedQuantities: dist,
             };
           }
-          return p;
+          return {
+            ...p,
+            quantity: totalQty,
+            centralQuantity: centralQty,
+            distributedQuantities: dist,
+          };
         });
 
         if (hadFictitiousDist) {
@@ -1232,6 +1237,12 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     pushToCloud({ products: [], movements: [] });
   };
 
+  const clearAllMovements = async () => {
+    setMovements([]);
+    localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify([]));
+    await forcePushToCloud({ movements: [] });
+  };
+
   const repairInflatedPrices = () => {
     const fixed = products.map((p) => {
       let cost = Number(p.costPrice) || 0;
@@ -1273,7 +1284,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return { success: false, message: 'Article introuvable dans le catalogue.' };
     }
 
-    const currentCentral = prod.centralQuantity !== undefined ? prod.centralQuantity : prod.quantity;
+    const currentCentral = prod.quantity;
     if (currentCentral < quantityToDistribute) {
       return {
         success: false,
@@ -1282,18 +1293,15 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     const now = new Date().toISOString();
-    const newCentral = currentCentral - quantityToDistribute;
+    // Le grand total reste TOUJOURS dans la grande boutique lors de l'octroi !
     const newDistributed = { ...(prod.distributedQuantities || {}) };
     newDistributed[targetUserId] = (newDistributed[targetUserId] || 0) + quantityToDistribute;
 
-    const sumDist = Object.values(newDistributed).reduce((a, b) => a + (Number(b) || 0), 0);
-    const newTotal = newCentral + sumDist;
-
     const updatedProduct: Product = {
       ...prod,
-      centralQuantity: newCentral,
+      centralQuantity: currentCentral,
       distributedQuantities: newDistributed,
-      quantity: newTotal,
+      quantity: currentCentral,
       lastUpdated: now,
     };
 
@@ -1306,15 +1314,15 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       productSku: prod.sku,
       productName: prod.name,
       type: 'TRANSFER',
-      quantityDelta: -quantityToDistribute,
+      quantityDelta: quantityToDistribute,
       previousStock: currentCentral,
-      newStock: newCentral,
-      reason: `Distribution vers ${targetUser.fullName} (${targetUser.storeName || targetUser.username})`,
+      newStock: currentCentral,
+      reason: `Dotation vers ${targetUser.fullName} (${targetUser.storeName || targetUser.username})`,
       operator: activeAppUser?.fullName || 'Responsable Stock',
       storeName: targetUser.storeName || 'Boutique VisionTech',
       targetUserId: targetUser.id,
       targetUserName: targetUser.fullName,
-      notes: notes || `Transfert de ${quantityToDistribute} unité(s) depuis le Grand Magasin vers ${targetUser.fullName}`,
+      notes: notes || `Dotation de ${quantityToDistribute} unité(s) allouée(s) à ${targetUser.fullName} (Stock central maintenu à ${currentCentral})`,
       createdAt: now,
     };
 
@@ -1331,7 +1339,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     return {
       success: true,
-      message: `${quantityToDistribute} unité(s) de "${prod.name}" distribuée(s) avec succès à ${targetUser.fullName}.`,
+      message: `${quantityToDistribute} unité(s) de "${prod.name}" octroyée(s) à ${targetUser.fullName}. Le stock central reste à ${currentCentral}.`,
     };
   };
 
@@ -1360,19 +1368,14 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     const now = new Date().toISOString();
-    const currentCentral = prod.centralQuantity !== undefined ? prod.centralQuantity : Math.max(0, prod.quantity - currentHeld);
-    const newCentral = currentCentral + quantityToRecall;
     const newDistributed = { ...(prod.distributedQuantities || {}) };
-    newDistributed[sourceUserId] = currentHeld - quantityToRecall;
-
-    const sumDist = Object.values(newDistributed).reduce((a, b) => a + (Number(b) || 0), 0);
-    const newTotal = newCentral + sumDist;
+    newDistributed[sourceUserId] = Math.max(0, currentHeld - quantityToRecall);
 
     const updatedProduct: Product = {
       ...prod,
-      centralQuantity: newCentral,
+      centralQuantity: prod.quantity,
       distributedQuantities: newDistributed,
-      quantity: newTotal,
+      quantity: prod.quantity,
       lastUpdated: now,
     };
 
@@ -1385,13 +1388,13 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       productSku: prod.sku,
       productName: prod.name,
       type: 'RETURN',
-      quantityDelta: quantityToRecall,
-      previousStock: currentCentral,
-      newStock: newCentral,
-      reason: `Retour de stock de ${sourceUser?.fullName || 'Vendeur'} vers le Grand Magasin`,
+      quantityDelta: -quantityToRecall,
+      previousStock: prod.quantity,
+      newStock: prod.quantity,
+      reason: `Récupération de dotation de ${sourceUser?.fullName || 'Vendeur'}`,
       operator: activeAppUser?.fullName || 'Responsable Stock',
       storeName: 'Grand Magasin Central',
-      notes: notes || `Récupération de ${quantityToRecall} unité(s) vers le Grand Magasin`,
+      notes: notes || `Récupération de ${quantityToRecall} unité(s) de dotation`,
       createdAt: now,
     };
 
@@ -1401,7 +1404,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     return {
       success: true,
-      message: `${quantityToRecall} unité(s) réintégrée(s) au Grand Magasin.`,
+      message: `${quantityToRecall} unité(s) réajustée(s) pour ${sourceUser?.fullName || 'Vendeur'}.`,
     };
   };
 
@@ -1413,27 +1416,57 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const prod = products.find((p) => p.id === productId);
     if (!prod) return { success: false, message: 'Article introuvable.' };
 
-    const currentHeld = prod.distributedQuantities?.[targetUserId] || 0;
+    const targetUser = appUsers.find((u) => u.id === targetUserId);
     const cleanQty = Math.max(0, Math.floor(Number(newQuantity) || 0));
 
-    if (cleanQty === currentHeld) {
-      return { success: true, message: 'La quantité est déjà identique.' };
+    if (cleanQty > prod.quantity) {
+      return {
+        success: false,
+        message: `Impossible d'octroyer ${cleanQty} pièces : le stock total du Grand Magasin est de ${prod.quantity} pièces.`,
+      };
     }
 
-    if (cleanQty > currentHeld) {
-      const delta = cleanQty - currentHeld;
-      const centralStock = prod.centralQuantity !== undefined ? prod.centralQuantity : prod.quantity;
-      if (delta > centralStock) {
-        return {
-          success: false,
-          message: `Stock insuffisant au Grand Magasin (disponible: ${centralStock} pièces).`,
-        };
-      }
-      return await distributeProduct(productId, targetUserId, delta, 'Ajustement de dotation');
-    } else {
-      const delta = currentHeld - cleanQty;
-      return await recallProduct(productId, targetUserId, delta, 'Ajustement de dotation');
-    }
+    const now = new Date().toISOString();
+    const newDistributed = { ...(prod.distributedQuantities || {}) };
+    newDistributed[targetUserId] = cleanQty;
+
+    const updatedProduct: Product = {
+      ...prod,
+      centralQuantity: prod.quantity,
+      distributedQuantities: newDistributed,
+      quantity: prod.quantity,
+      lastUpdated: now,
+    };
+
+    const updatedProducts = products.map((p) => (p.id === productId ? updatedProduct : p));
+    setProducts(updatedProducts);
+
+    const movement: StockMovement = {
+      id: `mov-${Date.now()}-${prod.id}`,
+      productId: prod.id,
+      productSku: prod.sku,
+      productName: prod.name,
+      type: 'TRANSFER',
+      quantityDelta: cleanQty - (prod.distributedQuantities?.[targetUserId] || 0),
+      previousStock: prod.quantity,
+      newStock: prod.quantity,
+      reason: `Ajustement dotation ${targetUser?.fullName || 'Boutique'} : ${cleanQty} pcs`,
+      operator: activeAppUser?.fullName || 'Responsable Stock',
+      storeName: targetUser?.storeName || 'Boutique VisionTech',
+      targetUserId: targetUserId,
+      targetUserName: targetUser?.fullName,
+      notes: `Dotation fixée à ${cleanQty} pièce(s) (Stock central inchangé à ${prod.quantity})`,
+      createdAt: now,
+    };
+
+    const updatedMovements = [movement, ...movements];
+    setMovements(updatedMovements);
+    pushToCloud({ products: updatedProducts, movements: updatedMovements });
+
+    return {
+      success: true,
+      message: `Dotation de "${prod.name}" ajustée à ${cleanQty} pièce(s) pour ${targetUser?.fullName || 'la boutique'}.`,
+    };
   };
 
   const removeFromBoutique = async (
@@ -1443,30 +1476,15 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const prod = products.find((p) => p.id === productId);
     if (!prod) return { success: false, message: 'Article introuvable.' };
 
-    const currentHeld = prod.distributedQuantities?.[targetUserId] || 0;
-    if (currentHeld > 0) {
-      const recallRes = await recallProduct(
-        productId,
-        targetUserId,
-        currentHeld,
-        'Retrait total de l’article de la boutique'
-      );
-      if (!recallRes.success) return recallRes;
-    }
-
-    // Cleanse entry from distributedQuantities
     const now = new Date().toISOString();
     const newDistributed = { ...(prod.distributedQuantities || {}) };
     delete newDistributed[targetUserId];
 
-    const currentCentral = prod.centralQuantity !== undefined ? prod.centralQuantity : prod.quantity;
-    const sumDist = Object.values(newDistributed).reduce((a, b) => a + (Number(b) || 0), 0);
-    const newTotal = currentCentral + sumDist;
-
     const updatedProduct: Product = {
       ...prod,
+      centralQuantity: prod.quantity,
       distributedQuantities: newDistributed,
-      quantity: newTotal,
+      quantity: prod.quantity,
       lastUpdated: now,
     };
 
@@ -1476,7 +1494,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     return {
       success: true,
-      message: `L'article "${prod.name}" a été entièrement retiré de la boutique.`,
+      message: `L'article "${prod.name}" a été retiré de la boutique (Stock central préservé à ${prod.quantity}).`,
     };
   };
 
@@ -1544,16 +1562,18 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const subtotal = prod.salePrice * soldItem.quantity;
       totalAmount += subtotal;
 
-      let centralQty = prod.centralQuantity !== undefined ? prod.centralQuantity : prod.quantity;
+      let centralQty = prod.quantity;
       const distributed = { ...(prod.distributedQuantities || {}) };
 
       if (isBoutiqueSale && effectiveSellerId && distributed[effectiveSellerId] !== undefined) {
-        distributed[effectiveSellerId] = Math.max(0, distributed[effectiveSellerId] - soldItem.quantity);
+        // Vente en boutique / caisse : déduit dans la caisse ET dans la boutique centrale !
+        distributed[effectiveSellerId] = Math.max(0, (distributed[effectiveSellerId] || 0) - soldItem.quantity);
+        centralQty = Math.max(0, prod.quantity - soldItem.quantity);
       } else {
-        centralQty = Math.max(0, centralQty - soldItem.quantity);
+        // Vente directe admin : déduit dans la boutique centrale
+        centralQty = Math.max(0, prod.quantity - soldItem.quantity);
       }
-      const sumDist = Object.values(distributed).reduce((a, b) => a + (Number(b) || 0), 0);
-      const newQty = centralQty + sumDist;
+      const newQty = centralQty;
 
       const sellerDisplayName = sellerUser?.fullName || activeAppUser?.fullName || cashierName;
       const boutiqueDisplayName = sellerUser?.storeName || activeAppUser?.storeName || 'Boutique Moussa Vision';
@@ -1583,7 +1603,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return {
         ...prod,
         quantity: newQty,
-        centralQuantity: centralQty,
+        centralQuantity: newQty,
         distributedQuantities: distributed,
         lastUpdated: now,
       };
@@ -1841,6 +1861,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setCashierName,
         processSale,
         clearAllProducts,
+        clearAllMovements,
         repairInflatedPrices,
         // Multi-Store & Stock Distribution
         distributeProduct,

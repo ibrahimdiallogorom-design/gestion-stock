@@ -107,7 +107,7 @@ export const DashboardView: React.FC = () => {
     let costVal = 0;
     let saleVal = 0;
     products.forEach((p) => {
-      const c = p.centralQuantity !== undefined ? p.centralQuantity : p.quantity;
+      const c = p.quantity;
       units += c;
       costVal += c * p.costPrice;
       saleVal += c * p.salePrice;
@@ -606,7 +606,7 @@ export const DashboardView: React.FC = () => {
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-blue-950 flex items-center gap-1.5">
                 <Building2 className="w-3.5 h-3.5 text-blue-600" />
-                Grand Magasin (Dépôt)
+                Grand Magasin (Stock Global)
               </span>
               <span className="font-mono font-bold text-blue-700">
                 {centralStockMetrics.units} pcs

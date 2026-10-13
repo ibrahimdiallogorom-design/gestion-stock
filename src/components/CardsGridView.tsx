@@ -189,31 +189,6 @@ export const CardsGridView: React.FC = () => {
     );
   };
 
-  const handleQuickAdd = (p: Product, e: React.MouseEvent) => {
-    e.stopPropagation();
-    recordMovement(
-      p.id,
-      'IN',
-      1,
-      'Réassort rapide comptoir (+1)',
-      'Vendeur Boutique',
-      'Ajustement express 1 clic'
-    );
-  };
-
-  const handleQuickSubtract = (p: Product, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (p.quantity <= 0) return;
-    recordMovement(
-      p.id,
-      'OUT',
-      1,
-      'Sortie express comptoir (-1)',
-      'Vendeur Boutique',
-      'Vente unitaire directe'
-    );
-  };
-
   if (filteredProducts.length === 0) {
     return (
       <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center space-y-3">
@@ -342,26 +317,12 @@ export const CardsGridView: React.FC = () => {
                 </button>
               ) : (
                 <div className="flex items-center justify-between">
-                  {/* Stepper Buttons for Quick Store Adjustments */}
-                  <div className="flex items-center bg-white rounded-lg border border-slate-200 p-0.5 shadow-2xs">
-                    <button
-                      onClick={(e) => handleQuickSubtract(p, e)}
-                      disabled={p.quantity <= 0}
-                      title="Vente / Sortie de 1 unité"
-                      className="w-7 h-7 flex items-center justify-center text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors disabled:opacity-30 disabled:pointer-events-none"
-                    >
-                      -
-                    </button>
-                    <span className="w-8 text-center font-mono tabular-nums text-xs font-bold text-slate-800">
-                      {p.quantity}
+                  {/* Safe Stock Badge */}
+                  <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1 rounded-lg shadow-2xs">
+                    <span className="text-[10px] text-slate-500 font-medium">Stock:</span>
+                    <span className="font-mono font-bold text-xs text-slate-900">
+                      {p.quantity} pcs
                     </span>
-                    <button
-                      onClick={(e) => handleQuickAdd(p, e)}
-                      title="Réception / Entrée de 1 unité"
-                      className="w-7 h-7 flex items-center justify-center text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors"
-                    >
-                      +
-                    </button>
                   </div>
 
                   {/* Action Icons */}

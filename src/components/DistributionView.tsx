@@ -74,14 +74,13 @@ export const DistributionView: React.FC = () => {
     let distributedSale = 0;
 
     products.forEach((p) => {
-      const cQty = p.centralQuantity !== undefined ? p.centralQuantity : p.quantity;
+      const cQty = p.quantity;
       const dMap = p.distributedQuantities || {};
       const dQty = Object.values(dMap).reduce((acc, val) => acc + (Number(val) || 0), 0);
-      const fullQty = cQty + dQty;
 
-      totalUnits += fullQty;
-      totalCost += fullQty * p.costPrice;
-      totalSale += fullQty * p.salePrice;
+      totalUnits += cQty;
+      totalCost += cQty * p.costPrice;
+      totalSale += cQty * p.salePrice;
 
       centralUnits += cQty;
       centralCost += cQty * p.costPrice;
@@ -145,7 +144,7 @@ export const DistributionView: React.FC = () => {
   const centralProducts = useMemo(() => {
     return products
       .map((p) => {
-        const cQty = p.centralQuantity !== undefined ? p.centralQuantity : p.quantity;
+        const cQty = p.quantity;
         return {
           product: p,
           quantity: cQty,

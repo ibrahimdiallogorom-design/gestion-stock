@@ -8,12 +8,13 @@ import {
   Download,
   Plus,
   ArrowLeftRight,
+  Trash2,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { MovementType } from '../types';
 
 export const MovementsView: React.FC = () => {
-  const { movements, openMovementModal, activeAppUser } = useStock();
+  const { movements, openMovementModal, activeAppUser, clearAllMovements, openConfirmModal } = useStock();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<MovementType | 'all'>('all');
 
@@ -111,6 +112,26 @@ export const MovementsView: React.FC = () => {
             <Download className="w-4 h-4 text-slate-500" />
             <span>Exporter CSV</span>
           </button>
+          {!isCashier && movements.length > 0 && (
+            <button
+              onClick={() => {
+                openConfirmModal(
+                  "Purger tout l'historique des mouvements ?",
+                  "Cette action supprimera tous les anciens mouvements et tickets enregistrés pour repartir sur un historique neuf avec vos vraies opérations de terrain. Les fiches d'articles et stocks actuels sont entièrement conservés. Voulez-vous continuer ?",
+                  async () => {
+                    await clearAllMovements();
+                  },
+                  true,
+                  "Oui, effacer l'historique"
+                );
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg shadow-xs transition-colors whitespace-nowrap"
+              title="Supprimer tous les mouvements de test"
+            >
+              <Trash2 className="w-4 h-4 text-rose-600" />
+              <span>Purger l'historique</span>
+            </button>
+          )}
           {!isCashier && (
             <button
               onClick={() => openMovementModal()}

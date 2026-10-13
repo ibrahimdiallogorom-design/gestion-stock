@@ -225,6 +225,9 @@ export const DistributionModal: React.FC = () => {
                   <span className="text-slate-500">Valeur marchande :</span>
                   <span className="font-bold font-mono text-emerald-700 text-sm">{saleTotal.toLocaleString('fr-FR')} FCFA</span>
                 </div>
+                <div className="p-2 bg-emerald-50 rounded-lg text-[11px] text-emerald-800">
+                  ℹ️ <strong>Règle de gestion :</strong> Le grand total reste conservé dans la boutique centrale ({currentProduct?.quantity} pièces). La déduction de stock interviendra lors des ventes en caisse.
+                </div>
               </div>
             </div>
 
@@ -298,10 +301,11 @@ export const DistributionModal: React.FC = () => {
                 <option value="">Aucun article dans le catalogue</option>
               ) : (
                 products.map((p) => {
-                  const cStock = p.centralQuantity !== undefined ? p.centralQuantity : p.quantity;
+                  const cStock = p.quantity;
+                  const distTotal = Object.values(p.distributedQuantities || {}).reduce((a, b) => a + (Number(b) || 0), 0);
                   return (
                     <option key={p.id} value={p.id}>
-                      [{p.sku}] {p.name} — Magasin Central: {cStock} | Total: {p.quantity} | {p.salePrice.toLocaleString('fr-FR')} F
+                      [{p.sku}] {p.name} — Stock Magasin: {cStock} pcs | Dotations: {distTotal} pcs | {p.salePrice.toLocaleString('fr-FR')} F
                     </option>
                   );
                 })
