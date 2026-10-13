@@ -14,7 +14,7 @@ export const DistributionModal: React.FC = () => {
 
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [targetUserId, setTargetUserId] = useState<string>('');
-  const [quantity, setQuantity] = useState<number>(1);
+  const [quantity, setQuantity] = useState<number | string>(1);
   const [actionType, setActionType] = useState<'DISTRIBUTE' | 'RECALL'>('DISTRIBUTE');
   const [notes, setNotes] = useState<string>('');
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -62,8 +62,12 @@ export const DistributionModal: React.FC = () => {
 
   const maxQuantity = actionType === 'DISTRIBUTE' ? centralStock : cashierHeldStock;
 
-  const costTotal = (currentProduct?.costPrice || 0) * (Number(quantity) || 0);
-  const saleTotal = (currentProduct?.salePrice || 0) * (Number(quantity) || 0);
+  const numericQuantity = typeof quantity === 'string'
+    ? (quantity.trim() === '' ? 0 : parseInt(quantity, 10) || 0)
+    : Number(quantity) || 0;
+
+  const costTotal = (currentProduct?.costPrice || 0) * numericQuantity;
+  const saleTotal = (currentProduct?.salePrice || 0) * numericQuantity;
 
   const handlePreSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,12 +83,12 @@ export const DistributionModal: React.FC = () => {
       return;
     }
 
-    if (quantity <= 0) {
-      setStatusMessage({ type: 'error', text: 'La quantité doit être supérieure à zéro.' });
+    if (numericQuantity <= 0) {
+      setStatusMessage({ type: 'error', text: 'Veuillez saisir une quantité supérieure à zéro.' });
       return;
     }
 
-    if (quantity > maxQuantity) {
+    if (numericQuantity > maxQuantity) {
       setStatusMessage({
         type: 'error',
         text: `Quantité impossible : maximum disponible = ${maxQuantity} unités.`,
@@ -102,7 +106,7 @@ export const DistributionModal: React.FC = () => {
 
     try {
       if (actionType === 'DISTRIBUTE') {
-        const res = await distributeProduct(selectedProductId, targetUserId, quantity, notes);
+        const res = await distributeProduct(selectedProductId, targetUserId, numericQuantity, notes);
         if (res.success) {
           setStatusMessage({ type: 'success', text: `Marchandises octroyées avec succès ! ${res.message}` });
           setTimeout(() => {
@@ -113,7 +117,7 @@ export const DistributionModal: React.FC = () => {
           setIsConfirming(false);
         }
       } else {
-        const res = await recallProduct(selectedProductId, targetUserId, quantity, notes);
+        const res = await recallProduct(selectedProductId, targetUserId, numericQuantity, notes);
         if (res.success) {
           setStatusMessage({ type: 'success', text: `Marchandises rapatriées avec succès ! ${res.message}` });
           setTimeout(() => {
@@ -219,7 +223,7 @@ export const DistributionModal: React.FC = () => {
                 </div>
                 <div className="flex justify-between items-center text-slate-700">
                   <span className="text-slate-500">Quantité {actionType === 'DISTRIBUTE' ? 'offerte' : 'rapatriée'} :</span>
-                  <span className="font-bold font-mono text-base text-slate-900">{quantity} unité(s)</span>
+                  <span className="font-bold font-mono text-base text-slate-900">{numericQuantity} unité(s)</span>
                 </div>
                 <div className="flex justify-between items-center text-slate-700 border-t border-slate-100 pt-2">
                   <span className="text-slate-500">Valeur marchande :</span>
@@ -356,50 +360,175 @@ export const DistributionModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Quantity Input with Quick Chips */}
-          <div>
-            <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1">
-              <span>Quantité à {actionType === 'DISTRIBUTE' ? 'attribuer' : 'réintégrer'}</span>
+          {/* Quantity Input with Quick Controls and Scrollable Strip */}
+          <div className="space-y-3 bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/80">
+            <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
+              <span className="flex items-center gap-1.5">
+                <span>Quantité à {actionType === 'DISTRIBUTE' ? 'attribuer' : 'réintégrer'}</span>
+              </span>
               <span className="text-[11px] text-slate-500 font-normal">
-                Max dispo : <strong className="text-slate-900 font-mono">{maxQuantity}</strong>
+                Dispo : <strong className="text-slate-900 font-mono font-bold">{maxQuantity}</strong> unité(s)
               </span>
             </div>
+
+            {/* Stepper Input + Boutons - / + / 0 */}
             <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min="1"
-                max={maxQuantity || 1}
-                value={quantity}
-                onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                className="w-28 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-center"
-              />
-              <div className="flex gap-1.5 flex-1">
-                {[1, 5, 10, 20].map((step) => (
+              <button
+                type="button"
+                onClick={() => setQuantity(Math.max(0, numericQuantity - 1))}
+                disabled={numericQuantity <= 0}
+                className="w-10 h-10 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40 flex items-center justify-center font-bold text-slate-700 text-lg shadow-xs transition-colors shrink-0"
+                title="Diminuer de 1"
+              >
+                -
+              </button>
+
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={quantity}
+                  placeholder="0"
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === '') {
+                      setQuantity('');
+                      return;
+                    }
+                    // Filter out non-digits
+                    const clean = raw.replace(/[^0-9]/g, '');
+                    if (clean === '') {
+                      setQuantity('');
+                    } else {
+                      const parsed = parseInt(clean, 10);
+                      setQuantity(Math.min(parsed, maxQuantity));
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-lg font-bold font-mono text-center text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-inner"
+                />
+                {quantity !== '' && numericQuantity > 0 && (
                   <button
-                    key={step}
                     type="button"
-                    disabled={step > maxQuantity}
-                    onClick={() => setQuantity(Math.min(step, maxQuantity || 1))}
-                    className="flex-1 py-1.5 text-xs font-mono bg-slate-100 hover:bg-slate-200 disabled:opacity-30 rounded-lg text-slate-700 font-medium"
+                    onClick={() => setQuantity(0)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] bg-slate-100 hover:bg-rose-100 hover:text-rose-700 text-slate-500 rounded font-medium transition-colors"
+                    title="Remettre à 0"
                   >
-                    +{step}
-                  </button>
-                ))}
-                {maxQuantity > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setQuantity(maxQuantity)}
-                    className="px-2 py-1.5 text-xs font-mono bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-lg whitespace-nowrap"
-                  >
-                    Tout ({maxQuantity})
+                    Effacer
                   </button>
                 )}
               </div>
+
+              <button
+                type="button"
+                onClick={() => setQuantity(Math.min(maxQuantity, numericQuantity + 1))}
+                disabled={numericQuantity >= maxQuantity}
+                className="w-10 h-10 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40 flex items-center justify-center font-bold text-slate-700 text-lg shadow-xs transition-colors shrink-0"
+                title="Augmenter de 1"
+              >
+                +
+              </button>
+            </div>
+
+            {/* Curseur de défilement (Slider) */}
+            {maxQuantity > 0 && (
+              <div className="space-y-1 pt-1">
+                <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium">
+                  <span>0</span>
+                  <span className="font-mono text-blue-700 font-bold">
+                    Glisser : {numericQuantity} / {maxQuantity}
+                  </span>
+                  <span>{maxQuantity}</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max={maxQuantity}
+                  value={numericQuantity}
+                  onChange={(e) => setQuantity(Number(e.target.value))}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+              </div>
+            )}
+
+            {/* Roulette / Bande de défilement horizontal des chiffres */}
+            {maxQuantity > 0 && (
+              <div className="space-y-1 pt-1">
+                <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                  <span>Défilement des chiffres (cliquez pour choisir) :</span>
+                  {numericQuantity > 0 && (
+                    <span className="text-blue-600 font-bold font-mono">Choisi : {numericQuantity}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-0.5 scrollbar-thin scroll-smooth border border-slate-200 bg-white rounded-lg p-1">
+                  {Array.from({ length: Math.min(maxQuantity + 1, 101) }, (_, i) => i).map((num) => {
+                    const isSelected = numericQuantity === num && quantity !== '';
+                    return (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setQuantity(num)}
+                        className={`h-8 min-w-[34px] px-2 rounded-md font-mono text-xs font-bold transition-all shrink-0 flex items-center justify-center ${
+                          isSelected
+                            ? 'bg-blue-600 text-white shadow-sm scale-105 ring-2 ring-blue-300'
+                            : 'bg-slate-50 text-slate-700 hover:bg-slate-200 border border-slate-200/80'
+                        }`}
+                      >
+                        {num}
+                      </button>
+                    );
+                  })}
+                  {maxQuantity > 100 && (
+                    <button
+                      type="button"
+                      onClick={() => setQuantity(maxQuantity)}
+                      className={`h-8 px-2.5 rounded-md font-mono text-xs font-bold transition-all shrink-0 flex items-center justify-center ${
+                        numericQuantity === maxQuantity
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
+                      }`}
+                    >
+                      Max ({maxQuantity})
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Raccourcis rapides */}
+            <div className="flex gap-1.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setQuantity(0)}
+                className="py-1 px-2 text-[11px] font-mono bg-slate-200/70 hover:bg-slate-300 rounded-lg text-slate-700 font-medium"
+              >
+                Zéro (0)
+              </button>
+              {[5, 10, 20].map((step) => (
+                <button
+                  key={step}
+                  type="button"
+                  disabled={step > maxQuantity}
+                  onClick={() => setQuantity(Math.min(step, maxQuantity))}
+                  className="flex-1 py-1 text-[11px] font-mono bg-white hover:bg-slate-100 disabled:opacity-30 border border-slate-200 rounded-lg text-slate-700 font-medium"
+                >
+                  +{step}
+                </button>
+              ))}
+              {maxQuantity > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setQuantity(maxQuantity)}
+                  className="px-2.5 py-1 text-[11px] font-mono bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-lg border border-blue-200 whitespace-nowrap"
+                >
+                  Tout ({maxQuantity})
+                </button>
+              )}
             </div>
           </div>
 
           {/* Financial Value of Batch */}
-          {currentProduct && quantity > 0 && (
+          {currentProduct && numericQuantity > 0 && (
             <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-1 text-xs">
               <div className="flex justify-between text-slate-600">
                 <span>Coût d'achat du lot :</span>

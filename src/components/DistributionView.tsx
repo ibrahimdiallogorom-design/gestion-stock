@@ -46,8 +46,8 @@ export const DistributionView: React.FC = () => {
   );
   const [searchFilter, setSearchFilter] = useState('');
 
-  // Inline quantity editing state: { [productId]: number }
-  const [editingQuantities, setEditingQuantities] = useState<Record<string, number>>({});
+  // Inline quantity editing state: { [productId]: number | string }
+  const [editingQuantities, setEditingQuantities] = useState<Record<string, number | string>>({});
   const [updatingProductId, setUpdatingProductId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -638,7 +638,10 @@ export const DistributionView: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const current = editingQuantities[item.product.id] ?? item.quantity;
+                                  const rawVal = editingQuantities[item.product.id];
+                                  const current = rawVal !== undefined
+                                    ? (typeof rawVal === 'string' ? (parseInt(rawVal, 10) || 0) : rawVal)
+                                    : item.quantity;
                                   if (current > 0) {
                                     setEditingQuantities((prev) => ({ ...prev, [item.product.id]: current - 1 }));
                                   }
@@ -649,19 +652,32 @@ export const DistributionView: React.FC = () => {
                                 -
                               </button>
                               <input
-                                type="number"
-                                min="0"
-                                value={editingQuantities[item.product.id] ?? item.quantity}
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                placeholder="0"
+                                value={editingQuantities[item.product.id] !== undefined ? editingQuantities[item.product.id] : item.quantity}
                                 onChange={(e) => {
-                                  const val = parseInt(e.target.value) || 0;
-                                  setEditingQuantities((prev) => ({ ...prev, [item.product.id]: Math.max(0, val) }));
+                                  const raw = e.target.value;
+                                  if (raw === '') {
+                                    setEditingQuantities((prev) => ({ ...prev, [item.product.id]: '' }));
+                                  } else {
+                                    const clean = raw.replace(/[^0-9]/g, '');
+                                    setEditingQuantities((prev) => ({
+                                      ...prev,
+                                      [item.product.id]: clean === '' ? '' : parseInt(clean, 10),
+                                    }));
+                                  }
                                 }}
                                 className="w-14 text-center font-mono font-bold text-slate-900 bg-white border border-slate-200 rounded py-0.5 text-xs focus:ring-1 focus:ring-blue-500"
                               />
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const current = editingQuantities[item.product.id] ?? item.quantity;
+                                  const rawVal = editingQuantities[item.product.id];
+                                  const current = rawVal !== undefined
+                                    ? (typeof rawVal === 'string' ? (parseInt(rawVal, 10) || 0) : rawVal)
+                                    : item.quantity;
                                   setEditingQuantities((prev) => ({ ...prev, [item.product.id]: current + 1 }));
                                 }}
                                 className="w-6 h-6 rounded bg-white hover:bg-slate-200 border border-slate-200 flex items-center justify-center font-bold text-slate-700 text-xs transition-colors"
@@ -672,12 +688,15 @@ export const DistributionView: React.FC = () => {
 
                               {/* Bouton Confirmer la nouvelle quantité */}
                               {editingQuantities[item.product.id] !== undefined &&
-                               editingQuantities[item.product.id] !== item.quantity && (
+                               (typeof editingQuantities[item.product.id] === 'string'
+                                 ? (parseInt(editingQuantities[item.product.id] as string, 10) || 0) !== item.quantity
+                                 : editingQuantities[item.product.id] !== item.quantity) && (
                                 <button
                                   type="button"
                                   disabled={updatingProductId === item.product.id}
                                   onClick={async () => {
-                                    const targetQty = editingQuantities[item.product.id];
+                                    const rawVal = editingQuantities[item.product.id];
+                                    const targetQty = typeof rawVal === 'string' ? (parseInt(rawVal, 10) || 0) : (rawVal || 0);
                                     setUpdatingProductId(item.product.id);
                                     const res = await setBoutiqueQuantity(
                                       item.product.id,
