@@ -45,12 +45,10 @@ $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 git commit -m "auto: mise a jour automatique cloud et application ($timestamp)"
 git push origin main
 
-# 6. Git Commit & Push (Workspace Antigravity)
+# 6. Synchronisation du Workspace Antigravity
 Write-Host "`n[Bonus] Synchronisation du Workspace Antigravity..." -ForegroundColor Yellow
 Set-Location $Workspace
-git add -A
-git commit -m "auto: mise a jour automatique cloud et application ($timestamp)"
-git push origin main
+git pull origin main
 
 Write-Host "`n==========================================================" -ForegroundColor Green
 Write-Host "  DEPLOIEMENT ET SYNCHRONISATION TOTALE REUSSIS !" -ForegroundColor Green
