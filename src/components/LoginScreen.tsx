@@ -11,6 +11,7 @@ import {
   ShieldAlert,
   Store,
   Cloud,
+  RefreshCw,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 
@@ -197,6 +198,29 @@ export const LoginScreen: React.FC = () => {
           <p className="text-[10px] text-slate-400 text-center pt-1 leading-relaxed">
             ☁️ <strong>Synchronisation Cloud :</strong> Les comptes configurés sur un téléphone sont reconnus et utilisables sur tous vos téléphones et ordinateurs.
           </p>
+
+          <div className="pt-2 flex justify-center">
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  if ('caches' in window) {
+                    const keys = await caches.keys();
+                    await Promise.all(keys.map((k) => caches.delete(k)));
+                  }
+                  if ('serviceWorker' in navigator) {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    for (const r of regs) await r.unregister();
+                  }
+                } catch (e) {}
+                window.location.href = window.location.origin + window.location.pathname + '?v=' + Date.now();
+              }}
+              className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900/60 hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <RefreshCw className="w-3 h-3 text-emerald-400" />
+              <span>Forcer la mise à jour / Vider le cache</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

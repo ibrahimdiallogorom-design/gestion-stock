@@ -11,6 +11,9 @@ $DeployDir = "C:\Users\USER\Desktop\PROJET\gestion de stock"
 # 1. Compilation Production Vite
 Write-Host "`n[1/5] Compilation de production Vite..." -ForegroundColor Yellow
 Set-Location $Workspace
+if (Test-Path "$Workspace\index.source.html") {
+    Copy-Item "$Workspace\index.source.html" "$Workspace\index.html" -Force
+}
 cmd /c npm.cmd run build
 
 # 2. Synchronisation des sources vers le dépôt de déploiement
@@ -27,15 +30,18 @@ Copy-Item -Path "$Workspace\dist\index.html" -Destination "$DeployDir\index.html
 Copy-Item -Path "$Workspace\dist\index.html" -Destination "$DeployDir\404.html" -Force
 Copy-Item -Path "$Workspace\dist\manifest.json" -Destination "$DeployDir\manifest.json" -Force
 Copy-Item -Path "$Workspace\dist\sw.js" -Destination "$DeployDir\sw.js" -Force
-Copy-Item -Path "$Workspace\dist\icon.png" -Destination "$DeployDir\icon.png" -Force
+Copy-Item -Path "$Workspace\icon.png" -Destination "$DeployDir\icon.png" -Force
+Copy-Item -Path "$Workspace\icon.png" -Destination "$Workspace\dist\icon.png" -Force
+
 if (Test-Path "$Workspace\dist\GestionStock.apk") {
     Copy-Item -Path "$Workspace\dist\GestionStock.apk" -Destination "$DeployDir\GestionStock.apk" -Force
 }
 
-# Synchroniser assets (avec suppression des anciens bundles hachés)
-robocopy "$Workspace\dist\assets" "$DeployDir\assets" /MIR /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null
-robocopy "$Workspace\dist\assets" "$Workspace\assets" /MIR /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null
+# Synchroniser assets (avec conservation cumulative pour éviter les 404 sur les caches mobiles)
+robocopy "$Workspace\dist\assets" "$DeployDir\assets" /E /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null
+robocopy "$Workspace\dist\assets" "$Workspace\assets" /E /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null
 Copy-Item -Path "$Workspace\dist\index.html" -Destination "$Workspace\404.html" -Force
+Copy-Item -Path "$Workspace\dist\index.html" -Destination "$Workspace\index.html" -Force
 
 # 5. Git Commit & Push (Dépôt de déploiement Desktop)
 Write-Host "`n[5/5] Envoi automatique vers GitHub (Push origin main)..." -ForegroundColor Yellow
@@ -48,7 +54,9 @@ git push origin main
 # 6. Synchronisation du Workspace Antigravity
 Write-Host "`n[Bonus] Synchronisation du Workspace Antigravity..." -ForegroundColor Yellow
 Set-Location $Workspace
-git pull origin main
+git add -A
+git commit -m "auto: synchronisation finale workspace ($timestamp)"
+git push origin main
 
 Write-Host "`n==========================================================" -ForegroundColor Green
 Write-Host "  DEPLOIEMENT ET SYNCHRONISATION TOTALE REUSSIS !" -ForegroundColor Green
