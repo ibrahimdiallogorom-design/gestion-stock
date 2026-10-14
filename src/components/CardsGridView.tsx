@@ -223,7 +223,20 @@ export const CardsGridView: React.FC = () => {
           >
             <div>
               {/* Product Visual Header */}
-              {getCategoryIllustration(p.category, p.name)}
+              {p.imageUrl ? (
+                <div className="h-36 w-full bg-slate-100 border-b border-slate-200 overflow-hidden relative group-hover:scale-[1.01] transition-transform duration-300">
+                  <img
+                    src={p.imageUrl}
+                    alt={p.name}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-xs text-white text-[10px] font-semibold">
+                    {p.category}
+                  </div>
+                </div>
+              ) : (
+                getCategoryIllustration(p.category, p.name)
+              )}
 
               {/* Card Body */}
               <div className="p-4 space-y-3">

@@ -135,6 +135,15 @@ export const MobileMenuDrawer: React.FC = () => {
       badgeColor: 'bg-teal-100 text-teal-800 font-bold',
     },
     {
+      id: 'catalog',
+      title: 'Catalogue Produits & WhatsApp',
+      description: 'Photos des articles, vitrine commerciale et partage direct aux clients par WhatsApp.',
+      icon: <Share2 className="w-6 h-6 text-emerald-600" />,
+      color: 'bg-emerald-50 border-emerald-300',
+      badge: 'Photos & Envoi',
+      badgeColor: 'bg-emerald-100 text-emerald-800 font-bold',
+    },
+    {
       id: 'accounting',
       title: 'Comptabilité & Trésorerie',
       description: 'Bilan financier, dépenses, achats de marchandises et calcul du transport.',

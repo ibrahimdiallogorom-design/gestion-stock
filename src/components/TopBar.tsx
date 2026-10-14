@@ -61,6 +61,8 @@ export const TopBar: React.FC = () => {
         return 'Rapports & Clôtures / Ventes Quotidiennes & Z de Caisse';
       case 'accounting':
         return 'Comptabilité & Trésorerie / Bilan, Coûts de Revient & Charges';
+      case 'catalog':
+        return 'Catalogue Produits / Vitrine Commerciale & WhatsApp';
       case 'movements':
         return 'Journal des Flux / Grand Livre des Mouvements';
       case 'suppliers':
@@ -163,11 +165,11 @@ export const TopBar: React.FC = () => {
 
       {/* Action Zone */}
       <div className="flex items-center gap-2 sm:gap-3">
-        {/* Prominent VISEUR Button (Synchronisation Cloud, Entrées, Sorties) */}
+        {/* Prominent VISEUR Button (Synchronisation Cloud, Entrées, Sorties) - Desktop only since it is now in the mobile bottom bar */}
         <button
           type="button"
           onClick={openViser}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-xl font-black text-xs shadow-md shadow-emerald-600/30 active:scale-95 transition-all shrink-0 cursor-pointer"
+          className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-xl font-black text-xs shadow-md shadow-emerald-600/30 active:scale-95 transition-all shrink-0 cursor-pointer"
           title="Viseur : Synchronisation Cloud, Entrées et Sorties de Stock"
         >
           <Target className="w-4 h-4 text-white" />

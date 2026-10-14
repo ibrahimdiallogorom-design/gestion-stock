@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Sparkles, Calculator, ChevronDown, ChevronUp, Check, Truck } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Sparkles, Calculator, ChevronDown, ChevronUp, Check, Truck, Camera, Upload, Trash2, Image as ImageIcon } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { Product, STANDARD_CATEGORIES } from '../types';
 
@@ -7,9 +7,12 @@ export const ProductModal: React.FC = () => {
   const { productModal, closeProductModal, addProduct, updateProduct, products } = useStock();
 
   const isEditing = !!productModal.product;
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [sku, setSku] = useState('');
   const [name, setName] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [description, setDescription] = useState('');
   const [category, setCategory] = useState<string>(STANDARD_CATEGORIES[0]);
   const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [customCategoryName, setCustomCategoryName] = useState('');
@@ -39,6 +42,8 @@ export const ProductModal: React.FC = () => {
         const p = productModal.product;
         setSku(p.sku);
         setName(p.name);
+        setImageUrl(p.imageUrl || '');
+        setDescription(p.description || '');
         setCategory(p.category);
         setQuantity(p.quantity);
         setMinThreshold(p.minThreshold);
@@ -52,6 +57,8 @@ export const ProductModal: React.FC = () => {
         const num = String(products.length + 1).padStart(3, '0');
         setSku(`${prefix}-${num}`);
         setName('');
+        setImageUrl('');
+        setDescription('');
         setCategory(STANDARD_CATEGORIES[0]);
         setIsCustomCategory(false);
         setCustomCategoryName('');
@@ -72,6 +79,51 @@ export const ProductModal: React.FC = () => {
     const catPrefix = category.slice(0, 3).toUpperCase();
     const randomSuffix = Math.floor(100 + Math.random() * 900);
     setSku(`${catPrefix}-${randomSuffix}`);
+  };
+
+  // Image Upload with Automatic Canvas Compression (max 600px, JPEG 0.78)
+  const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Veuillez sélectionner un fichier image valide (JPG, PNG, WEBP).');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 600;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', 0.78);
+          setImageUrl(compressed);
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -101,6 +153,8 @@ export const ProductModal: React.FC = () => {
       updateProduct(productModal.product.id, {
         sku: sku.trim(),
         name: name.trim(),
+        imageUrl: imageUrl.trim() || undefined,
+        description: description.trim() || undefined,
         category: finalCategory,
         minThreshold,
         costPrice,
@@ -112,6 +166,8 @@ export const ProductModal: React.FC = () => {
       addProduct({
         sku: sku.trim(),
         name: name.trim(),
+        imageUrl: imageUrl.trim() || undefined,
+        description: description.trim() || undefined,
         category: finalCategory,
         quantity,
         minThreshold,
@@ -127,15 +183,15 @@ export const ProductModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-lg w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50 shrink-0">
           <div>
             <h2 className="text-base font-bold text-slate-900">
               {isEditing ? "Modifier la fiche article" : "Ajouter un nouvel article au catalogue"}
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Renseignez les détails, prix et seuils de réapprovisionnement
+              Renseignez la photo, les détails, prix et seuils de réapprovisionnement
             </p>
           </div>
           <button
@@ -147,12 +203,103 @@ export const ProductModal: React.FC = () => {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
           {error && (
             <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg font-medium">
               {error}
             </div>
           )}
+
+          {/* Photo & Description du Produit (Catalogue & WhatsApp) */}
+          <div className="p-3 bg-gradient-to-r from-blue-50/70 to-indigo-50/70 border border-blue-200/80 rounded-xl space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                <Camera className="w-4 h-4 text-blue-600" />
+                <span>Photo de l'article (Catalogue & WhatsApp)</span>
+              </label>
+              {imageUrl && (
+                <button
+                  type="button"
+                  onClick={() => setImageUrl('')}
+                  className="text-[11px] text-rose-600 hover:text-rose-700 font-semibold flex items-center gap-1"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Supprimer la photo</span>
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* Photo Preview Thumbnail */}
+              <div className="w-20 h-20 rounded-xl border-2 border-dashed border-blue-300 bg-white flex items-center justify-center overflow-hidden shrink-0 shadow-2xs relative group">
+                {imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt="Aperçu article"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-slate-400 p-1 text-center">
+                    <ImageIcon className="w-6 h-6 text-slate-300 mb-0.5" />
+                    <span className="text-[9px] font-medium leading-tight">Sans photo</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Upload Controls */}
+              <div className="flex-1 space-y-1.5">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleImageFile}
+                  accept="image/*"
+                  className="hidden"
+                />
+
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95 transition-all"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{imageUrl ? "Changer la photo" : "Ajouter une photo"}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = prompt("Collez l'URL d'une image web (https://...) :");
+                      if (url && url.trim().startsWith('http')) {
+                        setImageUrl(url.trim());
+                      }
+                    }}
+                    className="px-2.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg font-medium text-xs shadow-2xs"
+                  >
+                    Lien Web
+                  </button>
+                </div>
+
+                <p className="text-[10px] text-slate-500">
+                  Prenez une photo avec votre téléphone ou choisissez depuis la galerie. L'image sera automatiquement optimisée pour le catalogue client.
+                </p>
+              </div>
+            </div>
+
+            {/* Commercial description */}
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1 text-[11px]">
+                Description commerciale (affichée aux clients dans le catalogue)
+              </label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Ex: Qualité supérieure, disponible en plusieurs tailles et coloris, livraison rapide..."
+                rows={2}
+                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-slate-900 text-xs resize-none"
+              />
+            </div>
+          </div>
 
           {/* SKU & Name */}
           <div className="grid grid-cols-3 gap-3">

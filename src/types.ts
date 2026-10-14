@@ -33,6 +33,8 @@ export interface Product {
   supplier: string;
   location?: string;
   lastUpdated: string;
+  imageUrl?: string; // Image / photo du produit (base64 compressée ou URL)
+  description?: string; // Description commerciale pour le catalogue client
 }
 
 export interface StockMovement {
@@ -88,6 +90,7 @@ export type ViewTab =
   | 'reports'
   | 'movements'
   | 'accounting'
+  | 'catalog'
   | 'suppliers'
   | 'sheets'
   | 'design_system'

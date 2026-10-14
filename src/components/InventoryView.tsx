@@ -390,13 +390,28 @@ export const InventoryView: React.FC = () => {
                         key={product.id}
                         className="hover:bg-slate-50/80 transition-colors group"
                       >
-                        {/* SKU & Name */}
+                        {/* SKU & Name with thumbnail */}
                         <td className={getRowPadding()}>
-                          <div className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
-                            {product.name}
-                          </div>
-                          <div className="text-[11px] font-mono text-slate-400 tracking-wider">
-                            {product.sku} {product.location ? `· ${product.location}` : ''}
+                          <div className="flex items-center gap-2.5">
+                            {product.imageUrl ? (
+                              <img
+                                src={product.imageUrl}
+                                alt={product.name}
+                                className="w-8 h-8 rounded-lg object-cover border border-slate-200 shrink-0 shadow-2xs"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 text-slate-400">
+                                <Package className="w-4 h-4 text-slate-300" />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <div className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors truncate">
+                                {product.name}
+                              </div>
+                              <div className="text-[11px] font-mono text-slate-400 tracking-wider truncate">
+                                {product.sku} {product.location ? `· ${product.location}` : ''}
+                              </div>
+                            </div>
                           </div>
                         </td>
 

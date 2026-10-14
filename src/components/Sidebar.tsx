@@ -92,6 +92,13 @@ export const Sidebar: React.FC = () => {
       badgeColor: 'text-emerald-700 bg-emerald-50 font-bold',
     },
     {
+      id: 'catalog',
+      label: 'Catalogue & WhatsApp',
+      icon: <Share2 className="w-4 h-4" />,
+      badge: 'Photos',
+      badgeColor: 'text-emerald-700 bg-emerald-50 font-bold',
+    },
+    {
       id: 'dashboard',
       label: 'Mon Tableau de Bord',
       icon: <LayoutDashboard className="w-4 h-4" />,
@@ -122,6 +129,13 @@ export const Sidebar: React.FC = () => {
       icon: <Boxes className="w-4 h-4" />,
       badge: lowStockCount + outOfStockCount > 0 ? lowStockCount + outOfStockCount : undefined,
       badgeColor: outOfStockCount > 0 ? 'text-rose-600 bg-rose-50' : 'text-amber-600 bg-amber-50',
+    },
+    {
+      id: 'catalog',
+      label: 'Catalogue & WhatsApp',
+      icon: <Share2 className="w-4 h-4" />,
+      badge: 'Photos & Envoi',
+      badgeColor: 'text-emerald-700 bg-emerald-50 font-bold',
     },
     {
       id: 'distribution',

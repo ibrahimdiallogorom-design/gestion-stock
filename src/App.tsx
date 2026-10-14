@@ -18,6 +18,7 @@ import { CashierView } from './components/CashierView';
 import { DailyReportsView } from './components/DailyReportsView';
 import { DistributionView } from './components/DistributionView';
 import { AccountingView } from './components/AccountingView';
+import { CatalogView } from './components/CatalogView';
 import { SwitchAccountModal } from './components/SwitchAccountModal';
 import { InstallAppModal } from './components/InstallAppModal';
 import { LoginScreen } from './components/LoginScreen';
@@ -40,6 +41,8 @@ import {
   Smartphone,
   Layers,
   Target,
+  Share2,
+  Menu,
 } from 'lucide-react';
 
 const AppContent: React.FC = () => {
@@ -96,6 +99,7 @@ const AppContent: React.FC = () => {
           {activeTab === 'reports' && <DailyReportsView />}
           {!isCashier && activeTab === 'accounting' && <AccountingView />}
           {activeTab === 'movements' && <MovementsView />}
+          {activeTab === 'catalog' && <CatalogView />}
           {!isCashier && activeTab === 'suppliers' && <SuppliersView />}
           {!isCashier && activeTab === 'sheets' && <SheetsSyncView />}
           {!isCashier && activeTab === 'design_system' && <DesignSystemView />}
@@ -125,31 +129,32 @@ const AppContent: React.FC = () => {
               <Boxes className="w-5 h-5" />
               <span>Mon Stock</span>
             </button>
-            {/* Center VISER Button (Synchronisation, Entrées, Sorties, APPS) */}
+            {/* Center VISEUR Button (Synchronisation Cloud, Entrées, Sorties) */}
             <button
               type="button"
               onClick={openViser}
               className="flex flex-col items-center justify-center -mt-6 bg-gradient-to-tr from-emerald-600 via-teal-600 to-emerald-700 text-white rounded-2xl w-14 h-14 shadow-xl shadow-emerald-500/30 active:scale-95 transition-all border-2 border-white cursor-pointer"
-              title="Viser : Synchronisation, Entrées, Sorties et APPS"
+              title="Viseur : Synchronisation Cloud, Entrées et Sorties de Stock"
             >
               <Target className="w-6 h-6 text-white" />
-              <span className="text-[9px] font-black tracking-tight uppercase">VISER</span>
+              <span className="text-[9px] font-black tracking-tight uppercase">VISEUR</span>
             </button>
             <button
-              onClick={() => setActiveTab('reports')}
+              onClick={() => setActiveTab('catalog')}
               className={`flex flex-col items-center py-1 px-2 text-[11px] font-bold ${
-                activeTab === 'reports' ? 'text-blue-600 font-black' : 'text-slate-500'
+                activeTab === 'catalog' ? 'text-blue-600 font-black' : 'text-slate-500'
               }`}
             >
-              <Receipt className="w-5 h-5" />
-              <span>Rapports</span>
+              <Share2 className="w-5 h-5" />
+              <span>Catalogue</span>
             </button>
             <button
-              onClick={openSwitchAccountModal}
-              className="flex flex-col items-center py-1 px-2 text-[11px] text-blue-600 hover:text-blue-700 font-bold"
+              type="button"
+              onClick={openMobileMenu}
+              className="flex flex-col items-center py-1 px-2 text-[11px] font-bold text-slate-500 hover:text-blue-600"
             >
-              <Users className="w-5 h-5" />
-              <span>Compte</span>
+              <Menu className="w-5 h-5" />
+              <span>Menu</span>
             </button>
           </>
         ) : (
@@ -183,22 +188,21 @@ const AppContent: React.FC = () => {
               <span className="text-[9px] font-black tracking-tight uppercase">VISEUR</span>
             </button>
             <button
-              onClick={() => setActiveTab('reports')}
+              onClick={() => setActiveTab('catalog')}
               className={`flex flex-col items-center py-1 px-2 text-[11px] font-bold ${
-                activeTab === 'reports' ? 'text-blue-600 font-black' : 'text-slate-500'
+                activeTab === 'catalog' ? 'text-blue-600 font-black' : 'text-slate-500'
               }`}
             >
-              <Receipt className="w-5 h-5" />
-              <span>Rapports</span>
+              <Share2 className="w-5 h-5" />
+              <span>Catalogue</span>
             </button>
             <button
-              onClick={() => setActiveTab('settings')}
-              className={`flex flex-col items-center py-1 px-2 text-[11px] font-bold ${
-                activeTab === 'settings' ? 'text-blue-600 font-black' : 'text-slate-500'
-              }`}
+              type="button"
+              onClick={openMobileMenu}
+              className="flex flex-col items-center py-1 px-2 text-[11px] font-bold text-slate-500 hover:text-blue-600"
             >
-              <Settings className="w-5 h-5" />
-              <span>Paramètres</span>
+              <Menu className="w-5 h-5" />
+              <span>Menu</span>
             </button>
           </>
         )}
