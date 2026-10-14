@@ -77,24 +77,13 @@ export const TopBar: React.FC = () => {
 
   return (
     <header className="h-16 bg-white border-b border-slate-200 px-3 sm:px-6 flex items-center justify-between shrink-0 gap-2">
-      {/* Breadcrumbs Trail & Mobile Menu Button */}
+      {/* Breadcrumbs Trail */}
       <div className="flex items-center gap-2 min-w-0">
-        {/* Prominent Mobile Menu Trigger */}
-        <button
-          type="button"
-          onClick={openMobileMenu}
-          className="md:hidden flex items-center gap-1.5 px-2.5 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-black text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all shrink-0 cursor-pointer"
-          title="Dérouler toutes les applications et fonctions"
-        >
-          <LayoutGrid className="w-4 h-4 text-white" />
-          <span className="tracking-tight">☰ APPS</span>
-        </button>
-
-        <span className="text-xs sm:text-sm font-semibold text-slate-900 tracking-tight truncate">
+        <span className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight truncate">
           {getBreadcrumbs()}
         </span>
         {sheetsSync.lastSyncedAt && activeTab !== 'design_system' && (
-          <span className="hidden sm:inline-flex text-xs text-slate-400 items-center gap-1.5 ml-3 pl-3 border-l border-slate-200">
+          <span className="hidden lg:inline-flex text-xs text-slate-400 items-center gap-1.5 ml-3 pl-3 border-l border-slate-200">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             <span className="font-mono tabular-nums">
               Synchro :{' '}
@@ -106,11 +95,11 @@ export const TopBar: React.FC = () => {
           </span>
         )}
 
-        {/* Real-time Cloud Firestore Multi-Device Live Indicator */}
+        {/* Real-time Cloud Firestore Multi-Device Live Indicator (Desktop only) */}
         <button
           type="button"
           onClick={forceSyncCloud}
-          className={`inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-semibold border transition-all ${
+          className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all ${
             cloudStatus === 'connected'
               ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
               : cloudStatus === 'connecting'
@@ -129,15 +118,12 @@ export const TopBar: React.FC = () => {
             }`}
           />
           <Cloud className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-          <span className="hidden sm:inline">
+          <span>
             {cloudStatus === 'connected' ? 'Cloud Synchro En Direct' : cloudStatusMessage}
-          </span>
-          <span className="sm:hidden">
-            {cloudStatus === 'connected' ? 'Cloud En Direct' : 'Synchro...'}
           </span>
         </button>
 
-        {/* Force Refresh & Purge Cache */}
+        {/* Force Refresh & Purge Cache (Desktop only) */}
         <button
           type="button"
           onClick={async () => {
@@ -155,17 +141,17 @@ export const TopBar: React.FC = () => {
             }
             window.location.reload();
           }}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-semibold border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-950 transition-colors shadow-2xs"
+          className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-950 transition-colors shadow-2xs"
           title="Forcer le rechargement de la dernière version du code (vider le cache PWA et rafraîchir)"
         >
           <RefreshCw className="w-3 h-3 text-slate-600" />
-          <span className="hidden sm:inline">Actualiser l'App</span>
+          <span>Actualiser l'App</span>
         </button>
       </div>
 
       {/* Action Zone */}
       <div className="flex items-center gap-2 sm:gap-3">
-        {/* Prominent VISER Button (Synchronisation, Entrées, Sorties, APPS) */}
+        {/* Prominent VISER Button (Synchronisation, Entrées, Sorties, APPS) - THE ONLY BUTTON ON MOBILE */}
         <button
           type="button"
           onClick={openViser}
@@ -176,10 +162,10 @@ export const TopBar: React.FC = () => {
           <span className="tracking-tight uppercase">Viser</span>
         </button>
 
-        {/* Direct Link to Caisse / POS */}
+        {/* Direct Link to Caisse / POS (Desktop only) */}
         <button
           onClick={() => setActiveTab('caisse')}
-          className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border ${
+          className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border ${
             activeTab === 'caisse'
               ? 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-2xs'
               : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -187,7 +173,7 @@ export const TopBar: React.FC = () => {
           title="Accéder au terminal de caisse enregistreuse"
         >
           <ShoppingCart className="w-3.5 h-3.5 text-emerald-600" />
-          <span className="hidden sm:inline">Caisse</span>
+          <span>Caisse</span>
           {isCashierUnlocked ? (
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Caisse ouverte" />
           ) : (
@@ -197,10 +183,10 @@ export const TopBar: React.FC = () => {
           )}
         </button>
 
-        {/* Direct Link to Reports */}
+        {/* Direct Link to Reports (Desktop only) */}
         <button
           onClick={() => setActiveTab('reports')}
-          className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border ${
+          className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border ${
             activeTab === 'reports'
               ? 'bg-blue-50 border-blue-300 text-blue-700 shadow-2xs'
               : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -208,24 +194,24 @@ export const TopBar: React.FC = () => {
           title="Consulter les rapports de vente et Z de caisse"
         >
           <Receipt className="w-3.5 h-3.5 text-blue-600" />
-          <span className="hidden sm:inline">Rapports</span>
+          <span>Rapports</span>
         </button>
 
-        {/* APPS Modal Button */}
+        {/* APPS Modal Button (Desktop only) */}
         <button
           onClick={openInstallModal}
-          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xs"
+          className="hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xs"
           title="Installer l'application sur votre téléphone ou partager l'accès"
         >
           <Smartphone className="w-3.5 h-3.5 text-white" />
           <span>APPS</span>
         </button>
 
-        {/* Direct Link to Design System & Theme Inspector (Admin only) */}
+        {/* Direct Link to Design System & Theme Inspector (Admin only, Desktop only) */}
         {!isCashier && (
           <button
             onClick={() => setActiveTab('design_system')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border ${
+            className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border ${
               activeTab === 'design_system'
                 ? 'bg-indigo-50 border-indigo-300 text-indigo-700 shadow-2xs'
                 : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -233,7 +219,7 @@ export const TopBar: React.FC = () => {
             title="Consulter les choix graphiques, tokens et univers"
           >
             <Palette className="w-3.5 h-3.5 text-indigo-600" />
-            <span className="hidden sm:inline">Explorer le Design</span>
+            <span>Explorer le Design</span>
             <span
               className="w-2 h-2 rounded-full ml-0.5"
               style={{ backgroundColor: currentTheme.accentColor }}
@@ -241,7 +227,7 @@ export const TopBar: React.FC = () => {
           </button>
         )}
 
-        {/* Google Sheets Quick Sync Button (Admin only) */}
+        {/* Google Sheets Quick Sync Button (Admin only, Desktop only) */}
         {!isCashier && hasGoogleToken && sheetsSync.spreadsheetId && (
           <button
             onClick={syncToSheetsAction}
@@ -260,9 +246,9 @@ export const TopBar: React.FC = () => {
           </button>
         )}
 
-        {/* Quick Movements (Admin only) */}
+        {/* Quick Movements (Admin only, Desktop only) */}
         {!isCashier && (
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+          <div className="hidden md:flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
             <button
               onClick={() => openMovementModal(undefined, 'IN')}
               className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-emerald-800 bg-white hover:bg-emerald-50 rounded-md shadow-xs transition-colors"
@@ -282,22 +268,22 @@ export const TopBar: React.FC = () => {
           </div>
         )}
 
-        {/* Add Product CTA (Admin only) */}
+        {/* Add Product CTA (Admin only, Desktop only) */}
         {!isCashier && (
           <button
             onClick={() => openProductModal()}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs shadow-blue-600/20 transition-colors whitespace-nowrap"
+            className="hidden md:flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs shadow-blue-600/20 transition-colors whitespace-nowrap"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Nouvel Article</span>
           </button>
         )}
 
-        {/* Direct Settings Shortcut (Admin only) */}
+        {/* Direct Settings Shortcut (Admin only, Desktop only) */}
         {!isCashier && (
           <button
             onClick={() => setActiveTab('settings')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
               activeTab === 'settings'
                 ? 'bg-blue-50 border-blue-300 text-blue-700 shadow-2xs'
                 : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -305,14 +291,14 @@ export const TopBar: React.FC = () => {
             title="Ouvrir les Paramètres de la boutique"
           >
             <Settings className="w-3.5 h-3.5 text-slate-600" />
-            <span className="hidden md:inline">Paramètres</span>
+            <span>Paramètres</span>
           </button>
         )}
 
-        {/* Active Application User Profile & Switch Account / Logout */}
+        {/* Active Application User Profile & Switch Account / Logout (Desktop only) */}
         {activeAppUser && (
-          <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-            <div className="hidden sm:flex flex-col text-right">
+          <div className="hidden md:flex items-center gap-2 pl-2 border-l border-slate-200">
+            <div className="flex flex-col text-right">
               <span className="text-xs font-bold text-slate-900 leading-tight">
                 {activeAppUser.fullName || activeAppUser.username}
               </span>
@@ -327,7 +313,7 @@ export const TopBar: React.FC = () => {
               className="px-2 py-1.5 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors flex items-center gap-1.5 text-xs font-semibold shadow-2xs"
             >
               <Users className="w-3.5 h-3.5 text-blue-600" />
-              <span className="hidden md:inline text-[11px]">Changer de compte</span>
+              <span className="text-[11px]">Changer de compte</span>
             </button>
 
             <button

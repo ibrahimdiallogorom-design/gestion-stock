@@ -18,6 +18,8 @@ import {
   Download,
   Lock,
   Palette,
+  Settings,
+  LogOut,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 
@@ -34,6 +36,7 @@ export const ViserDrawer: React.FC = () => {
     openDistributionModal,
     openInstallModal,
     openSwitchAccountModal,
+    logoutAppUser,
     setActiveTab,
     isCashierUnlocked,
     activeAppUser,
@@ -395,6 +398,22 @@ export const ViserDrawer: React.FC = () => {
               {!isCashier && (
                 <button
                   type="button"
+                  onClick={() => handleAction(() => setActiveTab('settings'))}
+                  className="p-3 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 hover:border-slate-300 transition-all text-left flex items-center gap-2.5 shadow-2xs cursor-pointer"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+                    <Settings className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-900 block leading-tight">Paramètres</span>
+                    <span className="text-[10px] text-slate-500">Configuration boutique</span>
+                  </div>
+                </button>
+              )}
+
+              {!isCashier && (
+                <button
+                  type="button"
                   onClick={() => handleAction(() => setActiveTab('design_system'))}
                   className="p-3 bg-white border border-slate-200 rounded-xl hover:bg-violet-50 hover:border-violet-300 transition-all text-left flex items-center gap-2.5 shadow-2xs cursor-pointer"
                 >
@@ -408,6 +427,34 @@ export const ViserDrawer: React.FC = () => {
                 </button>
               )}
             </div>
+
+            {/* User Session & Logout for Mobile */}
+            {activeAppUser && (
+              <div className="pt-3 mt-3 border-t border-slate-200 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-black text-xs shrink-0">
+                    {(activeAppUser.fullName || activeAppUser.username || 'U')[0].toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="font-bold text-slate-900 block leading-tight truncate">
+                      {activeAppUser.fullName || activeAppUser.username}
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      {activeAppUser.storeName || (activeAppUser.role === 'ADMIN' ? 'Gérant Principal' : 'Caisse')}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleAction(logoutAppUser)}
+                  className="px-3 py-1.5 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold border border-rose-200 flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                >
+                  <LogOut className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Déconnexion</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
