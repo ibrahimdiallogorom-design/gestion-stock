@@ -15,6 +15,8 @@ import {
   CashierSession,
   AppUser,
   UserRole,
+  Expense,
+  PurchaseBatch,
 } from '../types';
 import { INITIAL_PRODUCTS, INITIAL_MOVEMENTS, INITIAL_SUPPLIERS } from '../data/initialData';
 import { initAuth, googleSignIn, logout, getAccessToken } from '../services/firebaseAuth';
@@ -175,6 +177,20 @@ interface StockContextType {
   cloudStatusMessage: string;
   forceSyncCloud: () => Promise<void>;
   pullLatestFromCloud: () => Promise<{ success: boolean; message: string }>;
+  // Accounting & Cash Flow
+  expenses: Expense[];
+  purchases: PurchaseBatch[];
+  addExpense: (expense: Omit<Expense, 'id' | 'createdAt'>) => Promise<void>;
+  deleteExpense: (id: string) => Promise<void>;
+  recordPurchaseBatch: (
+    batchData: Omit<PurchaseBatch, 'id' | 'createdAt'>,
+    options?: {
+      updateProductStock?: boolean;
+      updateProductCostPrice?: boolean;
+      createExpense?: boolean;
+    }
+  ) => Promise<{ success: boolean; message: string }>;
+  deletePurchaseBatch: (id: string) => Promise<void>;
 }
 
 const StockContext = createContext<StockContextType | undefined>(undefined);
@@ -190,6 +206,8 @@ const STORAGE_KEYS = {
   CASHIER_NAME: 'stockflow_cashier_name_v1',
   APP_USERS: 'stockflow_app_users_v2',
   ACTIVE_USER: 'stockflow_active_user_v2',
+  EXPENSES: 'stockflow_expenses_v1',
+  PURCHASES: 'stockflow_purchases_v1',
 };
 
 export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -360,6 +378,29 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     totalSalesAmount: 0,
   });
 
+  // Accounting States (Expenses & Purchases)
+  const [expenses, setExpenses] = useState<Expense[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.EXPENSES);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  });
+
+  const [purchases, setPurchases] = useState<PurchaseBatch[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.PURCHASES);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  });
+
   // Global Multi-User Authentication state - Seule la boutique Moussa Vision est conservée
   const DEFAULT_APP_USERS: AppUser[] = [
     {
@@ -519,6 +560,14 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.SHEETS_CONFIG, JSON.stringify(sheetsSync));
   }, [sheetsSync]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(expenses));
+  }, [expenses]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.PURCHASES, JSON.stringify(purchases));
+  }, [purchases]);
 
   // Cloud Sync Status states
   const [cloudStatus, setCloudStatus] = useState<CloudSyncStatus>('connecting');
@@ -720,7 +769,62 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           setMovements([]);
         }
 
-        // 4. Cashier Security & Name
+        // 4. Expenses & Purchases Reconciliation
+        const localExpensesJson = localStorage.getItem(STORAGE_KEYS.EXPENSES);
+        let localExpenses: Expense[] = [];
+        try {
+          if (localExpensesJson) localExpenses = JSON.parse(localExpensesJson);
+        } catch (e) {}
+
+        const remoteExpenses = Array.isArray(remote.expenses) ? remote.expenses : [];
+        if (remoteExpenses.length > 0) {
+          const expMap = new Map<string, Expense>();
+          remoteExpenses.forEach((x) => expMap.set(x.id, x));
+          let localHadUnsynced = false;
+          localExpenses.forEach((lx) => {
+            if (!expMap.has(lx.id)) {
+              expMap.set(lx.id, lx);
+              localHadUnsynced = true;
+            }
+          });
+          const mergedExpenses = Array.from(expMap.values()).sort(
+            (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+          );
+          setExpenses(mergedExpenses);
+          localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(mergedExpenses));
+          if (localHadUnsynced) pushToCloud({ expenses: mergedExpenses });
+        } else if (localExpenses.length > 0) {
+          forcePushToCloud({ expenses: localExpenses });
+        }
+
+        const localPurchasesJson = localStorage.getItem(STORAGE_KEYS.PURCHASES);
+        let localPurchases: PurchaseBatch[] = [];
+        try {
+          if (localPurchasesJson) localPurchases = JSON.parse(localPurchasesJson);
+        } catch (e) {}
+
+        const remotePurchases = Array.isArray(remote.purchases) ? remote.purchases : [];
+        if (remotePurchases.length > 0) {
+          const purMap = new Map<string, PurchaseBatch>();
+          remotePurchases.forEach((p) => purMap.set(p.id, p));
+          let localHadUnsynced = false;
+          localPurchases.forEach((lp) => {
+            if (!purMap.has(lp.id)) {
+              purMap.set(lp.id, lp);
+              localHadUnsynced = true;
+            }
+          });
+          const mergedPurchases = Array.from(purMap.values()).sort(
+            (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+          );
+          setPurchases(mergedPurchases);
+          localStorage.setItem(STORAGE_KEYS.PURCHASES, JSON.stringify(mergedPurchases));
+          if (localHadUnsynced) pushToCloud({ purchases: mergedPurchases });
+        } else if (localPurchases.length > 0) {
+          forcePushToCloud({ purchases: localPurchases });
+        }
+
+        // 5. Cashier Security & Name
         if (remote.cashierPin) {
           setCashierPinState(remote.cashierPin);
           localStorage.setItem(STORAGE_KEYS.CASHIER_PIN, remote.cashierPin);
@@ -730,12 +834,14 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           localStorage.setItem(STORAGE_KEYS.CASHIER_NAME, remote.cashierName);
         }
 
-        // 5. Initial Seed if cloud document is missing users
+        // 6. Initial Seed if cloud document is missing users
         if (!remote.appUsers || remote.appUsers.length === 0) {
           forcePushToCloud({
             appUsers,
             products: localProds.length > 0 ? localProds : products,
             movements: localMovs.length > 0 ? localMovs : movements,
+            expenses: localExpenses.length > 0 ? localExpenses : expenses,
+            purchases: localPurchases.length > 0 ? localPurchases : purchases,
             cashierPin,
             cashierName,
             storeName: 'Boutique VisionTech',
@@ -759,12 +865,14 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         appUsers,
         products,
         movements,
+        expenses,
+        purchases,
         cashierPin,
         cashierName,
         storeName: 'Boutique VisionTech',
       });
       setCloudStatus('connected');
-      setCloudStatusMessage('Catalogue et stock synchronisés dans le Cloud');
+      setCloudStatusMessage('Catalogue, comptabilité et stock synchronisés dans le Cloud');
     } catch (e: any) {
       setCloudStatus('error');
       setCloudStatusMessage('Erreur de synchronisation');
@@ -788,6 +896,14 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (data.movements && Array.isArray(data.movements)) {
         setMovements(data.movements);
         localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(data.movements));
+      }
+      if (data.expenses && Array.isArray(data.expenses)) {
+        setExpenses(data.expenses);
+        localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(data.expenses));
+      }
+      if (data.purchases && Array.isArray(data.purchases)) {
+        setPurchases(data.purchases);
+        localStorage.setItem(STORAGE_KEYS.PURCHASES, JSON.stringify(data.purchases));
       }
       if (data.appUsers && Array.isArray(data.appUsers) && data.appUsers.length > 0) {
         setAppUsers(data.appUsers);
@@ -1775,6 +1891,163 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return { success: true };
   };
 
+  // Accounting & Cash Flow operations
+  const addExpense = async (expenseData: Omit<Expense, 'id' | 'createdAt'>) => {
+    const newExpense: Expense = {
+      ...expenseData,
+      id: `exp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [newExpense, ...expenses];
+    setExpenses(updated);
+    localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(updated));
+    pushToCloud({ expenses: updated });
+  };
+
+  const deleteExpense = async (id: string) => {
+    const updated = expenses.filter((e) => e.id !== id);
+    setExpenses(updated);
+    localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(updated));
+    pushToCloud({ expenses: updated });
+  };
+
+  const recordPurchaseBatch = async (
+    batchData: Omit<PurchaseBatch, 'id' | 'createdAt'>,
+    options?: {
+      updateProductStock?: boolean;
+      updateProductCostPrice?: boolean;
+      createExpense?: boolean;
+    }
+  ): Promise<{ success: boolean; message: string }> => {
+    const qty = Math.max(1, Number(batchData.quantityBought) || 1);
+    const purchaseTotal = Math.max(0, Number(batchData.purchasePriceTotal) || 0);
+    const transportTotal = Math.max(0, Number(batchData.shippingCost) || 0);
+    const unitPurchase = Math.round(purchaseTotal / qty);
+    const unitTransport = Math.round(transportTotal / qty);
+    const totalCostPaid = purchaseTotal + transportTotal;
+    const unitCost = Math.round(totalCostPaid / qty);
+
+    const now = new Date().toISOString();
+    const newBatch: PurchaseBatch = {
+      ...batchData,
+      id: `pur-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      quantityBought: qty,
+      purchasePriceTotal: purchaseTotal,
+      unitPurchasePrice: unitPurchase,
+      shippingCost: transportTotal,
+      unitShippingCost: unitTransport,
+      unitCostPrice: unitCost,
+      totalCostPaid: totalCostPaid,
+      createdAt: now,
+    };
+
+    const nextPurchases = [newBatch, ...purchases];
+    setPurchases(nextPurchases);
+    localStorage.setItem(STORAGE_KEYS.PURCHASES, JSON.stringify(nextPurchases));
+
+    let nextExpenses = expenses;
+    if (options?.createExpense !== false) {
+      const purchaseExpense: Expense = {
+        id: `exp-${Date.now()}-stock`,
+        date: batchData.date || now.split('T')[0],
+        category: 'ACHAT_STOCK',
+        description: `Achat Stock: ${batchData.productName} (x${qty})`,
+        amount: purchaseTotal,
+        paymentMethod: 'CASH',
+        recordedBy: batchData.recordedBy || activeAppUser?.fullName || 'Gérant',
+        storeName: 'Boutique Moussa Vision',
+        notes: `Prix achat total de ${purchaseTotal.toLocaleString('fr-FR')} FCFA (${unitPurchase.toLocaleString('fr-FR')} FCFA/u)`,
+        createdAt: now,
+      };
+
+      const newExpList = [purchaseExpense];
+      if (transportTotal > 0) {
+        const transportExpense: Expense = {
+          id: `exp-${Date.now()}-trsp`,
+          date: batchData.date || now.split('T')[0],
+          category: 'TRANSPORT',
+          description: `Frais transport/acheminement: ${batchData.productName} (x${qty})`,
+          amount: transportTotal,
+          paymentMethod: 'CASH',
+          recordedBy: batchData.recordedBy || activeAppUser?.fullName || 'Gérant',
+          storeName: 'Boutique Moussa Vision',
+          notes: `Frais de transport total de ${transportTotal.toLocaleString('fr-FR')} FCFA (${unitTransport.toLocaleString('fr-FR')} FCFA/u)`,
+          createdAt: new Date(Date.now() + 1).toISOString(),
+        };
+        newExpList.push(transportExpense);
+      }
+
+      nextExpenses = [...newExpList, ...expenses];
+      setExpenses(nextExpenses);
+      localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(nextExpenses));
+    }
+
+    // Optionally update existing product stock and/or costPrice
+    let updatedProducts = products;
+    let updatedMovements = movements;
+    if (batchData.productId) {
+      const prod = products.find((p) => p.id === batchData.productId);
+      if (prod) {
+        const newCost = options?.updateProductCostPrice ? unitCost : prod.costPrice;
+        const newTotalQty = options?.updateProductStock ? prod.quantity + qty : prod.quantity;
+        const newCentralQty = options?.updateProductStock ? (prod.centralQuantity || prod.quantity) + qty : (prod.centralQuantity || prod.quantity);
+
+        updatedProducts = products.map((p) =>
+          p.id === batchData.productId
+            ? {
+                ...p,
+                costPrice: newCost,
+                quantity: newTotalQty,
+                centralQuantity: newCentralQty,
+                lastUpdated: now,
+              }
+            : p
+        );
+        setProducts(updatedProducts);
+        localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(updatedProducts));
+
+        if (options?.updateProductStock) {
+          const newMovement: StockMovement = {
+            id: `mov-${Date.now()}`,
+            productId: prod.id,
+            productSku: prod.sku,
+            productName: prod.name,
+            type: 'IN',
+            quantityDelta: qty,
+            previousStock: prod.quantity,
+            newStock: newTotalQty,
+            reason: `Réassort Achat (${qty} pcs) + Frais de Transport`,
+            operator: batchData.recordedBy || activeAppUser?.fullName || 'Gérant',
+            notes: `Coût d'achat: ${unitPurchase} FCFA + Transport: ${unitTransport} FCFA = Coût de revient: ${unitCost} FCFA/u`,
+            createdAt: now,
+          };
+          updatedMovements = [newMovement, ...movements];
+          setMovements(updatedMovements);
+          localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(updatedMovements));
+        }
+      }
+    }
+
+    pushToCloud({
+      purchases: nextPurchases,
+      expenses: nextExpenses,
+      products: updatedProducts,
+      movements: updatedMovements,
+    });
+
+    return {
+      success: true,
+      message: `Lot d'achat enregistré ! Coût de revient calculé : ${unitCost.toLocaleString('fr-FR')} FCFA / pièce.`,
+    };
+  };
+
+  const deletePurchaseBatch = async (id: string) => {
+    const updated = purchases.filter((p) => p.id !== id);
+    setPurchases(updated);
+    localStorage.setItem(STORAGE_KEYS.PURCHASES, JSON.stringify(updated));
+    pushToCloud({ purchases: updated });
+  };
+
   // Modals helpers
   const openMovementModal = (productId?: string, defaultType: MovementType = 'IN') => {
     setMovementModal({ isOpen: true, productId, defaultType });
@@ -1892,6 +2165,13 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         cloudStatusMessage,
         forceSyncCloud,
         pullLatestFromCloud,
+        // Accounting & Cash Flow
+        expenses,
+        purchases,
+        addExpense,
+        deleteExpense,
+        recordPurchaseBatch,
+        deletePurchaseBatch,
       }}
     >
       {children}

@@ -80,7 +80,18 @@ export interface Supplier {
   minOrderAmount?: number;
 }
 
-export type ViewTab = 'dashboard' | 'inventory' | 'distribution' | 'caisse' | 'reports' | 'movements' | 'suppliers' | 'sheets' | 'design_system' | 'settings';
+export type ViewTab =
+  | 'dashboard'
+  | 'inventory'
+  | 'distribution'
+  | 'caisse'
+  | 'reports'
+  | 'movements'
+  | 'accounting'
+  | 'suppliers'
+  | 'sheets'
+  | 'design_system'
+  | 'settings';
 
 export interface CartItem {
   product: Product;
@@ -108,4 +119,48 @@ export interface AppUser {
   storeName?: string;
   createdAt: string;
 }
+
+export type ExpenseCategory =
+  | 'TRANSPORT'
+  | 'LOYER'
+  | 'FACTURES'
+  | 'SALAIRES'
+  | 'EMBALLAGE'
+  | 'REPAS_DEPLACEMENT'
+  | 'TAXES'
+  | 'ACHAT_STOCK'
+  | 'AUTRE';
+
+export interface Expense {
+  id: string;
+  date: string; // YYYY-MM-DD
+  category: ExpenseCategory;
+  description: string;
+  amount: number; // Montant en FCFA
+  paymentMethod: PaymentMethod;
+  recordedBy: string; // Utilisateur ayant saisi la charge
+  storeName?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface PurchaseBatch {
+  id: string;
+  date: string; // YYYY-MM-DD
+  productId?: string;
+  productSku?: string;
+  productName: string;
+  quantityBought: number; // Nombre de produits payés
+  purchasePriceTotal: number; // Prix total d'achat des marchandises
+  unitPurchasePrice: number; // Prix d'achat unitaire brut (hors transport)
+  shippingCost: number; // Frais de transport & acheminement vers destination
+  unitShippingCost: number; // Part de transport par article
+  unitCostPrice: number; // Prix de revient unitaire = (Achat + Transport) / Quantité
+  totalCostPaid: number; // Total décaissé = Achat + Transport
+  supplierName?: string;
+  notes?: string;
+  recordedBy: string;
+  createdAt: string;
+}
+
 

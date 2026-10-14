@@ -34,6 +34,8 @@ if (Test-Path "$Workspace\dist\GestionStock.apk") {
 
 # Synchroniser assets (avec suppression des anciens bundles hachés)
 robocopy "$Workspace\dist\assets" "$DeployDir\assets" /MIR /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null
+robocopy "$Workspace\dist\assets" "$Workspace\assets" /MIR /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null
+Copy-Item -Path "$Workspace\dist\index.html" -Destination "$Workspace\404.html" -Force
 
 # 5. Git Commit & Push (Dépôt de déploiement Desktop)
 Write-Host "`n[5/5] Envoi automatique vers GitHub (Push origin main)..." -ForegroundColor Yellow

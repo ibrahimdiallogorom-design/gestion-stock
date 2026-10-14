@@ -14,12 +14,14 @@ import {
   Firestore,
   Unsubscribe,
 } from 'firebase/firestore';
-import { AppUser, Product, StockMovement } from '../types';
+import { AppUser, Product, StockMovement, Expense, PurchaseBatch } from '../types';
 
 export interface CloudStoreData {
   appUsers?: AppUser[];
   products?: Product[];
   movements?: StockMovement[];
+  expenses?: Expense[];
+  purchases?: PurchaseBatch[];
   cashierPin?: string;
   cashierName?: string;
   storeName?: string;

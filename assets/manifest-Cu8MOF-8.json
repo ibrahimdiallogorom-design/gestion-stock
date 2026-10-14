@@ -1,0 +1,25 @@
+{
+  "name": "Boutique VisionTech - Gestion de Stock",
+  "short_name": "VisionTech",
+  "description": "Application de gestion de stock, encaissement caisse et multi-boutiques avec synchronisation Cloud automatique",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "./icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

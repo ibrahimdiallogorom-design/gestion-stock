@@ -54,6 +54,8 @@ export const TopBar: React.FC = () => {
         return 'Caisse / Terminal Point de Vente & Encaissement';
       case 'reports':
         return 'Rapports & Clôtures / Ventes Quotidiennes & Z de Caisse';
+      case 'accounting':
+        return 'Comptabilité & Trésorerie / Bilan, Coûts de Revient & Charges';
       case 'movements':
         return 'Journal des Flux / Grand Livre des Mouvements';
       case 'suppliers':

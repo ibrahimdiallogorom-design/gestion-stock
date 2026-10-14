@@ -17,6 +17,7 @@ import { SettingsView } from './components/SettingsView';
 import { CashierView } from './components/CashierView';
 import { DailyReportsView } from './components/DailyReportsView';
 import { DistributionView } from './components/DistributionView';
+import { AccountingView } from './components/AccountingView';
 import { SwitchAccountModal } from './components/SwitchAccountModal';
 import { InstallAppModal } from './components/InstallAppModal';
 import { LoginScreen } from './components/LoginScreen';
@@ -60,7 +61,7 @@ const AppContent: React.FC = () => {
   // Strict role guard: Cashiers can NEVER access administration views
   React.useEffect(() => {
     if (isCashier) {
-      const adminOnlyTabs = ['distribution', 'suppliers', 'sheets', 'design_system', 'settings'];
+      const adminOnlyTabs = ['distribution', 'suppliers', 'sheets', 'design_system', 'settings', 'accounting'];
       if (adminOnlyTabs.includes(activeTab)) {
         setActiveTab('caisse');
       }
@@ -87,6 +88,7 @@ const AppContent: React.FC = () => {
           {!isCashier && activeTab === 'distribution' && <DistributionView />}
           {activeTab === 'caisse' && <CashierView />}
           {activeTab === 'reports' && <DailyReportsView />}
+          {!isCashier && activeTab === 'accounting' && <AccountingView />}
           {activeTab === 'movements' && <MovementsView />}
           {!isCashier && activeTab === 'suppliers' && <SuppliersView />}
           {!isCashier && activeTab === 'sheets' && <SheetsSyncView />}

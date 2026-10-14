@@ -18,6 +18,7 @@ import {
   Share2,
   Smartphone,
   Download,
+  Calculator,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { ViewTab } from '../types';
@@ -141,6 +142,13 @@ export const Sidebar: React.FC = () => {
       icon: <Receipt className="w-4 h-4" />,
       badge: 'Z Caisse',
       badgeColor: 'text-emerald-700 bg-emerald-50 font-bold',
+    },
+    {
+      id: 'accounting',
+      label: 'Comptabilité & Trésorerie',
+      icon: <Calculator className="w-4 h-4" />,
+      badge: 'Bilan & Coûts',
+      badgeColor: 'text-amber-800 bg-amber-50 font-semibold',
     },
     {
       id: 'movements',

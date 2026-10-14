@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Sparkles } from 'lucide-react';
+import { X, Sparkles, Calculator, ChevronDown, ChevronUp, Check, Truck } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { Product, STANDARD_CATEGORIES } from '../types';
 
@@ -20,6 +20,14 @@ export const ProductModal: React.FC = () => {
   const [supplier, setSupplier] = useState('');
   const [location, setLocation] = useState('Rayon principal');
   const [error, setError] = useState<string | null>(null);
+
+  // Calculateur interactif de Coût de Revient (Achat + Transport)
+  const [showCostCalculator, setShowCostCalculator] = useState(false);
+  const [calcQty, setCalcQty] = useState<number>(10);
+  const [calcTotalPurchase, setCalcTotalPurchase] = useState<number>(0);
+  const [calcShippingCost, setCalcShippingCost] = useState<number>(0);
+  const [targetMarginPercent, setTargetMarginPercent] = useState<number>(30);
+  const [appliedSuccess, setAppliedSuccess] = useState(false);
 
   const allCategories = Array.from(
     new Set([...STANDARD_CATEGORIES, ...products.map((p) => p.category).filter(Boolean)])
@@ -276,6 +284,145 @@ export const ProductModal: React.FC = () => {
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 font-mono tabular-nums text-slate-900"
               />
             </div>
+          </div>
+
+          {/* Calculateur de Coût de Revient (Achat + Transport) */}
+          <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-3">
+            <button
+              type="button"
+              onClick={() => {
+                setShowCostCalculator(!showCostCalculator);
+                setAppliedSuccess(false);
+              }}
+              className="w-full flex items-center justify-between text-left font-semibold text-blue-900 text-xs hover:text-blue-700"
+            >
+              <span className="flex items-center gap-1.5">
+                <Calculator className="w-4 h-4 text-blue-600" />
+                <span>Calculateur de Coût de Revient (Prix d'achat + Transport)</span>
+              </span>
+              <span className="flex items-center gap-1 text-[11px] text-blue-600">
+                {showCostCalculator ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </span>
+            </button>
+
+            {showCostCalculator && (
+              <div className="mt-3 pt-3 border-t border-blue-100 space-y-3">
+                <p className="text-[11px] text-slate-600">
+                  Indiquez le montant payé pour le lot et les frais de transport jusqu'à destination. StockFlow calculera automatiquement le coût unitaire réel par article.
+                </p>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-700 block mb-0.5">
+                      Quantité payée *
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={calcQty}
+                      onChange={(e) => setCalcQty(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900 font-mono text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-700 block mb-0.5">
+                      Prix achat total (FCFA) *
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={calcTotalPurchase}
+                      onChange={(e) => setCalcTotalPurchase(Math.max(0, parseFloat(e.target.value) || 0))}
+                      placeholder="Ex: 50000"
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900 font-mono text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-700 block mb-0.5 flex items-center gap-1">
+                      <Truck className="w-3 h-3 text-amber-600" />
+                      <span>Frais Transport</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={calcShippingCost}
+                      onChange={(e) => setCalcShippingCost(Math.max(0, parseFloat(e.target.value) || 0))}
+                      placeholder="Ex: 5000"
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900 font-mono text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Explication pédagogique automatique */}
+                {calcQty > 0 && (
+                  <div className="bg-white rounded-lg p-2.5 border border-blue-200/80 text-[11px] space-y-1.5">
+                    <div className="flex justify-between items-center text-slate-600">
+                      <span>• Prix d'achat brut par article :</span>
+                      <span className="font-mono font-semibold text-slate-900">
+                        {Math.round(calcTotalPurchase / calcQty).toLocaleString('fr-FR')} FCFA / pc
+                        <span className="text-[10px] text-slate-400 font-normal ml-1">
+                          ({calcTotalPurchase.toLocaleString('fr-FR')} ÷ {calcQty})
+                        </span>
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-slate-600">
+                      <span>• Frais de transport par article :</span>
+                      <span className="font-mono font-semibold text-amber-700">
+                        +{Math.round(calcShippingCost / calcQty).toLocaleString('fr-FR')} FCFA / pc
+                        <span className="text-[10px] text-slate-400 font-normal ml-1">
+                          ({calcShippingCost.toLocaleString('fr-FR')} ÷ {calcQty})
+                        </span>
+                      </span>
+                    </div>
+
+                    <div className="pt-1.5 border-t border-slate-100 flex justify-between items-center font-bold text-xs text-blue-900">
+                      <span>🎯 Coût de Revient Unitaire Réel :</span>
+                      <span className="font-mono text-sm text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                        {Math.round((calcTotalPurchase + calcShippingCost) / calcQty).toLocaleString('fr-FR')} FCFA / pièce
+                      </span>
+                    </div>
+
+                    <div className="text-[10px] text-slate-400 text-right">
+                      Total décaissé pour {calcQty} articles : {(calcTotalPurchase + calcShippingCost).toLocaleString('fr-FR')} FCFA
+                    </div>
+                  </div>
+                )}
+
+                {/* Bouton d'application rapide */}
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const unitCost = Math.round((calcTotalPurchase + calcShippingCost) / Math.max(1, calcQty));
+                      setCostPrice(unitCost);
+                      if (!salePrice || salePrice <= unitCost) {
+                        setSalePrice(Math.round(unitCost * 1.3));
+                      }
+                      setAppliedSuccess(true);
+                      setTimeout(() => setAppliedSuccess(false), 2500);
+                    }}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-xs shadow-xs transition-colors"
+                  >
+                    {appliedSuccess ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Appliqué au prix d'achat !</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>
+                          Appliquer comme Prix d'achat ({Math.round((calcTotalPurchase + calcShippingCost) / Math.max(1, calcQty)).toLocaleString('fr-FR')} FCFA)
+                        </span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Prices */}
