@@ -7,9 +7,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>Boutique VisionTech - Gestion de Stock & Caisse</title>
-    <meta name="description" content="Application Boutique VisionTech : gestion de stock, encaissement caisse, multi-boutiques et rapports journaliers." />
+    <meta name="description" content="Application Boutique VisionTech : gestion de stock, encaissement caisse, multi-boutiques et comptabilité." />
     <meta property="og:title" content="Boutique VisionTech - Gestion de Stock & Caisse" />
-    <meta property="og:description" content="Application Boutique VisionTech : gestion de stock, encaissement caisse, multi-boutiques et rapports journaliers." />
+    <meta property="og:description" content="Application Boutique VisionTech : gestion de stock, encaissement caisse, multi-boutiques et comptabilité." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="theme-color" content="#2563eb" />
@@ -22,11 +22,53 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script type="module" crossorigin src="./assets/index-BPX4ybzs.js"></script>
+    
+    <script>
+      // 1. Détection ouverture locale file:// (double-clic direct sur PC)
+      if (window.location.protocol === 'file:') {
+        window.addEventListener('DOMContentLoaded', () => {
+          document.body.innerHTML = `
+            <div style="font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #090d16; color: white; padding: 20px; text-align: center;">
+              <div style="max-width: 520px; background: #131c2e; padding: 32px; border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7); border: 1px solid #1e293b;">
+                <div style="font-size: 56px; margin-bottom: 16px;">🌐</div>
+                <h2 style="font-size: 22px; font-weight: 800; margin-bottom: 12px; color: #f8fafc;">Ouverture sur Ordinateur</h2>
+                <p style="font-size: 14px; color: #94a3b8; line-height: 1.6; margin-bottom: 24px;">
+                  Les navigateurs bloquent l'exécution directe en double-cliquant sur un fichier local pour des raisons de sécurité. Pour ouvrir votre boutique avec la synchronisation Cloud :
+                </p>
+                <a href="https://ibrahimdiallogorom-design.github.io/gestion-stock/" style="display: inline-block; background: #2563eb; color: white; padding: 14px 28px; border-radius: 14px; font-weight: 700; text-decoration: none; font-size: 15px; box-shadow: 0 10px 20px -5px rgba(37,99,235,0.4);">
+                  👉 Ouvrir la Boutique VisionTech en Ligne
+                </a>
+                <p style="font-size: 12px; color: #64748b; margin-top: 20px;">
+                  Lien officiel : https://ibrahimdiallogorom-design.github.io/gestion-stock/
+                </p>
+              </div>
+            </div>
+          `;
+        });
+      }
+
+      // 2. Forçage de purge du cache Mobile / PWA
+      const APP_VERSION = 'v20261014-accounting-final-2';
+      const currentVer = localStorage.getItem('visiontech_app_version');
+      if (currentVer !== APP_VERSION) {
+        localStorage.setItem('visiontech_app_version', APP_VERSION);
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then((regs) => {
+            for (let reg of regs) reg.unregister();
+          });
+        }
+        if ('caches' in window) {
+          caches.keys().then((keys) => {
+            return Promise.all(keys.map((k) => caches.delete(k)));
+          });
+        }
+      }
+    </script>
+    <script type="module" crossorigin src="./assets/index-B57i2-_P.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-DHQfFhXi.css">
   </head>
   <body class="bg-slate-50 text-slate-900 antialiased font-sans">
-    <div id="root"></div>
+    <div id="root"></div>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
