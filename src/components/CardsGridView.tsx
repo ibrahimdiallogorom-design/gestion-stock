@@ -234,18 +234,18 @@ export const CardsGridView: React.FC = () => {
                 </div>
 
                 {/* Title */}
-                <h3 className="text-sm font-bold text-slate-900 leading-snug line-clamp-2 min-h-[2.5rem]">
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 leading-snug line-clamp-2 min-h-[2.5rem]">
                   {p.name}
                 </h3>
 
                 {/* Stock Level Metric Box */}
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-medium text-slate-500">
-                      Disponibilité en magasin
+                    <span className="text-[11px] sm:text-xs font-medium text-slate-500">
+                      Disponibilité
                     </span>
                     <span
-                      className={`text-xs font-bold font-mono tabular-nums ${
+                      className={`text-xs sm:text-sm font-black font-mono tabular-nums ${
                         isOutOfStock
                           ? 'text-rose-600'
                           : isCritical
@@ -258,7 +258,7 @@ export const CardsGridView: React.FC = () => {
                   </div>
 
                   {/* Progress Bar Gauge */}
-                  <div className="w-full bg-slate-200/80 h-1.5 rounded-full overflow-hidden">
+                  <div className="w-full bg-slate-200/80 h-2 rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all duration-300 ${
                         isOutOfStock
@@ -271,31 +271,31 @@ export const CardsGridView: React.FC = () => {
                     />
                   </div>
 
-                  <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono tabular-nums pt-0.5">
-                    <span>Seuil mini : {p.minThreshold}</span>
-                    <span>Fournisseur : {p.supplier.split(' ')[0]}</span>
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono tabular-nums pt-0.5">
+                    <span>Seuil: {p.minThreshold}</span>
+                    <span className="truncate max-w-[120px]">Fournisseur: {p.supplier.split(' ')[0]}</span>
                   </div>
                 </div>
 
                 {/* Financial Summary: Strictly Sale Price only for Cashier */}
                 {isCashier ? (
                   <div className="pt-2 flex items-center justify-between border-t border-slate-100">
-                    <span className="text-[11px] font-medium text-slate-500">Prix de Vente :</span>
-                    <span className="font-mono text-sm font-bold text-slate-900">
+                    <span className="text-xs font-semibold text-slate-500">Prix de Vente :</span>
+                    <span className="font-mono text-base sm:text-lg font-black text-slate-900">
                       {Math.round(p.salePrice).toLocaleString('fr-FR')} FCFA
                     </span>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-2 text-xs pt-1">
                     <div>
-                      <span className="text-[10px] text-slate-400 block">Prix d'Achat</span>
-                      <span className="font-mono tabular-nums text-slate-700 font-medium">
+                      <span className="text-[10px] sm:text-[11px] text-slate-400 block">Prix d'Achat</span>
+                      <span className="font-mono tabular-nums text-slate-700 font-semibold text-xs sm:text-sm">
                         {Math.round(p.costPrice).toLocaleString('fr-FR')} F
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="text-[10px] text-slate-400 block">Prix de Vente</span>
-                      <span className="font-mono tabular-nums font-bold text-slate-900">
+                      <span className="text-[10px] sm:text-[11px] text-slate-400 block">Prix de Vente</span>
+                      <span className="font-mono tabular-nums font-black text-slate-900 text-sm sm:text-base">
                         {Math.round(p.salePrice).toLocaleString('fr-FR')} F
                       </span>
                     </div>

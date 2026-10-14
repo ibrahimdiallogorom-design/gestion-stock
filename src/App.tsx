@@ -25,6 +25,7 @@ import { MovementModal } from './components/MovementModal';
 import { ProductModal } from './components/ProductModal';
 import { ConfirmModal } from './components/ConfirmModal';
 import { DistributionModal } from './components/DistributionModal';
+import { MobileMenuDrawer } from './components/MobileMenuDrawer';
 import { THEME_CONFIGS } from './components/ThemeClasses';
 import {
   LayoutDashboard,
@@ -36,6 +37,7 @@ import {
   Receipt,
   Users,
   Smartphone,
+  Layers,
 } from 'lucide-react';
 
 const AppContent: React.FC = () => {
@@ -48,6 +50,7 @@ const AppContent: React.FC = () => {
     isInstallModalOpen,
     openInstallModal,
     closeInstallModal,
+    openMobileMenu,
   } = useStock();
   const currentTheme = THEME_CONFIGS[theme];
 
@@ -98,105 +101,100 @@ const AppContent: React.FC = () => {
       </div>
 
       {/* Mobile Bottom Navigation Bar (md:hidden) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-white border-t border-slate-200 flex items-center justify-around z-40 px-1 shadow-lg">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-slate-200 flex items-center justify-around z-40 px-2 shadow-xl">
         {isCashier ? (
           <>
             <button
               onClick={() => setActiveTab('caisse')}
-              className={`flex flex-col items-center py-1 px-1.5 text-[10px] ${
-                activeTab === 'caisse' ? 'text-emerald-700 font-bold' : 'text-slate-500'
+              className={`flex flex-col items-center py-1 px-2 text-[11px] font-bold ${
+                activeTab === 'caisse' ? 'text-emerald-700 font-black' : 'text-slate-500'
               }`}
             >
-              <ShoppingCart className="w-4 h-4" />
+              <ShoppingCart className="w-5 h-5" />
               <span>Caisse</span>
             </button>
             <button
               onClick={() => setActiveTab('inventory')}
-              className={`flex flex-col items-center py-1 px-1.5 text-[10px] ${
-                activeTab === 'inventory' ? 'text-blue-600 font-bold' : 'text-slate-500'
+              className={`flex flex-col items-center py-1 px-2 text-[11px] font-bold ${
+                activeTab === 'inventory' ? 'text-blue-600 font-black' : 'text-slate-500'
               }`}
             >
-              <Boxes className="w-4 h-4" />
+              <Boxes className="w-5 h-5" />
               <span>Mon Stock</span>
+            </button>
+            {/* Center Scrollable Apps & Functions Trigger Button */}
+            <button
+              type="button"
+              onClick={openMobileMenu}
+              className="flex flex-col items-center justify-center -mt-6 bg-gradient-to-tr from-blue-600 via-indigo-600 to-blue-700 text-white rounded-2xl w-14 h-14 shadow-xl shadow-blue-500/30 active:scale-95 transition-all border-2 border-white cursor-pointer"
+              title="Dérouler toutes les applications et fonctions"
+            >
+              <Layers className="w-6 h-6 text-white" />
+              <span className="text-[9px] font-black tracking-tight uppercase">MENU</span>
             </button>
             <button
               onClick={() => setActiveTab('reports')}
-              className={`flex flex-col items-center py-1 px-1.5 text-[10px] ${
-                activeTab === 'reports' ? 'text-blue-600 font-bold' : 'text-slate-500'
+              className={`flex flex-col items-center py-1 px-2 text-[11px] font-bold ${
+                activeTab === 'reports' ? 'text-blue-600 font-black' : 'text-slate-500'
               }`}
             >
-              <Receipt className="w-4 h-4" />
-              <span>Mes Rapports</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('dashboard')}
-              className={`flex flex-col items-center py-1 px-1.5 text-[10px] ${
-                activeTab === 'dashboard' ? 'text-blue-600 font-bold' : 'text-slate-500'
-              }`}
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              <span>Accueil</span>
+              <Receipt className="w-5 h-5" />
+              <span>Rapports</span>
             </button>
             <button
               onClick={openSwitchAccountModal}
-              className="flex flex-col items-center py-1 px-1.5 text-[10px] text-blue-600 hover:text-blue-700 font-semibold"
+              className="flex flex-col items-center py-1 px-2 text-[11px] text-blue-600 hover:text-blue-700 font-bold"
             >
-              <Users className="w-4 h-4" />
+              <Users className="w-5 h-5" />
               <span>Compte</span>
             </button>
           </>
         ) : (
           <>
             <button
-              onClick={() => setActiveTab('dashboard')}
-              className={`flex flex-col items-center py-1 px-1.5 text-[10px] ${
-                activeTab === 'dashboard' ? 'text-blue-600 font-bold' : 'text-slate-500'
-              }`}
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              <span>Accueil</span>
-            </button>
-            <button
               onClick={() => setActiveTab('inventory')}
-              className={`flex flex-col items-center py-1 px-1.5 text-[10px] ${
-                activeTab === 'inventory' ? 'text-blue-600 font-bold' : 'text-slate-500'
+              className={`flex flex-col items-center py-1 px-2 text-[11px] font-bold ${
+                activeTab === 'inventory' ? 'text-blue-600 font-black' : 'text-slate-500'
               }`}
             >
-              <Boxes className="w-4 h-4" />
-              <span>Stocks</span>
+              <Boxes className="w-5 h-5" />
+              <span>Stock</span>
             </button>
             <button
               onClick={() => setActiveTab('caisse')}
-              className={`flex flex-col items-center py-1 px-1.5 text-[10px] ${
-                activeTab === 'caisse' ? 'text-blue-600 font-bold' : 'text-slate-500'
+              className={`flex flex-col items-center py-1 px-2 text-[11px] font-bold ${
+                activeTab === 'caisse' ? 'text-emerald-700 font-black' : 'text-slate-500'
               }`}
             >
-              <ShoppingCart className="w-4 h-4" />
+              <ShoppingCart className="w-5 h-5" />
               <span>Caisse</span>
+            </button>
+            {/* Center Scrollable Apps & Functions Trigger Button */}
+            <button
+              type="button"
+              onClick={openMobileMenu}
+              className="flex flex-col items-center justify-center -mt-6 bg-gradient-to-tr from-blue-600 via-indigo-600 to-blue-700 text-white rounded-2xl w-14 h-14 shadow-xl shadow-blue-500/30 active:scale-95 transition-all border-2 border-white cursor-pointer"
+              title="Dérouler toutes les applications et fonctions"
+            >
+              <Layers className="w-6 h-6 text-white" />
+              <span className="text-[9px] font-black tracking-tight uppercase">MENU</span>
             </button>
             <button
               onClick={() => setActiveTab('reports')}
-              className={`flex flex-col items-center py-1 px-1.5 text-[10px] ${
-                activeTab === 'reports' ? 'text-blue-600 font-bold' : 'text-slate-500'
+              className={`flex flex-col items-center py-1 px-2 text-[11px] font-bold ${
+                activeTab === 'reports' ? 'text-blue-600 font-black' : 'text-slate-500'
               }`}
             >
-              <Receipt className="w-4 h-4" />
+              <Receipt className="w-5 h-5" />
               <span>Rapports</span>
             </button>
             <button
-              onClick={openSwitchAccountModal}
-              className="flex flex-col items-center py-1 px-1.5 text-[10px] text-blue-600 hover:text-blue-700 font-semibold"
-            >
-              <Users className="w-4 h-4" />
-              <span>Compte</span>
-            </button>
-            <button
               onClick={() => setActiveTab('settings')}
-              className={`flex flex-col items-center py-1 px-1.5 text-[10px] ${
-                activeTab === 'settings' ? 'text-blue-600 font-bold' : 'text-slate-500'
+              className={`flex flex-col items-center py-1 px-2 text-[11px] font-bold ${
+                activeTab === 'settings' ? 'text-blue-600 font-black' : 'text-slate-500'
               }`}
             >
-              <Settings className="w-4 h-4" />
+              <Settings className="w-5 h-5" />
               <span>Paramètres</span>
             </button>
           </>
@@ -210,6 +208,7 @@ const AppContent: React.FC = () => {
       <SwitchAccountModal />
       <DistributionModal />
       <InstallAppModal isOpen={isInstallModalOpen} onClose={closeInstallModal} />
+      <MobileMenuDrawer />
     </div>
   );
 };

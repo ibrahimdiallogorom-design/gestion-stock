@@ -190,7 +190,13 @@ interface StockContextType {
       createExpense?: boolean;
     }
   ) => Promise<{ success: boolean; message: string }>;
-  deletePurchaseBatch: (id: string) => Promise<void>;
+  // Mobile Menu Drawer & Grand Caractère Mode
+  isMobileMenuOpen: boolean;
+  openMobileMenu: () => void;
+  closeMobileMenu: () => void;
+  isLargeTextMode: boolean;
+  toggleLargeTextMode: () => void;
+  setLargeTextMode: (enabled: boolean) => void;
 }
 
 const StockContext = createContext<StockContextType | undefined>(undefined);
@@ -208,6 +214,7 @@ const STORAGE_KEYS = {
   ACTIVE_USER: 'stockflow_active_user_v2',
   EXPENSES: 'stockflow_expenses_v1',
   PURCHASES: 'stockflow_purchases_v1',
+  LARGE_TEXT_MODE: 'stockflow_large_text_mode_v1',
 };
 
 export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -547,6 +554,42 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       defaultTargetUserId: undefined,
     });
   };
+
+  // Mobile Menu Drawer & Large Text Mode
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const openMobileMenu = () => setIsMobileMenuOpen(true);
+  const closeMobileMenu = () => setIsMobileMenuOpen(false);
+
+  const [isLargeTextMode, setIsLargeTextMode] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.LARGE_TEXT_MODE);
+      if (saved !== null) return saved === 'true';
+    } catch (e) {}
+    return true; // Default to large comfortable typography on mobile
+  });
+
+  const toggleLargeTextMode = () => {
+    setIsLargeTextMode((prev) => {
+      const next = !prev;
+      localStorage.setItem(STORAGE_KEYS.LARGE_TEXT_MODE, String(next));
+      return next;
+    });
+  };
+
+  const setLargeTextMode = (enabled: boolean) => {
+    setIsLargeTextMode(enabled);
+    localStorage.setItem(STORAGE_KEYS.LARGE_TEXT_MODE, String(enabled));
+  };
+
+  useEffect(() => {
+    if (isLargeTextMode) {
+      document.documentElement.classList.add('large-text-mode');
+      document.body.classList.add('large-text-mode');
+    } else {
+      document.documentElement.classList.remove('large-text-mode');
+      document.body.classList.remove('large-text-mode');
+    }
+  }, [isLargeTextMode]);
 
   // Sync to localStorage
   useEffect(() => {
@@ -2172,6 +2215,13 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         deleteExpense,
         recordPurchaseBatch,
         deletePurchaseBatch,
+        // Mobile Menu Drawer & Large Text Mode
+        isMobileMenuOpen,
+        openMobileMenu,
+        closeMobileMenu,
+        isLargeTextMode,
+        toggleLargeTextMode,
+        setLargeTextMode,
       }}
     >
       {children}

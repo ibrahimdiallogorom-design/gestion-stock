@@ -243,14 +243,14 @@ export const SettingsView: React.FC = () => {
   };
 
   return (
-    <div className="p-8 space-y-8 max-w-4xl mx-auto">
+    <div className="p-3.5 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 max-w-5xl mx-auto">
       {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
-          <Settings className="w-6 h-6 text-blue-600" />
+        <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2.5">
+          <Settings className="w-6 h-6 text-blue-600 shrink-0" />
           <span>Paramètres de l'Application</span>
         </h1>
-        <p className="text-sm text-slate-500 mt-1">
+        <p className="text-xs sm:text-sm text-slate-500 mt-1">
           Configurez les paramètres généraux de votre boutique, vos préférences d'affichage et gérez vos sauvegardes de données.
         </p>
       </div>
@@ -263,7 +263,7 @@ export const SettingsView: React.FC = () => {
       )}
 
       {/* Cloud Sync Status & Multi-Device Settings */}
-      <div className="bg-gradient-to-br from-blue-900 via-indigo-900 to-slate-900 text-white rounded-2xl p-6 shadow-xl space-y-5">
+      <div className="bg-gradient-to-br from-blue-900 via-indigo-900 to-slate-900 text-white rounded-2xl p-4 sm:p-6 shadow-xl space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-blue-300">
@@ -370,7 +370,7 @@ export const SettingsView: React.FC = () => {
       </div>
 
       {/* 1. General Store Settings */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-5">
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 space-y-5">
         <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
           <Store className="w-5 h-5 text-blue-600" />
           <h2 className="text-base font-bold text-slate-900">
@@ -453,7 +453,7 @@ export const SettingsView: React.FC = () => {
       </div>
 
       {/* 2. User Accounts & Multi-Store Login Management */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-5">
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 space-y-5">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <Users className="w-5 h-5 text-blue-600" />
@@ -782,7 +782,7 @@ export const SettingsView: React.FC = () => {
       </div>
 
       {/* 3. Cashier Terminal Security & Password */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-5">
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 space-y-5">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <Lock className="w-5 h-5 text-blue-600" />
@@ -933,7 +933,7 @@ export const SettingsView: React.FC = () => {
       </div>
 
       {/* 3. Visual & Display Preferences */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-5">
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 space-y-5">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <Palette className="w-5 h-5 text-indigo-600" />
@@ -1029,7 +1029,7 @@ export const SettingsView: React.FC = () => {
       </div>
 
       {/* 3. Data Management & Backups */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-5">
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 space-y-5">
         <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
           <Database className="w-5 h-5 text-emerald-600" />
           <h2 className="text-base font-bold text-slate-900">

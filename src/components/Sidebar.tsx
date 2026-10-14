@@ -19,6 +19,7 @@ import {
   Smartphone,
   Download,
   Calculator,
+  Type,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { ViewTab } from '../types';
@@ -37,6 +38,8 @@ export const Sidebar: React.FC = () => {
     logoutAppUser,
     openSwitchAccountModal,
     openInstallModal,
+    isLargeTextMode,
+    toggleLargeTextMode,
   } = useStock();
 
   const isCashier = activeAppUser?.role === 'CASHIER';
@@ -345,6 +348,28 @@ export const Sidebar: React.FC = () => {
             </span>
           </div>
           <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+        </button>
+
+        {/* Toggle Grand Caractère Mode */}
+        <button
+          type="button"
+          onClick={toggleLargeTextMode}
+          className="w-full flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors text-left"
+          title="Activer ou désactiver l'affichage en grand caractère"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <Type className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <span className="text-[11px] font-semibold text-slate-800 truncate">
+              Grand Caractère
+            </span>
+          </div>
+          <span
+            className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+              isLargeTextMode ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'
+            }`}
+          >
+            {isLargeTextMode ? 'ON' : 'OFF'}
+          </span>
         </button>
 
         {/* Google Sheets Sync status */}

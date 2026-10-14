@@ -125,14 +125,14 @@ export const InventoryView: React.FC = () => {
   };
 
   return (
-    <div className="p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="p-3.5 sm:p-6 lg:p-8 space-y-5 sm:space-y-6 max-w-7xl mx-auto">
       {/* Title & Top Action Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
             {isCashier ? `Stock de ma Boutique (${activeAppUser?.fullName || 'Caisse'})` : 'Catalogue & Gestion des Stocks'}
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
             {isCashier
               ? `Articles dotés et disponibles pour votre caisse. Prix de vente uniquement.`
               : 'Visualisez vos articles, surveillez les seuils de réapprovisionnement et effectuez des ajustements rapides.'}
@@ -140,9 +140,9 @@ export const InventoryView: React.FC = () => {
         </div>
 
         {/* View Switcher Controls (Cards / Table / Kanban) */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap overflow-x-auto pb-1">
           {/* View Mode Segmented Switch */}
-          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-2xs">
+          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-2xs shrink-0">
             <button
               onClick={() => setViewMode('cards')}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
@@ -182,7 +182,7 @@ export const InventoryView: React.FC = () => {
           {!isCashier && products.length > 0 && (
             <button
               onClick={handleClearAll}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg shadow-2xs transition-colors whitespace-nowrap"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg shadow-2xs transition-colors whitespace-nowrap shrink-0"
               title="Supprimer tous les articles du catalogue pour remettre les valeurs à 0"
             >
               <Trash2 className="w-4 h-4" />
@@ -193,7 +193,7 @@ export const InventoryView: React.FC = () => {
           {!isCashier && (
             <button
               onClick={() => openDistributionModal()}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg shadow-2xs transition-colors whitespace-nowrap"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg shadow-2xs transition-colors whitespace-nowrap shrink-0"
               title="Distribuer des produits du Grand Magasin vers les vendeurs et sous-boutiques"
             >
               <Share2 className="w-4 h-4" />
@@ -204,7 +204,7 @@ export const InventoryView: React.FC = () => {
           {!isCashier && (
             <button
               onClick={() => openProductModal()}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs shadow-blue-600/20 transition-colors whitespace-nowrap"
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs shadow-blue-600/20 transition-colors whitespace-nowrap shrink-0"
             >
               <Plus className="w-4 h-4" />
               <span>Ajouter une référence</span>
@@ -215,7 +215,7 @@ export const InventoryView: React.FC = () => {
           {isCashier && (
             <button
               onClick={() => setActiveTab('caisse')}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs shadow-emerald-600/20 transition-colors whitespace-nowrap"
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs shadow-emerald-600/20 transition-colors whitespace-nowrap shrink-0"
             >
               <Store className="w-4 h-4" />
               <span>Ouvrir la Caisse</span>
@@ -225,7 +225,7 @@ export const InventoryView: React.FC = () => {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
+      <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 space-y-3">
         <div className="flex flex-col md:flex-row items-center justify-between gap-3">
           {/* Live Search */}
           <div className="relative w-full md:w-80">
@@ -235,7 +235,7 @@ export const InventoryView: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Rechercher par nom, SKU ou fournisseur..."
-              className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all placeholder:text-slate-400"
+              className="w-full pl-9 pr-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all placeholder:text-slate-400"
             />
           </div>
 

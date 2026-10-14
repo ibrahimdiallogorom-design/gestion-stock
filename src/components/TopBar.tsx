@@ -16,6 +16,7 @@ import {
   Users,
   Cloud,
   Smartphone,
+  LayoutGrid,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { THEME_CONFIGS } from './ThemeClasses';
@@ -39,6 +40,7 @@ export const TopBar: React.FC = () => {
     cloudStatusMessage,
     forceSyncCloud,
     openInstallModal,
+    openMobileMenu,
   } = useStock();
 
   const currentTheme = THEME_CONFIGS[theme];
@@ -72,10 +74,21 @@ export const TopBar: React.FC = () => {
   };
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0">
-      {/* Breadcrumbs Trail */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-semibold text-slate-900 tracking-tight">
+    <header className="h-16 bg-white border-b border-slate-200 px-3 sm:px-6 flex items-center justify-between shrink-0 gap-2">
+      {/* Breadcrumbs Trail & Mobile Menu Button */}
+      <div className="flex items-center gap-2 min-w-0">
+        {/* Prominent Mobile Menu Trigger */}
+        <button
+          type="button"
+          onClick={openMobileMenu}
+          className="md:hidden flex items-center gap-1.5 px-2.5 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-black text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all shrink-0 cursor-pointer"
+          title="Dérouler toutes les applications et fonctions"
+        >
+          <LayoutGrid className="w-4 h-4 text-white" />
+          <span className="tracking-tight">☰ APPS</span>
+        </button>
+
+        <span className="text-xs sm:text-sm font-semibold text-slate-900 tracking-tight truncate">
           {getBreadcrumbs()}
         </span>
         {sheetsSync.lastSyncedAt && activeTab !== 'design_system' && (

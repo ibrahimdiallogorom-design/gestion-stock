@@ -105,3 +105,28 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #64748b;
 }
+
+/* Mode Grand Caractère (Lisibilité & Confort Smartphone) */
+.large-text-mode {
+  font-size: 1.0625rem;
+}
+
+.large-text-mode h1 {
+  font-size: 1.75rem !important;
+  line-height: 1.25 !important;
+}
+
+.large-text-mode h2 {
+  font-size: 1.35rem !important;
+}
+
+.large-text-mode h3 {
+  font-size: 1.15rem !important;
+}
+
+.large-text-mode input,
+.large-text-mode select,
+.large-text-mode textarea {
+  font-size: 1rem !important;
+}
+
