@@ -17,6 +17,7 @@ import {
   Cloud,
   Smartphone,
   LayoutGrid,
+  Target,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { THEME_CONFIGS } from './ThemeClasses';
@@ -41,6 +42,7 @@ export const TopBar: React.FC = () => {
     forceSyncCloud,
     openInstallModal,
     openMobileMenu,
+    openViser,
   } = useStock();
 
   const currentTheme = THEME_CONFIGS[theme];
@@ -162,11 +164,22 @@ export const TopBar: React.FC = () => {
       </div>
 
       {/* Action Zone */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
+        {/* Prominent VISER Button (Synchronisation, Entrées, Sorties, APPS) */}
+        <button
+          type="button"
+          onClick={openViser}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-xl font-black text-xs shadow-md shadow-emerald-600/30 active:scale-95 transition-all shrink-0 cursor-pointer"
+          title="Viser : Synchronisation, Entrées, Sorties et APPS"
+        >
+          <Target className="w-4 h-4 text-white" />
+          <span className="tracking-tight uppercase">Viser</span>
+        </button>
+
         {/* Direct Link to Caisse / POS */}
         <button
           onClick={() => setActiveTab('caisse')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border ${
+          className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border ${
             activeTab === 'caisse'
               ? 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-2xs'
               : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -187,7 +200,7 @@ export const TopBar: React.FC = () => {
         {/* Direct Link to Reports */}
         <button
           onClick={() => setActiveTab('reports')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border ${
+          className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border ${
             activeTab === 'reports'
               ? 'bg-blue-50 border-blue-300 text-blue-700 shadow-2xs'
               : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -201,7 +214,7 @@ export const TopBar: React.FC = () => {
         {/* APPS Modal Button */}
         <button
           onClick={openInstallModal}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xs"
+          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xs"
           title="Installer l'application sur votre téléphone ou partager l'accès"
         >
           <Smartphone className="w-3.5 h-3.5 text-white" />

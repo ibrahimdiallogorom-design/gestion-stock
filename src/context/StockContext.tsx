@@ -194,6 +194,10 @@ interface StockContextType {
   isMobileMenuOpen: boolean;
   openMobileMenu: () => void;
   closeMobileMenu: () => void;
+  // Viser Drawer (Synchronisation, Entrées, Sorties, APPS)
+  isViserOpen: boolean;
+  openViser: () => void;
+  closeViser: () => void;
   isLargeTextMode: boolean;
   toggleLargeTextMode: () => void;
   setLargeTextMode: (enabled: boolean) => void;
@@ -559,6 +563,11 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const openMobileMenu = () => setIsMobileMenuOpen(true);
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
+
+  // Viser Drawer state (Synchronisation, Entrées, Sorties, APPS)
+  const [isViserOpen, setIsViserOpen] = useState<boolean>(false);
+  const openViser = () => setIsViserOpen(true);
+  const closeViser = () => setIsViserOpen(false);
 
   const [isLargeTextMode, setIsLargeTextMode] = useState<boolean>(() => {
     try {
@@ -2219,6 +2228,10 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isMobileMenuOpen,
         openMobileMenu,
         closeMobileMenu,
+        // Viser Drawer (Synchronisation, Entrées, Sorties, APPS)
+        isViserOpen,
+        openViser,
+        closeViser,
         isLargeTextMode,
         toggleLargeTextMode,
         setLargeTextMode,

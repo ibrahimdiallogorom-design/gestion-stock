@@ -26,6 +26,7 @@ import { ProductModal } from './components/ProductModal';
 import { ConfirmModal } from './components/ConfirmModal';
 import { DistributionModal } from './components/DistributionModal';
 import { MobileMenuDrawer } from './components/MobileMenuDrawer';
+import { ViserDrawer } from './components/ViserDrawer';
 import { THEME_CONFIGS } from './components/ThemeClasses';
 import {
   LayoutDashboard,
@@ -38,6 +39,7 @@ import {
   Users,
   Smartphone,
   Layers,
+  Target,
 } from 'lucide-react';
 
 const AppContent: React.FC = () => {
@@ -51,6 +53,7 @@ const AppContent: React.FC = () => {
     openInstallModal,
     closeInstallModal,
     openMobileMenu,
+    openViser,
   } = useStock();
   const currentTheme = THEME_CONFIGS[theme];
 
@@ -122,15 +125,15 @@ const AppContent: React.FC = () => {
               <Boxes className="w-5 h-5" />
               <span>Mon Stock</span>
             </button>
-            {/* Center Scrollable Apps & Functions Trigger Button */}
+            {/* Center VISER Button (Synchronisation, Entrées, Sorties, APPS) */}
             <button
               type="button"
-              onClick={openMobileMenu}
-              className="flex flex-col items-center justify-center -mt-6 bg-gradient-to-tr from-blue-600 via-indigo-600 to-blue-700 text-white rounded-2xl w-14 h-14 shadow-xl shadow-blue-500/30 active:scale-95 transition-all border-2 border-white cursor-pointer"
-              title="Dérouler toutes les applications et fonctions"
+              onClick={openViser}
+              className="flex flex-col items-center justify-center -mt-6 bg-gradient-to-tr from-emerald-600 via-teal-600 to-emerald-700 text-white rounded-2xl w-14 h-14 shadow-xl shadow-emerald-500/30 active:scale-95 transition-all border-2 border-white cursor-pointer"
+              title="Viser : Synchronisation, Entrées, Sorties et APPS"
             >
-              <Layers className="w-6 h-6 text-white" />
-              <span className="text-[9px] font-black tracking-tight uppercase">MENU</span>
+              <Target className="w-6 h-6 text-white" />
+              <span className="text-[9px] font-black tracking-tight uppercase">VISER</span>
             </button>
             <button
               onClick={() => setActiveTab('reports')}
@@ -169,15 +172,15 @@ const AppContent: React.FC = () => {
               <ShoppingCart className="w-5 h-5" />
               <span>Caisse</span>
             </button>
-            {/* Center Scrollable Apps & Functions Trigger Button */}
+            {/* Center VISER Button (Synchronisation, Entrées, Sorties, APPS) */}
             <button
               type="button"
-              onClick={openMobileMenu}
-              className="flex flex-col items-center justify-center -mt-6 bg-gradient-to-tr from-blue-600 via-indigo-600 to-blue-700 text-white rounded-2xl w-14 h-14 shadow-xl shadow-blue-500/30 active:scale-95 transition-all border-2 border-white cursor-pointer"
-              title="Dérouler toutes les applications et fonctions"
+              onClick={openViser}
+              className="flex flex-col items-center justify-center -mt-6 bg-gradient-to-tr from-emerald-600 via-teal-600 to-emerald-700 text-white rounded-2xl w-14 h-14 shadow-xl shadow-emerald-500/30 active:scale-95 transition-all border-2 border-white cursor-pointer"
+              title="Viser : Synchronisation, Entrées, Sorties et APPS"
             >
-              <Layers className="w-6 h-6 text-white" />
-              <span className="text-[9px] font-black tracking-tight uppercase">MENU</span>
+              <Target className="w-6 h-6 text-white" />
+              <span className="text-[9px] font-black tracking-tight uppercase">VISER</span>
             </button>
             <button
               onClick={() => setActiveTab('reports')}
@@ -209,6 +212,7 @@ const AppContent: React.FC = () => {
       <DistributionModal />
       <InstallAppModal isOpen={isInstallModalOpen} onClose={closeInstallModal} />
       <MobileMenuDrawer />
+      <ViserDrawer />
     </div>
   );
 };
