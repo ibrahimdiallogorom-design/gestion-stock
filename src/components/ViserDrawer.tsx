@@ -122,14 +122,14 @@ export const ViserDrawer: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-black text-white tracking-wide">
-                  Viser
+                  Viseur
                 </h2>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold">
                   Accès Direct
                 </span>
               </div>
               <p className="text-xs text-blue-200 mt-0.5">
-                Synchronisation, entrées, sorties et applications
+                Synchronisation Cloud, Entrées et Sorties de stock
               </p>
             </div>
           </div>

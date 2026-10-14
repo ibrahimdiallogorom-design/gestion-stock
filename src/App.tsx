@@ -172,15 +172,15 @@ const AppContent: React.FC = () => {
               <ShoppingCart className="w-5 h-5" />
               <span>Caisse</span>
             </button>
-            {/* Center VISER Button (Synchronisation, Entrées, Sorties, APPS) */}
+            {/* Center VISEUR Button (Synchronisation Cloud, Entrées, Sorties) */}
             <button
               type="button"
               onClick={openViser}
               className="flex flex-col items-center justify-center -mt-6 bg-gradient-to-tr from-emerald-600 via-teal-600 to-emerald-700 text-white rounded-2xl w-14 h-14 shadow-xl shadow-emerald-500/30 active:scale-95 transition-all border-2 border-white cursor-pointer"
-              title="Viser : Synchronisation, Entrées, Sorties et APPS"
+              title="Viseur : Synchronisation Cloud, Entrées et Sorties de Stock"
             >
               <Target className="w-6 h-6 text-white" />
-              <span className="text-[9px] font-black tracking-tight uppercase">VISER</span>
+              <span className="text-[9px] font-black tracking-tight uppercase">VISEUR</span>
             </button>
             <button
               onClick={() => setActiveTab('reports')}

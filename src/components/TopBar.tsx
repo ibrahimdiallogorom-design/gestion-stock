@@ -18,6 +18,7 @@ import {
   Smartphone,
   LayoutGrid,
   Target,
+  Menu,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { THEME_CONFIGS } from './ThemeClasses';
@@ -77,8 +78,19 @@ export const TopBar: React.FC = () => {
 
   return (
     <header className="h-16 bg-white border-b border-slate-200 px-3 sm:px-6 flex items-center justify-between shrink-0 gap-2">
-      {/* Breadcrumbs Trail */}
+      {/* Breadcrumbs Trail & Mobile Menu Button */}
       <div className="flex items-center gap-2 min-w-0">
+        {/* Bouton MENU Indépendant pour Mobile (Accès Stock, Caisse, Comptabilité, Paramètres...) */}
+        <button
+          type="button"
+          onClick={openMobileMenu}
+          className="md:hidden flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl font-bold text-xs shadow-md shadow-blue-500/20 transition-all shrink-0 cursor-pointer"
+          title="Ouvrir le Menu (Stock, Caisse, Comptabilité, Rapports, Paramètres...)"
+        >
+          <Menu className="w-4 h-4 text-white" />
+          <span className="tracking-tight uppercase">Menu</span>
+        </button>
+
         <span className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight truncate">
           {getBreadcrumbs()}
         </span>
@@ -151,15 +163,15 @@ export const TopBar: React.FC = () => {
 
       {/* Action Zone */}
       <div className="flex items-center gap-2 sm:gap-3">
-        {/* Prominent VISER Button (Synchronisation, Entrées, Sorties, APPS) - THE ONLY BUTTON ON MOBILE */}
+        {/* Prominent VISEUR Button (Synchronisation Cloud, Entrées, Sorties) */}
         <button
           type="button"
           onClick={openViser}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-xl font-black text-xs shadow-md shadow-emerald-600/30 active:scale-95 transition-all shrink-0 cursor-pointer"
-          title="Viser : Synchronisation, Entrées, Sorties et APPS"
+          title="Viseur : Synchronisation Cloud, Entrées et Sorties de Stock"
         >
           <Target className="w-4 h-4 text-white" />
-          <span className="tracking-tight uppercase">Viser</span>
+          <span className="tracking-tight uppercase">Viseur</span>
         </button>
 
         {/* Direct Link to Caisse / POS (Desktop only) */}
