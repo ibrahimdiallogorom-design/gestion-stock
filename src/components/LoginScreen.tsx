@@ -41,10 +41,20 @@ export const LoginScreen: React.FC = () => {
     }
   };
 
-  const handleQuickSelect = (u: string, p: string) => {
+  const handleInstantLogin = (u: string, p: string) => {
     setUsername(u);
     setPassword(p);
     setErrorMsg(null);
+    setIsSubmitting(true);
+    const result = loginAppUser(u, p);
+    if (!result.success) {
+      setErrorMsg(result.message || 'Identifiants incorrects.');
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleQuickSelect = (u: string, p: string) => {
+    handleInstantLogin(u, p);
   };
 
   return (
@@ -77,12 +87,10 @@ export const LoginScreen: React.FC = () => {
             <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium border transition-all ${
               cloudStatus === 'connected'
                 ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
-                : cloudStatus === 'connecting'
-                ? 'bg-blue-950/40 border-blue-500/40 text-blue-300 animate-pulse'
-                : 'bg-slate-800/80 border-slate-700/60 text-slate-400'
+                : 'bg-blue-950/40 border-blue-500/40 text-blue-300'
             }`}>
               <Cloud className="w-3.5 h-3.5" />
-              <span>{cloudStatus === 'connected' ? 'Cloud Synchro Partout' : cloudStatusMessage}</span>
+              <span>{cloudStatus === 'connected' ? 'Cloud Connecté' : 'Mode Hors-Ligne (100% Autonome)'}</span>
             </div>
           </div>
         </div>

@@ -1,42 +1,56 @@
-// VisionTech StockFlow - Service Worker Offline-First & Auto-Sync
-const CACHE_NAME = 'visiontech-app-v20261021';
+// VisionTech StockFlow - Service Worker 100% Offline-First
+// Généré automatiquement lors de la compilation
+const CACHE_NAME = 'visiontech-cache-v20261021223343';
 
-// Fichiers vitaux de l'App Shell à pré-mettre en cache dès l'installation
 const PRECACHE_ASSETS = [
-  './',
-  './index.html',
-  './manifest.json',
-  './icon.png',
-  './favicon.png',
+  "./",
+  "./index.html",
+  "./manifest.json",
+  "./icon.png",
+  "./favicon.png",
+  "./assets/icon-pnxEVMeK.png",
+  "./assets/index-BA8Y9EGF.css",
+  "./assets/index-PsXKgBgl.js",
+  "./assets/manifest-Cu8MOF-8.json"
 ];
 
-// 1. Installation : mise en cache immédiate de l'App Shell
+// 1. Installation immédiate : téléchargement et mise en cache de TOUS les fichiers de l'application
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(PRECACHE_ASSETS).catch((err) => {
-        console.warn('Precache partial warning:', err);
-      });
-    }).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then(async (cache) => {
+      console.log('[SW] Mise en cache complète de l\'application pour fonctionnement hors-ligne...');
+      for (const asset of PRECACHE_ASSETS) {
+        try {
+          await cache.add(asset);
+        } catch (err) {
+          console.warn('[SW] Avertissement ressource non bloquante :', asset, err);
+        }
+      }
+    })
   );
 });
 
-// 2. Activation : nettoyage des anciens caches obsolètes et prise de contrôle immédiate
+// 2. Activation immédiate : prise de contrôle de tous les onglets ouverts et suppression des anciens caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.map((k) => {
-          if (k.startsWith('visiontech-') && k !== CACHE_NAME) {
-            return caches.delete(k);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+    Promise.all([
+      self.clients.claim(),
+      caches.keys().then((keys) => {
+        return Promise.all(
+          keys.map((k) => {
+            if (k.startsWith('visiontech-') && k !== CACHE_NAME) {
+              console.log('[SW] Nettoyage ancien cache :', k);
+              return caches.delete(k);
+            }
+          })
+        );
+      }),
+    ])
   );
 });
 
-// 3. Gestion des messages (Purge manuelle depuis l'application)
+// 3. Purge manuelle demandée par l'utilisateur
 self.addEventListener('message', (event) => {
   if (event.data && event.data.action === 'PURGE_CACHE') {
     caches.keys().then((keys) => {
@@ -49,74 +63,75 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// 4. Stratégie de chargement hybride Ultra-Robuste (Offline-First)
+// 4. Interception des requêtes : STRATÉGIE CACHE-FIRST RADICALE POUR TOUT LE CONTENU LOCAL
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
 
-  // Ne pas intercepter les requêtes non-GET ou les appels directs à Google Firestore API
-  if (request.method !== 'GET' || url.hostname.includes('firestore.googleapis.com') || url.hostname.includes('identitytoolkit.googleapis.com')) {
+  // Ignorer les requêtes externes Firebase Firestore / Auth (gérées directement par le SDK)
+  if (
+    request.method !== 'GET' ||
+    url.hostname.includes('firestore.googleapis.com') ||
+    url.hostname.includes('identitytoolkit.googleapis.com') ||
+    url.hostname.includes('securetoken.googleapis.com')
+  ) {
     return;
   }
 
-  // Pour la navigation HTML (ex: chargement initial ou rafraîchissement sans connexion)
+  // A. Navigation HTML (Ouverture de l'application ou rechargement de page hors-ligne)
   if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) {
     event.respondWith(
-      fetch(request)
-        .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            const clone = networkResponse.clone();
+      caches.match('./index.html').then((cachedIndex) => {
+        if (cachedIndex) {
+          // Si en ligne, tenter de mettre à jour index.html en tâche de fond
+          if (navigator.onLine) {
+            fetch(request).then((networkRes) => {
+              if (networkRes && networkRes.status === 200) {
+                caches.open(CACHE_NAME).then((cache) => {
+                  cache.put(request, networkRes.clone());
+                  cache.put('./index.html', networkRes);
+                });
+              }
+            }).catch(() => {});
+          }
+          return cachedIndex;
+        }
+
+        // Si pas en cache (première visite absolue), aller sur le réseau
+        return fetch(request).then((networkRes) => {
+          if (networkRes && networkRes.status === 200) {
+            const clone = networkRes.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(request, clone.clone());
               cache.put('./index.html', clone);
             });
           }
-          return networkResponse;
-        })
-        .catch(async () => {
-          // HORS-LIGNE : Servir la page index.html mise en cache
-          const cached = await caches.match(request);
-          if (cached) return cached;
-          const fallback = await caches.match('./index.html');
-          if (fallback) return fallback;
-          return caches.match('./');
-        })
+          return networkRes;
+        });
+      })
     );
     return;
   }
 
-  // Pour les assets statiques (JS, CSS, images, polices, manifest)
+  // B. Fichiers statiques internes (JS, CSS, PNG, JSON, etc.)
   event.respondWith(
-    caches.match(request).then((cachedResponse) => {
+    caches.match(request, { ignoreSearch: true }).then((cachedResponse) => {
       if (cachedResponse) {
-        // En arrière-plan, tenter de rafraîchir le cache si connecté
-        fetch(request)
-          .then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              caches.open(CACHE_NAME).then((cache) => cache.put(request, networkResponse));
-            }
-          })
-          .catch(() => {}); // Silencieux si hors-ligne
+        // Déjà en cache local : retourner immédiatement SANS attendre le réseau !
         return cachedResponse;
       }
 
-      // Si pas encore en cache, aller sur le réseau et mettre en cache pour la prochaine fois
-      return fetch(request)
-        .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            const clone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          }
-          return networkResponse;
-        })
-        .catch(() => {
-          // Hors-ligne et ressource absente
-          return new Response('Ressource hors-ligne indisponible', {
-            status: 503,
-            statusText: 'Service Unavailable',
-            headers: new Headers({ 'Content-Type': 'text/plain' })
-          });
-        });
+      // Si pas encore en cache, chercher sur le réseau et sauvegarder pour les prochaines ouvertures
+      return fetch(request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const clone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+        }
+        return networkResponse;
+      }).catch(() => {
+        // En cas d'échec hors-ligne sur une icône ou image secondaire
+        return new Response('', { status: 408, statusText: 'Hors-Ligne' });
+      });
     })
   );
 });

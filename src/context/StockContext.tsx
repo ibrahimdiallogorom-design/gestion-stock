@@ -523,14 +523,24 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (saved) {
         const u = JSON.parse(saved);
         const lower = (u.username || '').toLowerCase();
-        if (['caissier', 'caisse_ouaga', 'caisse_gorom'].includes(lower) || ['user-caissier-1', 'user-caissier-2', 'user-caissier-3'].includes(u.id)) {
-          localStorage.removeItem(STORAGE_KEYS.ACTIVE_USER);
-          return null;
+        // If an old alias was saved, map cleanly to Moussa Vision to preserve session
+        if (['user-caissier-1', 'user-caissier-2', 'user-caissier-3', 'caisse_ouaga', 'caisse_gorom'].includes(u.id) || ['caisse_ouaga', 'caisse_gorom'].includes(lower)) {
+          const moussaUser: AppUser = {
+            id: 'user-caissier-moussa',
+            username: 'Moussavision',
+            fullName: 'Moussa Vision (Caissier)',
+            role: 'CASHIER',
+            password: '1234',
+            storeName: 'Boutique Moussa Vision',
+            createdAt: '2026-01-01T00:00:00Z',
+          };
+          localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(moussaUser));
+          return moussaUser;
         }
         return u;
       }
     } catch (e) {}
-    return null; // Null by default on any fresh device or browser!
+    return null;
   });
 
   // Switch Account Modal state
