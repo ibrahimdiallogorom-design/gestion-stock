@@ -3,13 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
     <title>Boutique VisionTech - Gestion de Stock & Caisse</title>
-    <meta name="description" content="Application Boutique VisionTech : gestion de stock, encaissement caisse, multi-boutiques et comptabilité." />
+    <meta name="description" content="Application Boutique VisionTech : gestion de stock, encaissement caisse, multi-boutiques et comptabilité. Fonctionne 100% hors-ligne." />
     <meta property="og:title" content="Boutique VisionTech - Gestion de Stock & Caisse" />
-    <meta property="og:description" content="Application Boutique VisionTech : gestion de stock, encaissement caisse, multi-boutiques et comptabilité." />
+    <meta property="og:description" content="Application Boutique VisionTech : gestion de stock, encaissement caisse, multi-boutiques et comptabilité. Fonctionne 100% hors-ligne." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="theme-color" content="#2563eb" />
@@ -46,37 +43,21 @@
           `;
         });
       }
-
-      // 2. Forçage de purge du cache Mobile / PWA
-      const APP_VERSION = 'v20261014-accounting-final-2';
-      const currentVer = localStorage.getItem('visiontech_app_version');
-      if (currentVer !== APP_VERSION) {
-        localStorage.setItem('visiontech_app_version', APP_VERSION);
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations().then((regs) => {
-            for (let reg of regs) reg.unregister();
-          });
-        }
-        if ('caches' in window) {
-          caches.keys().then((keys) => {
-            return Promise.all(keys.map((k) => caches.delete(k)));
-          });
-        }
-      }
     </script>
     <script type="module" src="/src/main.tsx"></script>
   </head>
   <body class="bg-slate-50 text-slate-900 antialiased font-sans">
     <div id="root"></div>
     <script>
+      // Enregistrement du Service Worker pour fonctionnement 100% Hors-Ligne
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('./sw.js').then((registration) => {
-            registration.update();
-          }).catch(() => {});
-
-          navigator.serviceWorker.addEventListener('controllerchange', () => {
-            window.location.reload();
+            if (navigator.onLine) {
+              registration.update().catch(() => {});
+            }
+          }).catch((err) => {
+            console.warn('Service worker registration failed:', err);
           });
 
           navigator.serviceWorker.addEventListener('message', (event) => {
