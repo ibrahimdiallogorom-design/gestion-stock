@@ -14,7 +14,7 @@ import {
   Firestore,
   Unsubscribe,
 } from 'firebase/firestore';
-import { AppUser, Product, StockMovement, Expense, PurchaseBatch } from '../types';
+import { AppUser, Product, StockMovement, Expense, PurchaseBatch, VisitorSurvey } from '../types';
 
 export interface CloudStoreData {
   appUsers?: AppUser[];
@@ -22,6 +22,7 @@ export interface CloudStoreData {
   movements?: StockMovement[];
   expenses?: Expense[];
   purchases?: PurchaseBatch[];
+  surveys?: VisitorSurvey[];
   cashierPin?: string;
   cashierName?: string;
   storeName?: string;

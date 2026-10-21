@@ -46,6 +46,8 @@ export const MobileMenuDrawer: React.FC = () => {
     isLargeTextMode,
     toggleLargeTextMode,
     cloudStatus,
+    surveys,
+    openSurveyModal,
   } = useStock();
 
   const [query, setQuery] = useState('');
@@ -152,6 +154,15 @@ export const MobileMenuDrawer: React.FC = () => {
       badge: 'Bilan & Coûts',
       badgeColor: 'bg-amber-100 text-amber-800 font-bold',
       adminOnly: true,
+    },
+    {
+      id: 'surveys',
+      title: 'Sondages & Visites Prospects',
+      description: 'Comprendre pourquoi les visiteurs repartent sans acheter (prix, qualité, rupture) et CRM WhatsApp.',
+      icon: <Users className="w-6 h-6 text-indigo-600" />,
+      color: 'bg-indigo-50 border-indigo-200',
+      badge: surveys.length > 0 ? `${surveys.length} visites` : 'Nouveau',
+      badgeColor: 'bg-indigo-100 text-indigo-800 font-bold',
     },
     {
       id: 'movements',

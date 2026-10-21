@@ -36,6 +36,7 @@ export const ViserDrawer: React.FC = () => {
     openDistributionModal,
     openInstallModal,
     openSwitchAccountModal,
+    openSurveyModal,
     logoutAppUser,
     setActiveTab,
     isCashierUnlocked,
@@ -384,6 +385,34 @@ export const ViserDrawer: React.FC = () => {
                 <div>
                   <span className="font-bold text-slate-900 block leading-tight">Rapports</span>
                   <span className="text-[10px] text-slate-500">Z de caisse & ventes</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleAction(() => openSurveyModal())}
+                className="p-3 bg-indigo-50/80 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition-all text-left flex items-center gap-2.5 shadow-2xs cursor-pointer"
+              >
+                <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="font-bold text-indigo-950 block leading-tight">Sondage Visite</span>
+                  <span className="text-[10px] text-indigo-700 font-semibold">+ Motif & WhatsApp</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleAction(() => setActiveTab('surveys'))}
+                className="p-3 bg-white border border-slate-200 rounded-xl hover:bg-indigo-50 hover:border-indigo-300 transition-all text-left flex items-center gap-2.5 shadow-2xs cursor-pointer"
+              >
+                <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="font-bold text-slate-900 block leading-tight">CRM & Stats Visites</span>
+                  <span className="text-[10px] text-slate-500">Demandes & Promos</span>
                 </div>
               </button>
 

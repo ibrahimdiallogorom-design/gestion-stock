@@ -17,6 +17,7 @@ import {
   UserRole,
   Expense,
   PurchaseBatch,
+  VisitorSurvey,
 } from '../types';
 import { INITIAL_PRODUCTS, INITIAL_MOVEMENTS, INITIAL_SUPPLIERS } from '../data/initialData';
 import { initAuth, googleSignIn, logout, getAccessToken } from '../services/firebaseAuth';
@@ -201,6 +202,18 @@ interface StockContextType {
   isLargeTextMode: boolean;
   toggleLargeTextMode: () => void;
   setLargeTextMode: (enabled: boolean) => void;
+  // Outil de Sondage & Visites / CRM Prospects
+  surveys: VisitorSurvey[];
+  addVisitorSurvey: (surveyData: Omit<VisitorSurvey, 'id' | 'createdAt'>) => Promise<{ success: boolean; message: string }>;
+  deleteVisitorSurvey: (id: string) => Promise<void>;
+  updateVisitorSurvey: (id: string, updates: Partial<VisitorSurvey>) => Promise<void>;
+  surveyModal: {
+    isOpen: boolean;
+    survey?: VisitorSurvey;
+    defaultProduct?: string;
+  };
+  openSurveyModal: (survey?: VisitorSurvey, defaultProduct?: string) => void;
+  closeSurveyModal: () => void;
 }
 
 const StockContext = createContext<StockContextType | undefined>(undefined);
@@ -218,6 +231,7 @@ const STORAGE_KEYS = {
   ACTIVE_USER: 'stockflow_active_user_v2',
   EXPENSES: 'stockflow_expenses_v1',
   PURCHASES: 'stockflow_purchases_v1',
+  SURVEYS: 'stockflow_surveys_v1',
   LARGE_TEXT_MODE: 'stockflow_large_text_mode_v1',
 };
 
@@ -410,6 +424,26 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     } catch (e) {}
     return [];
+  });
+
+  // Outil de Sondage des Visites & CRM Prospects
+  const [surveys, setSurveys] = useState<VisitorSurvey[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.SURVEYS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  });
+
+  const [surveyModal, setSurveyModal] = useState<{
+    isOpen: boolean;
+    survey?: VisitorSurvey;
+    defaultProduct?: string;
+  }>({
+    isOpen: false,
   });
 
   // Global Multi-User Authentication state - Seule la boutique Moussa Vision est conservée
@@ -620,6 +654,10 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.PURCHASES, JSON.stringify(purchases));
   }, [purchases]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.SURVEYS, JSON.stringify(surveys));
+  }, [surveys]);
 
   // Cloud Sync Status states
   const [cloudStatus, setCloudStatus] = useState<CloudSyncStatus>('connecting');
@@ -874,6 +912,41 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (localHadUnsynced) pushToCloud({ purchases: mergedPurchases });
         } else if (localPurchases.length > 0) {
           forcePushToCloud({ purchases: localPurchases });
+        }
+
+        // 4c. Visitor Surveys & CRM Leads Reconciliation
+        const localSurveysJson = localStorage.getItem(STORAGE_KEYS.SURVEYS);
+        let localSurveys: VisitorSurvey[] = [];
+        try {
+          if (localSurveysJson) localSurveys = JSON.parse(localSurveysJson);
+        } catch (e) {}
+
+        const remoteSurveys = Array.isArray(remote.surveys) ? remote.surveys : [];
+        if (remoteSurveys.length > 0) {
+          const surMap = new Map<string, VisitorSurvey>();
+          remoteSurveys.forEach((s) => surMap.set(s.id, s));
+          let localHadUnsynced = false;
+          localSurveys.forEach((ls) => {
+            if (!surMap.has(ls.id)) {
+              surMap.set(ls.id, ls);
+              localHadUnsynced = true;
+            } else {
+              const localTime = new Date(ls.createdAt || 0).getTime();
+              const remoteTime = new Date(surMap.get(ls.id)!.createdAt || 0).getTime();
+              if (localTime > remoteTime) {
+                surMap.set(ls.id, ls);
+                localHadUnsynced = true;
+              }
+            }
+          });
+          const mergedSurveys = Array.from(surMap.values()).sort(
+            (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+          );
+          setSurveys(mergedSurveys);
+          localStorage.setItem(STORAGE_KEYS.SURVEYS, JSON.stringify(mergedSurveys));
+          if (localHadUnsynced) pushToCloud({ surveys: mergedSurveys });
+        } else if (localSurveys.length > 0) {
+          forcePushToCloud({ surveys: localSurveys });
         }
 
         // 5. Cashier Security & Name
@@ -2100,6 +2173,48 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     pushToCloud({ purchases: updated });
   };
 
+  // Outil de Sondage des Visites & CRM Prospects
+  const addVisitorSurvey = async (
+    surveyData: Omit<VisitorSurvey, 'id' | 'createdAt'>
+  ): Promise<{ success: boolean; message: string }> => {
+    const now = new Date().toISOString();
+    const newSurvey: VisitorSurvey = {
+      ...surveyData,
+      id: `srv-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      createdAt: now,
+    };
+    const updated = [newSurvey, ...surveys];
+    setSurveys(updated);
+    localStorage.setItem(STORAGE_KEYS.SURVEYS, JSON.stringify(updated));
+    pushToCloud({ surveys: updated });
+    return {
+      success: true,
+      message: 'Visite enregistrée avec succès dans le sondage !',
+    };
+  };
+
+  const deleteVisitorSurvey = async (id: string) => {
+    const updated = surveys.filter((s) => s.id !== id);
+    setSurveys(updated);
+    localStorage.setItem(STORAGE_KEYS.SURVEYS, JSON.stringify(updated));
+    pushToCloud({ surveys: updated });
+  };
+
+  const updateVisitorSurvey = async (id: string, updates: Partial<VisitorSurvey>) => {
+    const updated = surveys.map((s) => (s.id === id ? { ...s, ...updates } : s));
+    setSurveys(updated);
+    localStorage.setItem(STORAGE_KEYS.SURVEYS, JSON.stringify(updated));
+    pushToCloud({ surveys: updated });
+  };
+
+  const openSurveyModal = (survey?: VisitorSurvey, defaultProduct?: string) => {
+    setSurveyModal({ isOpen: true, survey, defaultProduct });
+  };
+
+  const closeSurveyModal = () => {
+    setSurveyModal({ isOpen: false, survey: undefined, defaultProduct: undefined });
+  };
+
   // Modals helpers
   const openMovementModal = (productId?: string, defaultType: MovementType = 'IN') => {
     setMovementModal({ isOpen: true, productId, defaultType });
@@ -2235,6 +2350,14 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isLargeTextMode,
         toggleLargeTextMode,
         setLargeTextMode,
+        // Outil de Sondage & Visites / CRM Prospects
+        surveys,
+        addVisitorSurvey,
+        deleteVisitorSurvey,
+        updateVisitorSurvey,
+        surveyModal,
+        openSurveyModal,
+        closeSurveyModal,
       }}
     >
       {children}

@@ -40,6 +40,7 @@ export const Sidebar: React.FC = () => {
     openInstallModal,
     isLargeTextMode,
     toggleLargeTextMode,
+    surveys,
   } = useStock();
 
   const isCashier = activeAppUser?.role === 'CASHIER';
@@ -97,6 +98,13 @@ export const Sidebar: React.FC = () => {
       icon: <Share2 className="w-4 h-4" />,
       badge: 'Photos',
       badgeColor: 'text-emerald-700 bg-emerald-50 font-bold',
+    },
+    {
+      id: 'surveys',
+      label: 'Sondages & Visites',
+      icon: <Users className="w-4 h-4" />,
+      badge: surveys.length > 0 ? `${surveys.length} vis.` : 'Nouveau',
+      badgeColor: 'text-indigo-700 bg-indigo-50 font-bold',
     },
     {
       id: 'dashboard',
@@ -166,6 +174,13 @@ export const Sidebar: React.FC = () => {
       icon: <Calculator className="w-4 h-4" />,
       badge: 'Bilan & Coûts',
       badgeColor: 'text-amber-800 bg-amber-50 font-semibold',
+    },
+    {
+      id: 'surveys',
+      label: 'Sondages & Visites',
+      icon: <Users className="w-4 h-4" />,
+      badge: surveys.length > 0 ? `${surveys.length} vis.` : 'Nouveau',
+      badgeColor: 'text-indigo-700 bg-indigo-50 font-bold',
     },
     {
       id: 'movements',

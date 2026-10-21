@@ -88,9 +88,10 @@ export type ViewTab =
   | 'distribution'
   | 'caisse'
   | 'reports'
-  | 'movements'
   | 'accounting'
+  | 'surveys'
   | 'catalog'
+  | 'movements'
   | 'suppliers'
   | 'sheets'
   | 'design_system'
@@ -165,5 +166,65 @@ export interface PurchaseBatch {
   recordedBy: string;
   createdAt: string;
 }
+
+export type NonPurchaseReason =
+  | 'PRICE_TOO_HIGH' // Prix jugé trop cher / Hors budget
+  | 'QUALITY_CONCERN' // Qualité / Finition / Ne correspond pas aux attentes
+  | 'OUT_OF_STOCK' // Rupture de stock / Modèle ou taille non disponible
+  | 'JUST_LOOKING' // Simple visiteur / Renseignement / En réflexion
+  | 'PAYMENT_METHOD' // Problème moyen de paiement (Orange Money, Wave, pas de monnaie, etc.)
+  | 'OTHER'; // Autre raison spécifiée
+
+export const NON_PURCHASE_REASON_LABELS: Record<NonPurchaseReason, { label: string; icon: string; description: string }> = {
+  PRICE_TOO_HIGH: {
+    label: 'Prix trop élevé',
+    icon: '💰',
+    description: 'Le client trouve le prix trop cher ou a un budget inférieur',
+  },
+  QUALITY_CONCERN: {
+    label: 'Qualité / Modèle non adapté',
+    icon: '💎',
+    description: 'La qualité, taille, couleur ou matière ne convient pas',
+  },
+  OUT_OF_STOCK: {
+    label: 'Rupture de stock / Article absent',
+    icon: '📦',
+    description: "Le produit ou la variante recherchée n'est pas disponible",
+  },
+  JUST_LOOKING: {
+    label: 'Simple visite / Réflexion',
+    icon: '👀',
+    description: 'Venu se renseigner, comparer ou réfléchir avant achat',
+  },
+  PAYMENT_METHOD: {
+    label: 'Moyen de paiement refusé',
+    icon: '💳',
+    description: 'Pas de monnaie, pas de terminal ou compte de paiement indisponible',
+  },
+  OTHER: {
+    label: 'Autre motif',
+    icon: '✍️',
+    description: 'Autre cause détaillée dans les remarques',
+  },
+};
+
+export interface VisitorSurvey {
+  id: string;
+  date: string; // YYYY-MM-DD
+  visitorName?: string; // Nom du visiteur / client
+  whatsappNumber?: string; // Téléphone / WhatsApp du visiteur
+  requestedProduct: string; // Article ou produit recherché
+  requestedCategory?: string; // Catégorie du produit
+  budgetProposed?: number; // Budget espéré par le client (FCFA)
+  actualPrice?: number; // Prix proposé en boutique (FCFA)
+  reason: NonPurchaseReason; // Motif principal de non-achat
+  reasonDetails?: string; // Détails / explications du motif
+  recordedBy: string; // Caissier ou gérant ayant accueilli le visiteur
+  storeName?: string; // Nom de la boutique (ex: Boutique Moussa Vision)
+  contactedForPromo?: boolean; // Marqué si contacté pour une promo ultérieure
+  promoNotes?: string; // Historique de relance
+  createdAt: string; // Horodatage ISO
+}
+
 
 

@@ -19,6 +19,8 @@ import { DailyReportsView } from './components/DailyReportsView';
 import { DistributionView } from './components/DistributionView';
 import { AccountingView } from './components/AccountingView';
 import { CatalogView } from './components/CatalogView';
+import { SurveysView } from './components/SurveysView';
+import { SurveyModal } from './components/SurveyModal';
 import { SwitchAccountModal } from './components/SwitchAccountModal';
 import { InstallAppModal } from './components/InstallAppModal';
 import { LoginScreen } from './components/LoginScreen';
@@ -102,6 +104,7 @@ const AppContent: React.FC = () => {
           {activeTab === 'caisse' && <CashierView />}
           {activeTab === 'reports' && <DailyReportsView />}
           {!isCashier && activeTab === 'accounting' && <AccountingView />}
+          {activeTab === 'surveys' && <SurveysView />}
           {activeTab === 'movements' && <MovementsView />}
           {activeTab === 'catalog' && <CatalogView />}
           {!isCashier && activeTab === 'suppliers' && <SuppliersView />}
@@ -215,6 +218,7 @@ const AppContent: React.FC = () => {
       {/* Action Modals */}
       <MovementModal />
       <ProductModal />
+      <SurveyModal />
       <ConfirmModal />
       <SwitchAccountModal />
       <DistributionModal />
