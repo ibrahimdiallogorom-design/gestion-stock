@@ -30,6 +30,7 @@ Copy-Item -Path "$Workspace\dist\index.html" -Destination "$DeployDir\index.html
 Copy-Item -Path "$Workspace\dist\index.html" -Destination "$DeployDir\404.html" -Force
 Copy-Item -Path "$Workspace\dist\manifest.json" -Destination "$DeployDir\manifest.json" -Force
 Copy-Item -Path "$Workspace\dist\sw.js" -Destination "$DeployDir\sw.js" -Force
+Copy-Item -Path "$Workspace\dist\sw.js" -Destination "$Workspace\sw.js" -Force
 Copy-Item -Path "$Workspace\icon.png" -Destination "$DeployDir\icon.png" -Force
 Copy-Item -Path "$Workspace\icon.png" -Destination "$Workspace\dist\icon.png" -Force
 
