@@ -28,6 +28,7 @@ import { ConfirmModal } from './components/ConfirmModal';
 import { DistributionModal } from './components/DistributionModal';
 import { MobileMenuDrawer } from './components/MobileMenuDrawer';
 import { ViserDrawer } from './components/ViserDrawer';
+import { OfflineSyncBanner } from './components/OfflineSyncBanner';
 import { THEME_CONFIGS } from './components/ThemeClasses';
 import {
   LayoutDashboard,
@@ -89,6 +90,9 @@ const AppContent: React.FC = () => {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Contextual Top Bar */}
         <TopBar />
+
+        {/* Global Offline Mode & Auto-Sync Banner */}
+        <OfflineSyncBanner />
 
         {/* Viewport Content */}
         <main className="flex-1 min-h-0 overflow-y-auto pb-16 md:pb-0">

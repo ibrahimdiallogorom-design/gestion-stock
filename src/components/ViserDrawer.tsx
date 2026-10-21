@@ -52,6 +52,14 @@ export const ViserDrawer: React.FC = () => {
   const isCashier = activeAppUser?.role === 'CASHIER';
 
   const handleForceSync = async () => {
+    if (!navigator.onLine) {
+      setSyncFeedback({
+        text: 'Vous êtes actuellement hors-ligne. Vos données sont bien enregistrées sur votre appareil et seront envoyées automatiquement dès le retour d’Internet.',
+      });
+      setTimeout(() => setSyncFeedback(null), 6000);
+      return;
+    }
+
     setIsSyncing(true);
     setSyncFeedback({ text: 'Synchronisation Cloud en cours...' });
     try {
