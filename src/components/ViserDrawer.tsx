@@ -37,6 +37,7 @@ export const ViserDrawer: React.FC = () => {
     openInstallModal,
     openSwitchAccountModal,
     openSurveyModal,
+    openDirectSaleModal,
     logoutAppUser,
     setActiveTab,
     isCashierUnlocked,
@@ -291,6 +292,31 @@ export const ViserDrawer: React.FC = () => {
                 </span>
               </div>
             </button>
+
+            {!isCashier && (
+              <button
+                type="button"
+                onClick={() => handleAction(() => openDirectSaleModal())}
+                className="w-full text-left p-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 transition-all active:scale-[0.98] flex items-start gap-3.5 group cursor-pointer"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-white/15 text-white flex items-center justify-center shrink-0">
+                  <ShoppingCart className="w-6 h-6" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-black text-white leading-tight">
+                      Vente Directe Grand Magasin
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-extrabold uppercase">
+                      Sans Caisse
+                    </span>
+                  </div>
+                  <p className="text-xs text-emerald-100 mt-1">
+                    Vendre directement sur le stock du Grand Magasin sans passer par la caisse.
+                  </p>
+                </div>
+              </button>
+            )}
           </div>
 
           {/* 4. L'APP (APPS PWA & APK) */}

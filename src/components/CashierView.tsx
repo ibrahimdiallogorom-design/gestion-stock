@@ -54,58 +54,66 @@ export const CashierView: React.FC = () => {
     appUsers,
   } = useStock();
 
-  // If cashier terminal is locked, display the secure lock screen
-  if (!isCashierUnlocked) {
+  const isRoleCashier = activeAppUser?.role === 'CASHIER';
+
+  // If cashier terminal is locked and user is a Cashier, display the secure lock screen
+  if (!isCashierUnlocked && isRoleCashier) {
     return <CashierLockScreen />;
   }
 
-  const isRoleCashier = activeAppUser?.role === 'CASHIER';
   const cashiers = useMemo(() => appUsers.filter((u) => u.role === 'CASHIER'), [appUsers]);
 
   // Determine which boutique cashier this POS terminal represents:
   // - If Cashier: strictly locked to activeAppUser.id
-  // - If Admin: can choose which boutique register they are managing, defaulting to the first cashier (Moussa Vision)
+  // - If Admin: defaults to 'CENTRAL' (Grand Magasin Central) so Admin can sell directly from Grand Magasin, or choose a cashier boutique
   const [selectedBoutiqueId, setSelectedBoutiqueId] = useState<string>(() => {
     if (isRoleCashier && activeAppUser?.id) return activeAppUser.id;
-    return cashiers[0]?.id || 'user-caissier-moussa';
+    return 'CENTRAL';
   });
+
+  const isCentralSelected = !isRoleCashier && selectedBoutiqueId === 'CENTRAL';
 
   const effectiveCashier = useMemo(() => {
     if (isRoleCashier && activeAppUser) return activeAppUser;
+    if (selectedBoutiqueId === 'CENTRAL') return null;
     const found = cashiers.find((c) => c.id === selectedBoutiqueId);
     return found || cashiers[0] || null;
   }, [isRoleCashier, activeAppUser, cashiers, selectedBoutiqueId]);
 
-  const effectiveCashierId = effectiveCashier?.id;
+  const effectiveCashierId = isCentralSelected ? 'CENTRAL' : effectiveCashier?.id;
 
-  // Strict available stock: ONLY articles octroyés à cette boutique
+  // Available stock: Grand Magasin stock if CENTRAL selected, else articles octroyés à cette boutique
   const getAvailableStock = (prod: Product) => {
+    if (isCentralSelected) {
+      return prod.quantity || 0;
+    }
     if (effectiveCashierId && prod.distributedQuantities?.[effectiveCashierId] !== undefined) {
       return prod.distributedQuantities[effectiveCashierId] || 0;
     }
     return 0;
   };
 
-  // Compute total stock assigned to this cashier boutique
+  // Compute total stock assigned to this cashier boutique (or Grand Magasin)
   const cashierInventoryStats = useMemo(() => {
     if (!effectiveCashierId) return null;
     let units = 0;
     let value = 0;
     products.forEach((p) => {
-      const q = p.distributedQuantities?.[effectiveCashierId] || 0;
+      const q = isCentralSelected ? (p.quantity || 0) : (p.distributedQuantities?.[effectiveCashierId] || 0);
       if (q > 0) {
         units += q;
         value += q * p.salePrice;
       }
     });
     return { units, value };
-  }, [effectiveCashierId, products]);
+  }, [effectiveCashierId, isCentralSelected, products]);
 
   // Count total articles allocated to this boutique
   const totalAllocatedArticlesCount = useMemo(() => {
     if (!effectiveCashierId) return 0;
+    if (isCentralSelected) return products.filter((p) => (p.quantity || 0) > 0).length;
     return products.filter((p) => (p.distributedQuantities?.[effectiveCashierId] || 0) > 0).length;
-  }, [effectiveCashierId, products]);
+  }, [effectiveCashierId, isCentralSelected, products]);
 
   // POS State
   const [search, setSearch] = useState('');
@@ -119,21 +127,23 @@ export const CashierView: React.FC = () => {
   const [saleError, setSaleError] = useState<string | null>(null);
   const [lastReceipt, setLastReceipt] = useState<LastSaleReceipt | null>(null);
 
-  // Available categories: strictly only categories of articles allocated to this boutique
+  // Available categories
   const categories = useMemo(() => {
-    const allocatedProds = effectiveCashierId
+    const allocatedProds = isCentralSelected
+      ? products.filter((p) => (p.quantity || 0) > 0)
+      : effectiveCashierId
       ? products.filter((p) => (p.distributedQuantities?.[effectiveCashierId] || 0) > 0)
       : products;
     const cats = Array.from(new Set(allocatedProds.map((p) => p.category).filter(Boolean)));
     return ['all', ...cats];
-  }, [products, effectiveCashierId]);
+  }, [products, effectiveCashierId, isCentralSelected]);
 
   // Filtered products for quick touch selection:
-  // STRICT RULE: Cashier boutique ONLY sees articles granted to their boutique!
-  // Any article with 0 allocated or not distributed is COMPLETELY HIDDEN!
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
-      if (effectiveCashierId) {
+      if (isCentralSelected) {
+        if ((p.quantity || 0) <= 0) return false;
+      } else if (effectiveCashierId) {
         const myQty = p.distributedQuantities?.[effectiveCashierId] || 0;
         if (myQty <= 0) return false; // Strictly hidden!
       }
@@ -144,7 +154,7 @@ export const CashierView: React.FC = () => {
       const matchCat = selectedCategory === 'all' || p.category === selectedCategory;
       return matchSearch && matchCat;
     });
-  }, [products, search, selectedCategory, effectiveCashierId]);
+  }, [products, search, selectedCategory, effectiveCashierId, isCentralSelected]);
 
   // Cart operations
   const addToCart = (product: Product) => {
@@ -306,30 +316,38 @@ export const CashierView: React.FC = () => {
                 Poste de Caisse Ouvert
               </h1>
               <span className="text-xs px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-semibold">
-                {effectiveCashier?.storeName || effectiveCashier?.fullName || cashierName}
+                {isCentralSelected
+                  ? 'Grand Magasin Central'
+                  : effectiveCashier?.storeName || effectiveCashier?.fullName || cashierName}
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Articles cloisonnés : seuls les produits octroyés à cette boutique sont disponibles à la vente.
+              {isCentralSelected
+                ? 'Vente directe sur le stock global du Grand Magasin Central.'
+                : 'Articles cloisonnés : seuls les produits octroyés à cette boutique sont disponibles à la vente.'}
             </p>
           </div>
         </div>
 
         {/* Session Metrics & Boutique Selector / Lock Button */}
         <div className="flex flex-wrap items-center gap-3">
-          {/* Admin Boutique Selector if multiple stores exist */}
-          {!isRoleCashier && cashiers.length > 0 && (
+          {/* Admin Boutique Selector */}
+          {!isRoleCashier && (
             <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900">
               <Store className="w-4 h-4 text-blue-600" />
-              <span className="font-semibold">Boutique active :</span>
+              <span className="font-semibold">Vendre depuis :</span>
               <select
-                value={effectiveCashierId || ''}
-                onChange={(e) => setSelectedBoutiqueId(e.target.value)}
+                value={selectedBoutiqueId}
+                onChange={(e) => {
+                  setSelectedBoutiqueId(e.target.value);
+                  setCart([]);
+                }}
                 className="bg-white border border-blue-300 rounded-lg px-2 py-1 font-bold text-slate-800 focus:outline-none text-xs"
               >
+                <option value="CENTRAL">🏢 Grand Magasin Central (Tout le stock)</option>
                 {cashiers.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.storeName || c.fullName} ({c.username})
+                    🏪 {c.storeName || c.fullName} ({c.username})
                   </option>
                 ))}
               </select>

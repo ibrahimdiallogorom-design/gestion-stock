@@ -43,6 +43,7 @@ export const TopBar: React.FC = () => {
     forceSyncCloud,
     openInstallModal,
     openMobileMenu,
+    openDirectSaleModal,
     openViser,
   } = useStock();
 
@@ -263,6 +264,14 @@ export const TopBar: React.FC = () => {
         {/* Quick Movements (Admin only, Desktop only) */}
         {!isCashier && (
           <div className="hidden md:flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+            <button
+              onClick={() => openDirectSaleModal()}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md shadow-xs transition-colors"
+              title="Vendre directement depuis le Grand Magasin (sans passer par la caisse)"
+            >
+              <ShoppingCart className="w-3.5 h-3.5 text-white" />
+              <span>Vendre</span>
+            </button>
             <button
               onClick={() => openMovementModal(undefined, 'IN')}
               className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-emerald-800 bg-white hover:bg-emerald-50 rounded-md shadow-xs transition-colors"

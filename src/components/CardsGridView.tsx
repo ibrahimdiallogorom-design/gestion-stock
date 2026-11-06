@@ -26,6 +26,7 @@ export const CardsGridView: React.FC = () => {
     deleteProduct,
     recordMovement,
     openDistributionModal,
+    openDirectSaleModal,
     theme,
     activeAppUser,
     setActiveTab,
@@ -340,6 +341,15 @@ export const CardsGridView: React.FC = () => {
 
                   {/* Action Icons */}
                   <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => openDirectSaleModal(p.id)}
+                      disabled={p.quantity <= 0}
+                      title="Vendre directement depuis le Grand Magasin"
+                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors disabled:opacity-30 disabled:pointer-events-none shadow-2xs"
+                    >
+                      <ShoppingCart className="w-3.5 h-3.5" />
+                      <span>Vendre</span>
+                    </button>
                     <button
                       onClick={() => openMovementModal(p.id, 'IN')}
                       title="Nouveau mouvement détaillé"

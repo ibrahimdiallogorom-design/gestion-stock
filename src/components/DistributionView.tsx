@@ -20,6 +20,7 @@ import {
   Check,
   X,
   AlertTriangle,
+  ShoppingCart,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { Product, AppUser } from '../types';
@@ -31,6 +32,7 @@ export const DistributionView: React.FC = () => {
     activeAppUser,
     movements,
     openDistributionModal,
+    openDirectSaleModal,
     setBoutiqueQuantity,
     removeFromBoutique,
     createAppUser,
@@ -209,7 +211,15 @@ export const DistributionView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={() => openDirectSaleModal()}
+            className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <ShoppingCart className="w-4 h-4" />
+            <span>Vendre du Grand Magasin</span>
+          </button>
+
           <button
             onClick={() => {
               setNewStoreName('');
@@ -219,7 +229,7 @@ export const DistributionView: React.FC = () => {
               setStoreFormError(null);
               setIsCreateStoreModalOpen(true);
             }}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl shadow-2xs transition-all"
           >
             <Plus className="w-4 h-4" />
             <span>Créer une Boutique</span>
@@ -444,12 +454,21 @@ export const DistributionView: React.FC = () => {
                     {Math.round(globalFinancials.centralSale).toLocaleString('fr-FR')} F
                   </td>
                   <td className="py-3.5 px-4 text-right">
-                    <button
-                      onClick={() => setSelectedStoreId('CENTRAL')}
-                      className="px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors"
-                    >
-                      Voir le stock
-                    </button>
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        onClick={() => openDirectSaleModal()}
+                        className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors flex items-center gap-1 shadow-2xs"
+                      >
+                        <ShoppingCart className="w-3.5 h-3.5" />
+                        <span>Vendre</span>
+                      </button>
+                      <button
+                        onClick={() => setSelectedStoreId('CENTRAL')}
+                        className="px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors"
+                      >
+                        Voir le stock
+                      </button>
+                    </div>
                   </td>
                 </tr>
 
@@ -777,6 +796,16 @@ export const DistributionView: React.FC = () => {
                                 <span>Supprimer</span>
                               </button>
                             )}
+                            <button
+                              type="button"
+                              onClick={() => openDirectSaleModal(item.product.id)}
+                              disabled={item.product.quantity <= 0}
+                              className="px-2.5 py-1 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 rounded-lg transition-colors flex items-center gap-1 shadow-2xs"
+                              title="Vendre directement cet article depuis le Grand Magasin"
+                            >
+                              <ShoppingCart className="w-3.5 h-3.5" />
+                              <span>Vendre</span>
+                            </button>
                             <button
                               type="button"
                               onClick={() => openDistributionModal(item.product.id, activeStoreDetail.cashier?.id)}

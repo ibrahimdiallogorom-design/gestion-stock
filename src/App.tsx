@@ -21,6 +21,7 @@ import { AccountingView } from './components/AccountingView';
 import { CatalogView } from './components/CatalogView';
 import { SurveysView } from './components/SurveysView';
 import { DataAuditView } from './components/DataAuditView';
+import { DirectSaleModal } from './components/DirectSaleModal';
 import { SurveyModal } from './components/SurveyModal';
 import { SwitchAccountModal } from './components/SwitchAccountModal';
 import { InstallAppModal } from './components/InstallAppModal';
@@ -220,6 +221,7 @@ const AppContent: React.FC = () => {
       {/* Action Modals */}
       <MovementModal />
       <ProductModal />
+      <DirectSaleModal />
       <SurveyModal />
       <ConfirmModal />
       <SwitchAccountModal />

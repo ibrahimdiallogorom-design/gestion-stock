@@ -215,6 +215,13 @@ interface StockContextType {
   };
   openSurveyModal: (survey?: VisitorSurvey, defaultProduct?: string) => void;
   closeSurveyModal: () => void;
+  // Vente Directe Grand Magasin (sans passer par la caisse)
+  directSaleModal: {
+    isOpen: boolean;
+    productId?: string;
+  };
+  openDirectSaleModal: (productId?: string) => void;
+  closeDirectSaleModal: () => void;
 }
 
 const StockContext = createContext<StockContextType | undefined>(undefined);
@@ -601,6 +608,28 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       isOpen: false,
       productId: undefined,
       defaultTargetUserId: undefined,
+    });
+  };
+
+  // Vente Directe Grand Magasin Modal state
+  const [directSaleModal, setDirectSaleModal] = useState<{
+    isOpen: boolean;
+    productId?: string;
+  }>({
+    isOpen: false,
+  });
+
+  const openDirectSaleModal = (productId?: string) => {
+    setDirectSaleModal({
+      isOpen: true,
+      productId,
+    });
+  };
+
+  const closeDirectSaleModal = () => {
+    setDirectSaleModal({
+      isOpen: false,
+      productId: undefined,
     });
   };
 
@@ -1268,6 +1297,11 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const previousStock = targetProduct.quantity;
     const newStock = Math.max(0, previousStock + delta);
     const now = new Date().toISOString();
+    const isManualSale =
+      type === 'OUT' &&
+      ((reason || '').toLowerCase().includes('vente') ||
+        (reason || '').toLowerCase().includes('commande'));
+    const autoTicket = isManualSale ? `TCK-${Date.now().toString().slice(-6)}` : undefined;
 
     const newMovement: StockMovement = {
       id: `mov-${Date.now()}`,
@@ -1279,14 +1313,23 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       previousStock,
       newStock,
       reason,
-      operator: operator || (currentUser?.displayName || 'Opérateur Boutique'),
+      operator: operator || (activeAppUser?.fullName || currentUser?.displayName || 'Gérant Grand Magasin'),
       notes,
       createdAt: now,
+      ...(isManualSale
+        ? {
+            storeName: 'Grand Magasin Central',
+            ticketNumber: autoTicket,
+            saleAmount: Math.abs(delta) * (Number(targetProduct.salePrice) || 0),
+            unitCostAtSale: Math.max(0, Number(targetProduct.costPrice) || 0),
+            paymentMethod: 'CASH' as PaymentMethod,
+          }
+        : {}),
     };
 
     const updatedProducts = products.map((p) =>
       p.id === productId
-        ? { ...p, quantity: newStock, lastUpdated: now }
+        ? { ...p, quantity: newStock, centralQuantity: newStock, lastUpdated: now }
         : p
     );
     const updatedMovements = [newMovement, ...movements];
@@ -1759,15 +1802,17 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     customerName?: string,
     sellerUserId?: string
   ): Promise<{ success: boolean; ticketNumber: string; error?: string }> => {
-    if (!isCashierUnlocked) {
+    const isDirectCentralSale = sellerUserId === 'CENTRAL';
+    if (!isCashierUnlocked && activeAppUser?.role === 'CASHIER' && !isDirectCentralSale) {
       return { success: false, ticketNumber: '', error: 'Session caisse verrouillée. Veuillez vous identifier.' };
     }
     if (items.length === 0) {
       return { success: false, ticketNumber: '', error: 'Le panier est vide.' };
     }
 
-    const effectiveSellerId =
-      sellerUserId || (activeAppUser?.role === 'CASHIER' ? activeAppUser?.id : undefined);
+    const effectiveSellerId = isDirectCentralSale
+      ? undefined
+      : sellerUserId || (activeAppUser?.role === 'CASHIER' ? activeAppUser?.id : undefined);
     const sellerUser = effectiveSellerId ? appUsers.find((u) => u.id === effectiveSellerId) : null;
     const isBoutiqueSale = !!effectiveSellerId;
 
@@ -1780,14 +1825,14 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const cashierStock = (isBoutiqueSale && effectiveSellerId && prod.distributedQuantities?.[effectiveSellerId] !== undefined)
         ? (prod.distributedQuantities[effectiveSellerId] || 0)
         : null;
-      const available = cashierStock !== null ? cashierStock : (prod.centralQuantity !== undefined ? prod.centralQuantity : prod.quantity);
+      const available = cashierStock !== null ? cashierStock : prod.quantity;
       if (available < item.quantity) {
         return {
           success: false,
           ticketNumber: '',
           error: cashierStock !== null
             ? `Stock insuffisant dans cette caisse pour "${item.product.name}" (disponible: ${available}). Demandez une dotation au Grand Magasin.`
-            : `Stock insuffisant pour "${item.product.name}" (disponible: ${available}).`,
+            : `Stock insuffisant au Grand Magasin pour "${item.product.name}" (disponible: ${available}).`,
         };
       }
     }
@@ -1811,7 +1856,11 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const soldItem = items.find((it) => it.product.id === prod.id);
       if (!soldItem) return prod;
 
-      const subtotal = prod.salePrice * soldItem.quantity;
+      const unitPriceUsed =
+        soldItem.product.salePrice !== undefined && Number.isFinite(Number(soldItem.product.salePrice))
+          ? Number(soldItem.product.salePrice)
+          : prod.salePrice;
+      const subtotal = unitPriceUsed * soldItem.quantity;
       totalAmount += subtotal;
 
       let centralQty = prod.quantity;
@@ -1822,13 +1871,17 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         distributed[effectiveSellerId] = Math.max(0, (distributed[effectiveSellerId] || 0) - soldItem.quantity);
         centralQty = Math.max(0, prod.quantity - soldItem.quantity);
       } else {
-        // Vente directe admin : déduit dans la boutique centrale
+        // Vente directe Grand Magasin : déduit directement dans le stock du Grand Magasin
         centralQty = Math.max(0, prod.quantity - soldItem.quantity);
       }
       const newQty = centralQty;
 
-      const sellerDisplayName = sellerUser?.fullName || activeAppUser?.fullName || cashierName;
-      const boutiqueDisplayName = sellerUser?.storeName || activeAppUser?.storeName || 'Boutique Moussa Vision';
+      const sellerDisplayName = isBoutiqueSale
+        ? sellerUser?.fullName || activeAppUser?.fullName || cashierName
+        : activeAppUser?.fullName || 'Gérant Grand Magasin';
+      const boutiqueDisplayName = isBoutiqueSale
+        ? sellerUser?.storeName || 'Boutique Moussa Vision'
+        : 'Grand Magasin Central';
 
       newMovements.push({
         id: `mov-${Date.now()}-${prod.id}`,
@@ -1839,7 +1892,9 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         quantityDelta: -soldItem.quantity,
         previousStock: prod.quantity,
         newStock: newQty,
-        reason: `Vente Caisse #${ticketNumber} (${paymentLabel}${customerName ? ` - ${customerName}` : ''})`,
+        reason: isBoutiqueSale
+          ? `Vente Caisse #${ticketNumber} (${paymentLabel}${customerName ? ` - ${customerName}` : ''})`
+          : `Vente Directe Grand Magasin #${ticketNumber} (${paymentLabel}${customerName ? ` - ${customerName}` : ''})`,
         operator: sellerDisplayName,
         notes: `Règlement ${paymentLabel}${paymentMethod === 'ACOMPTE' ? ` (Acompte payé: ${acompteAmount ?? 0} F, Restant: ${remainingAmount ?? 0} F)` : paymentMethod === 'CREDIT' ? ` (Crédit restant: ${remainingAmount ?? totalAmount} F)` : ''}${customerName ? ` - Client: ${customerName}` : ''} - Ticket ${ticketNumber}`,
         createdAt: now,
@@ -2370,6 +2425,9 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         surveyModal,
         openSurveyModal,
         closeSurveyModal,
+        directSaleModal,
+        openDirectSaleModal,
+        closeDirectSaleModal,
       }}
     >
       {children}

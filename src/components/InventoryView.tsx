@@ -17,6 +17,7 @@ import {
   Share2,
   Building2,
   Store,
+  ShoppingCart,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { Product, STANDARD_CATEGORIES } from '../types';
@@ -43,6 +44,7 @@ export const InventoryView: React.FC = () => {
     clearAllProducts,
     repairInflatedPrices,
     openDistributionModal,
+    openDirectSaleModal,
     appUsers,
     activeAppUser,
     setActiveTab,
@@ -479,6 +481,15 @@ export const InventoryView: React.FC = () => {
                             </div>
                           ) : (
                             <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={() => openDirectSaleModal(product.id)}
+                                disabled={product.quantity <= 0}
+                                title="Vendre directement depuis le Grand Magasin"
+                                className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-bold flex items-center gap-1 transition-colors disabled:opacity-30 disabled:pointer-events-none shadow-2xs"
+                              >
+                                <ShoppingCart className="w-3.5 h-3.5" />
+                                <span>Vendre</span>
+                              </button>
                               <button
                                 onClick={() => openDistributionModal(product.id)}
                                 title="Distribuer aux vendeurs (Dotation)"
