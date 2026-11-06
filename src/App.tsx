@@ -20,6 +20,7 @@ import { DistributionView } from './components/DistributionView';
 import { AccountingView } from './components/AccountingView';
 import { CatalogView } from './components/CatalogView';
 import { SurveysView } from './components/SurveysView';
+import { DataAuditView } from './components/DataAuditView';
 import { SurveyModal } from './components/SurveyModal';
 import { SwitchAccountModal } from './components/SwitchAccountModal';
 import { InstallAppModal } from './components/InstallAppModal';
@@ -105,6 +106,7 @@ const AppContent: React.FC = () => {
           {activeTab === 'reports' && <DailyReportsView />}
           {!isCashier && activeTab === 'accounting' && <AccountingView />}
           {activeTab === 'surveys' && <SurveysView />}
+          {!isCashier && activeTab === 'audit' && <DataAuditView />}
           {activeTab === 'movements' && <MovementsView />}
           {activeTab === 'catalog' && <CatalogView />}
           {!isCashier && activeTab === 'suppliers' && <SuppliersView />}

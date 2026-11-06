@@ -22,7 +22,7 @@ import { useStock } from '../context/StockContext';
 import { StockMovement, PaymentMethod } from '../types';
 
 export const DailyReportsView: React.FC = () => {
-  const { movements, appUsers, activeAppUser, openSwitchAccountModal } = useStock();
+  const { movements, products, appUsers, activeAppUser, openSwitchAccountModal } = useStock();
 
   // Date helpers
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
@@ -147,7 +147,12 @@ export const DailyReportsView: React.FC = () => {
 
     salesMovements.forEach((m) => {
       const ticketId = m.ticketNumber || m.id;
-      const amount = m.saleAmount || (Math.abs(m.quantityDelta) * 50); // fallback reasonable estimate
+      // Montant réel de la ligne ; si absent (anciennes données), prix de vente du produit × quantité
+      const fallbackPrice = Number(products.find((p) => p.id === m.productId)?.salePrice) || 0;
+      const amount =
+        m.saleAmount !== undefined && m.saleAmount !== null
+          ? Number(m.saleAmount) || 0
+          : Math.abs(Number(m.quantityDelta) || 0) * fallbackPrice;
       const store = m.storeName || 'Boutique Moussa Vision';
       const cashier = m.operator || 'Caissier';
       const payment: PaymentMethod = m.paymentMethod || 'CASH';
@@ -182,7 +187,7 @@ export const DailyReportsView: React.FC = () => {
     return Array.from(map.values()).sort(
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
-  }, [salesMovements]);
+  }, [salesMovements, products]);
 
   // Totals & KPIs
   const totalSalesAmount = useMemo(() => {

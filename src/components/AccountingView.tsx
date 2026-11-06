@@ -94,9 +94,13 @@ export const AccountingView: React.FC = () => {
   }, [period]);
 
   // Filtered movements (Sales / Encaissements)
+  // ⚠️ Seules les VRAIES ventes (ticket de caisse ou motif "vente") sont comptées.
+  // Les sorties manuelles (pertes, casse, retraits) ne sont pas du chiffre d'affaires.
   const filteredSalesMovements = useMemo(() => {
     return movements.filter((m) => {
       if (m.type !== 'OUT') return false;
+      const isSale = !!m.ticketNumber || (m.reason || '').toLowerCase().includes('vente');
+      if (!isSale) return false;
       const movDate = (m.createdAt || '').split('T')[0];
       return movDate >= periodRange.start && movDate <= periodRange.end;
     });
@@ -122,20 +126,34 @@ export const AccountingView: React.FC = () => {
 
   // --- Financial Calculations ---
   // 1. Chiffre d'Affaires réalisé (Ventes)
+  // Si une ligne de vente n'a pas de montant enregistré, on utilise prix de vente × quantité.
+  const salePriceMap = useMemo(() => {
+    const map = new Map<string, number>();
+    products.forEach((p) => map.set(p.id, Number(p.salePrice) || 0));
+    return map;
+  }, [products]);
+
   const totalRevenue = useMemo(() => {
     return filteredSalesMovements.reduce((acc, m) => {
-      return acc + (Number(m.saleAmount) || 0);
+      const amount =
+        m.saleAmount !== undefined && m.saleAmount !== null
+          ? Number(m.saleAmount) || 0
+          : (salePriceMap.get(m.productId) || 0) * Math.abs(Number(m.quantityDelta) || 0);
+      return acc + amount;
     }, 0);
-  }, [filteredSalesMovements]);
+  }, [filteredSalesMovements, salePriceMap]);
 
-  // 2. Coût d'achat estimé des marchandises vendues (CAMV)
+  // 2. Coût d'achat des marchandises vendues (CAMV)
+  // On utilise le prix d'achat FIGÉ au moment de la vente (unitCostAtSale) quand il existe,
+  // sinon le prix d'achat actuel du produit (anciennes ventes).
   const costOfGoodsSold = useMemo(() => {
     const prodMap = new Map<string, number>();
     products.forEach((p) => prodMap.set(p.id, p.costPrice || 0));
 
     return filteredSalesMovements.reduce((acc, m) => {
-      const unitCost = prodMap.get(m.productId) || 0;
-      const qtySold = Math.abs(m.quantityDelta);
+      const unitCost =
+        m.unitCostAtSale !== undefined ? Number(m.unitCostAtSale) || 0 : prodMap.get(m.productId) || 0;
+      const qtySold = Math.abs(Number(m.quantityDelta) || 0);
       return acc + unitCost * qtySold;
     }, 0);
   }, [filteredSalesMovements, products]);
@@ -143,14 +161,20 @@ export const AccountingView: React.FC = () => {
   // 3. Marge Brute Commerciale
   const grossProfit = totalRevenue - costOfGoodsSold;
 
-  // 4. Dépenses d'exploitation (hors achat de stock)
+  // Les frais de transport créés automatiquement avec un achat de stock (id se terminant par "-trsp")
+  // sont DÉJÀ inclus dans le prix de revient (et dans le total décaissé de l'achat).
+  // On les exclut pour ne pas les compter deux fois.
+  const isPurchaseLinkedExpense = (e: { id: string; category: string }) =>
+    e.category === 'ACHAT_STOCK' || (e.category === 'TRANSPORT' && (e.id || '').endsWith('-trsp'));
+
+  // 4. Dépenses d'exploitation (hors achat de stock et hors transport d'achat)
   const operatingExpenses = useMemo(() => {
     return filteredExpenses
-      .filter((e) => e.category !== 'ACHAT_STOCK')
+      .filter((e) => !isPurchaseLinkedExpense(e))
       .reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
   }, [filteredExpenses]);
 
-  // 5. Total des achats de stock décaissés sur la période
+  // 5. Total des achats de stock décaissés sur la période (marchandise + transport)
   const totalStockPurchasesPaid = useMemo(() => {
     return filteredPurchases.reduce((acc, p) => acc + (Number(p.totalCostPaid) || 0), 0);
   }, [filteredPurchases]);
@@ -194,7 +218,7 @@ export const AccountingView: React.FC = () => {
   const expensesByCategory = useMemo(() => {
     const map: Record<string, number> = {};
     filteredExpenses
-      .filter((e) => e.category !== 'ACHAT_STOCK')
+      .filter((e) => !isPurchaseLinkedExpense(e))
       .forEach((e) => {
         map[e.category] = (map[e.category] || 0) + (Number(e.amount) || 0);
       });

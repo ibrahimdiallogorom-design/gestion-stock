@@ -20,6 +20,7 @@ import {
   Download,
   Calculator,
   Type,
+  ShieldCheck,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { ViewTab } from '../types';
@@ -174,6 +175,13 @@ export const Sidebar: React.FC = () => {
       icon: <Calculator className="w-4 h-4" />,
       badge: 'Bilan & Coûts',
       badgeColor: 'text-amber-800 bg-amber-50 font-semibold',
+    },
+    {
+      id: 'audit',
+      label: 'Contrôle des chiffres',
+      icon: <ShieldCheck className="w-4 h-4" />,
+      badge: 'Audit',
+      badgeColor: 'text-red-700 bg-red-50 font-bold',
     },
     {
       id: 'surveys',

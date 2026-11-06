@@ -25,6 +25,7 @@ import {
   Lock,
   Sparkles,
   Type,
+  ShieldCheck,
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { ViewTab } from '../types';
@@ -153,6 +154,16 @@ export const MobileMenuDrawer: React.FC = () => {
       color: 'bg-amber-50 border-amber-200',
       badge: 'Bilan & Coûts',
       badgeColor: 'bg-amber-100 text-amber-800 font-bold',
+      adminOnly: true,
+    },
+    {
+      id: 'audit',
+      title: 'Contrôle des chiffres',
+      description: 'Isole les chiffres qui ne concordent pas (stock, prix, ventes, achats, dépenses) pour les corriger un par un.',
+      icon: <ShieldCheck className="w-6 h-6 text-red-600" />,
+      color: 'bg-red-50 border-red-200',
+      badge: 'Audit',
+      badgeColor: 'bg-red-100 text-red-800 font-bold',
       adminOnly: true,
     },
     {

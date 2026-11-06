@@ -53,6 +53,7 @@ export interface StockMovement {
   storeName?: string;
   ticketNumber?: string;
   saleAmount?: number;
+  unitCostAtSale?: number; // Prix d'achat unitaire figé au moment de la vente (marge historique fiable)
   paymentMethod?: PaymentMethod;
   acompteAmount?: number; // Acompte payé
   remainingAmount?: number; // Total restant (Crédit)
@@ -90,6 +91,7 @@ export type ViewTab =
   | 'reports'
   | 'accounting'
   | 'surveys'
+  | 'audit'
   | 'catalog'
   | 'movements'
   | 'suppliers'

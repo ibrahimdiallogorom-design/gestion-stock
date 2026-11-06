@@ -191,6 +191,7 @@ interface StockContextType {
       createExpense?: boolean;
     }
   ) => Promise<{ success: boolean; message: string }>;
+  deletePurchaseBatch: (id: string) => Promise<void>;
   // Mobile Menu Drawer & Grand Caractère Mode
   isMobileMenuOpen: boolean;
   openMobileMenu: () => void;
@@ -1845,6 +1846,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         storeName: boutiqueDisplayName,
         ticketNumber: ticketNumber,
         saleAmount: subtotal,
+        unitCostAtSale: Math.max(0, Number(prod.costPrice) || 0),
         paymentMethod: paymentMethod,
         acompteAmount: acompteAmount,
         remainingAmount: remainingAmount,
