@@ -291,8 +291,10 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               salePrice: sale,
             };
           });
-          localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(cleanProducts));
-          return cleanProducts;
+          if (cleanProducts.length > 0) {
+            localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(cleanProducts));
+            return cleanProducts;
+          }
         }
       }
     } catch (e) {
@@ -316,8 +318,10 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               !(m.createdAt && m.createdAt.startsWith('2026-10-13')) &&
               !(m.type === 'RETURN' && Number(m.quantityDelta) < 0)
           );
-          localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(sanitized));
-          return sanitized;
+          if (sanitized.length > 0) {
+            localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(sanitized));
+            return sanitized;
+          }
         }
       }
     } catch (e) {
@@ -736,7 +740,24 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     registerAfficherSurInterface((listeProduits) => {
       if (!mounted) return;
       if (listeProduits && listeProduits.length > 0) {
-        setProducts(listeProduits);
+        setProducts((prev) => {
+          if (prev.length === 0) return listeProduits;
+          const map = new Map<string, Product>();
+          prev.forEach((p) => map.set(p.id, p));
+          listeProduits.forEach((dp) => {
+            const existing = map.get(dp.id);
+            if (!existing) {
+              map.set(dp.id, dp);
+            } else {
+              const dTime = new Date(dp.lastUpdated || 0).getTime();
+              const eTime = new Date(existing.lastUpdated || 0).getTime();
+              if (dTime > eTime) {
+                map.set(dp.id, dp);
+              }
+            }
+          });
+          return Array.from(map.values());
+        });
       }
     });
     chargerProduitsPourAffichage();

@@ -7,6 +7,9 @@ import {
 } from 'firebase/auth';
 import {
   getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   doc,
   getDoc,
   setDoc,
@@ -56,6 +59,7 @@ const CLOUD_CREDENTIALS = {
 };
 
 const OFFLINE_QUEUE_KEY = 'stockflow_offline_sync_queue_v2';
+const OFFLINE_OPS_COUNT_KEY = 'stockflow_offline_ops_count_v1';
 
 // Singleton instances
 let cloudApp: FirebaseApp | null = null;
@@ -67,7 +71,16 @@ function getCloudServices() {
     const existing = getApps().find((a) => a.name === APP_NAME);
     cloudApp = existing || initializeApp(CLOUD_FIREBASE_CONFIG, APP_NAME);
     cloudAuth = getAuth(cloudApp);
-    cloudDb = getFirestore(cloudApp);
+    try {
+      // Activer le cache persistant IndexedDB natif de Firestore pour le mode Sahel Hors-Ligne
+      cloudDb = initializeFirestore(cloudApp, {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager(),
+        }),
+      });
+    } catch (e) {
+      cloudDb = getFirestore(cloudApp);
+    }
   }
   return { auth: cloudAuth!, db: cloudDb! };
 }
@@ -97,11 +110,23 @@ export function getOfflineQueue(): Partial<CloudStoreData> | null {
   }
 }
 
+export function getPendingOfflineCount(): number {
+  try {
+    const c = Number(localStorage.getItem(OFFLINE_OPS_COUNT_KEY) || 0);
+    if (c > 0) return c;
+    return hasPendingOfflineData() ? 1 : 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
 export function saveOfflineQueue(data: Partial<CloudStoreData>) {
   try {
     const current = getOfflineQueue() || {};
     const merged = { ...current, ...data };
     localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(merged));
+    const prevCount = Number(localStorage.getItem(OFFLINE_OPS_COUNT_KEY) || 0);
+    localStorage.setItem(OFFLINE_OPS_COUNT_KEY, String(prevCount + 1));
   } catch (e) {}
   // Enregistre également dans la table Dexie VisionTechOfflineDB.commandesOffline
   addCommandeOffline(data);
@@ -110,6 +135,7 @@ export function saveOfflineQueue(data: Partial<CloudStoreData>) {
 export function clearOfflineQueue() {
   try {
     localStorage.removeItem(OFFLINE_QUEUE_KEY);
+    localStorage.removeItem(OFFLINE_OPS_COUNT_KEY);
   } catch (e) {}
   clearCommandesOffline();
 }
@@ -119,7 +145,23 @@ export function hasPendingOfflineData(): boolean {
   return q !== null && Object.keys(q).length > 0;
 }
 
-// Ensure background session authentication for Firestore security rules (with singleton lock)
+// Helper timeout pour éviter les blocages infinis sur réseau 2G/Edge Sahel
+function withTimeout<T>(promise: Promise<T>, ms: number, fallbackMsg = 'Network timeout'): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const tid = setTimeout(() => reject(new Error(fallbackMsg)), ms);
+    promise
+      .then((res) => {
+        clearTimeout(tid);
+        resolve(res);
+      })
+      .catch((err) => {
+        clearTimeout(tid);
+        reject(err);
+      });
+  });
+}
+
+// Ensure background session authentication for Firestore security rules (with singleton lock & timeout)
 let authPromise: Promise<void> | null = null;
 
 async function ensureCloudAuth(auth: Auth): Promise<void> {
@@ -128,24 +170,24 @@ async function ensureCloudAuth(auth: Auth): Promise<void> {
 
   authPromise = (async () => {
     try {
-      await signInWithEmailAndPassword(
-        auth,
-        CLOUD_CREDENTIALS.email,
-        CLOUD_CREDENTIALS.password
+      await withTimeout(
+        signInWithEmailAndPassword(auth, CLOUD_CREDENTIALS.email, CLOUD_CREDENTIALS.password),
+        7000,
+        'Auth timeout (Sahel 2G)'
       );
     } catch (err: any) {
       if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
         try {
-          await createUserWithEmailAndPassword(
-            auth,
-            CLOUD_CREDENTIALS.email,
-            CLOUD_CREDENTIALS.password
+          await withTimeout(
+            createUserWithEmailAndPassword(auth, CLOUD_CREDENTIALS.email, CLOUD_CREDENTIALS.password),
+            7000,
+            'Create Auth timeout'
           );
         } catch (createErr) {
           console.warn('Cloud Auth create fallback warning:', createErr);
         }
       } else {
-        console.warn('Cloud Auth sign-in warning:', err);
+        console.warn('Cloud Auth sign-in warning (mode hors-ligne actif):', err?.message || err);
       }
     } finally {
       authPromise = null;
@@ -162,6 +204,73 @@ let activeCallbacks: {
 } | null = null;
 
 /**
+ * Fusionne la file d'attente hors-ligne locale par-dessus les données distantes
+ * pour garantir que les saisies faites sans connexion dans le Sahel ne soient JAMAIS écrasées.
+ */
+function mergeOfflineQueueOverRemote(remote: CloudStoreData): CloudStoreData {
+  const queue = getOfflineQueue();
+  if (!queue || Object.keys(queue).length === 0) return remote;
+
+  const merged: CloudStoreData = { ...remote };
+
+  // Fusionner les produits : les produits créés ou modifiés hors-ligne l'emportent toujours
+  if (Array.isArray(queue.products) && queue.products.length > 0) {
+    const prodMap = new Map<string, Product>();
+    (remote.products || []).forEach((p) => prodMap.set(p.id, p));
+    queue.products.forEach((qp) => {
+      const existing = prodMap.get(qp.id);
+      if (!existing) {
+        prodMap.set(qp.id, qp);
+      } else {
+        const qTime = new Date(qp.lastUpdated || 0).getTime();
+        const rTime = new Date(existing.lastUpdated || 0).getTime();
+        if (qTime >= rTime) {
+          prodMap.set(qp.id, qp);
+        }
+      }
+    });
+    merged.products = Array.from(prodMap.values());
+  }
+
+  // Fusionner les mouvements : conserver tous les mouvements créés hors-ligne
+  if (Array.isArray(queue.movements) && queue.movements.length > 0) {
+    const movMap = new Map<string, StockMovement>();
+    (remote.movements || []).forEach((m) => movMap.set(m.id, m));
+    queue.movements.forEach((qm) => movMap.set(qm.id, qm));
+    merged.movements = Array.from(movMap.values()).sort(
+      (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    );
+  }
+
+  if (Array.isArray(queue.expenses) && queue.expenses.length > 0) {
+    const expMap = new Map<string, Expense>();
+    (remote.expenses || []).forEach((e) => expMap.set(e.id, e));
+    queue.expenses.forEach((qe) => expMap.set(qe.id, qe));
+    merged.expenses = Array.from(expMap.values());
+  }
+
+  if (Array.isArray(queue.purchases) && queue.purchases.length > 0) {
+    const purMap = new Map<string, PurchaseBatch>();
+    (remote.purchases || []).forEach((p) => purMap.set(p.id, p));
+    queue.purchases.forEach((qp) => purMap.set(qp.id, qp));
+    merged.purchases = Array.from(purMap.values());
+  }
+
+  if (Array.isArray(queue.surveys) && queue.surveys.length > 0) {
+    const surMap = new Map<string, VisitorSurvey>();
+    (remote.surveys || []).forEach((s) => surMap.set(s.id, s));
+    queue.surveys.forEach((qs) => surMap.set(qs.id, qs));
+    merged.surveys = Array.from(surMap.values());
+  }
+
+  if (Array.isArray(queue.appUsers) && queue.appUsers.length > 0) {
+    merged.appUsers = queue.appUsers;
+  }
+
+  return merged;
+}
+
+/**
  * Initialise la synchronisation en temps réel avec le Cloud Firestore.
  * Détecte les passages en ligne et hors-ligne pour basculer automatiquement.
  */
@@ -174,7 +283,6 @@ export function initCloudSync(callbacks: {
   let unsubSnapshot: Unsubscribe | null = null;
   let isCancelled = false;
 
-  // Initial check
   if (!navigator.onLine) {
     callbacks.onStatusChange('offline', 'Mode Hors-Ligne (Stock local sécurisé)');
   } else {
@@ -191,6 +299,20 @@ export function initCloudSync(callbacks: {
       await ensureCloudAuth(auth);
       if (isCancelled) return;
 
+      // PRIORITÉ ABSOLUE SAHEL : Si des données ont été saisies hors-ligne, les envoyer AVANT d'écouter le Cloud !
+      if (hasPendingOfflineData()) {
+        try {
+          await flushOfflineQueue();
+        } catch (e) {
+          // Si le réseau est trop faible pour envoyer maintenant, on garde la file intacte
+        }
+      }
+
+      if (unsubSnapshot) {
+        unsubSnapshot();
+        unsubSnapshot = null;
+      }
+
       const storeDocRef = doc(db, 'stores', STORE_DOC_ID);
 
       unsubSnapshot = onSnapshot(
@@ -198,29 +320,33 @@ export function initCloudSync(callbacks: {
         (snap) => {
           if (isCancelled) return;
           if (snap.exists()) {
-            const data = snap.data() as CloudStoreData;
+            const rawData = snap.data() as CloudStoreData;
+            // Toujours protéger les opérations hors-ligne non encore envoyées
+            const safeData = hasPendingOfflineData()
+              ? mergeOfflineQueueOverRemote(rawData)
+              : rawData;
             callbacks.onStatusChange('connected', 'Connecté au Cloud (Temps Réel)');
-            callbacks.onRemoteData(data);
+            callbacks.onRemoteData(safeData);
+
+            // Si des opérations hors-ligne étaient en attente et que la connexion vient de passer, les pousser
+            if (hasPendingOfflineData()) {
+              flushOfflineQueue().catch(() => {});
+            }
           } else {
             callbacks.onStatusChange('connected', 'Prêt (Cloud initial)');
           }
         },
         (error) => {
-          console.warn('Firestore snapshot error:', error);
+          console.warn('Firestore snapshot warning (offline fallback):', error);
           if (!isCancelled) {
             callbacks.onStatusChange('offline', 'Mode Hors-Ligne (Stock local sécurisé)');
           }
         }
       );
-
-      // Si des données hors-ligne étaient en attente, les vider maintenant
-      if (hasPendingOfflineData()) {
-        flushOfflineQueue().catch(() => {});
-      }
     } catch (err: any) {
-      console.warn('Failed to start Cloud sync:', err);
+      console.warn('Mode Hors-Ligne actif (réseau Sahel indisponible):', err);
       if (!isCancelled) {
-        callbacks.onStatusChange('offline', 'Connexion Cloud indisponible (Local)');
+        callbacks.onStatusChange('offline', 'Mode Hors-Ligne (Stock local sécurisé)');
       }
     }
   };
@@ -229,37 +355,53 @@ export function initCloudSync(callbacks: {
 
   // Écoute automatique de la reconnexion Internet (Smartphone & Ordinateur)
   const handleOnline = async () => {
-    callbacks.onStatusChange('connecting', 'Connexion Internet rétablie ! Synchronisation avec le Cloud...');
+    callbacks.onStatusChange(
+      'connecting',
+      'Connexion Internet détectée ! Envoi automatique des saisies hors-ligne...'
+    );
     try {
       await flushOfflineQueue();
       if (!unsubSnapshot) {
-        startListening();
+        await startListening();
       }
-      callbacks.onStatusChange('connected', 'Données synchronisées avec succès !');
+      callbacks.onStatusChange('connected', 'Données hors-ligne synchronisées avec succès !');
     } catch (err) {
-      callbacks.onStatusChange('offline', 'Reconnexion en attente...');
+      callbacks.onStatusChange('offline', 'En attente d’un signal réseau stable...');
     }
   };
 
   const handleOffline = () => {
-    callbacks.onStatusChange('offline', 'Mode Hors-Ligne : Données sauvegardées localement');
+    callbacks.onStatusChange('offline', 'Mode Hors-Ligne : Données sauvegardées sur l’appareil');
+  };
+
+  // Écoute des événements Service Worker Background Sync
+  const handleSwMessage = (event: MessageEvent) => {
+    if (event.data && event.data.action === 'TRIGGER_CLOUD_SYNC' && navigator.onLine) {
+      flushOfflineQueue().catch(() => {});
+    }
   };
 
   window.addEventListener('online', handleOnline);
   window.addEventListener('offline', handleOffline);
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', handleSwMessage);
+  }
 
-  // Vérification périodique toutes les 25 secondes si des données locales restent à envoyer
+  // Vérification automatique toutes les 10 secondes (idéal pour les connexions intermittentes du Sahel)
   const retryInterval = setInterval(() => {
     if (navigator.onLine && hasPendingOfflineData()) {
       flushOfflineQueue().catch(() => {});
     }
-  }, 25000);
+  }, 10000);
 
   return () => {
     isCancelled = true;
     activeCallbacks = null;
     window.removeEventListener('online', handleOnline);
     window.removeEventListener('offline', handleOffline);
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+    }
     clearInterval(retryInterval);
     if (unsubSnapshot) {
       unsubSnapshot();
@@ -268,8 +410,7 @@ export function initCloudSync(callbacks: {
 }
 
 /**
- * Vide la file d'attente hors-ligne et pousse tout vers Firestore.
- * Récupère également les dernières données distantes.
+ * Vide la file d'attente hors-ligne et pousse tout vers Firestore en fusionnant intelligemment.
  */
 export async function flushOfflineQueue(): Promise<void> {
   let queue = getOfflineQueue();
@@ -285,37 +426,42 @@ export async function flushOfflineQueue(): Promise<void> {
     }
   }
   if (!queue || Object.keys(queue).length === 0) {
-    // Si pas de données à envoyer, on tire simplement les données fraîches
-    try {
-      const remote = await pullFromCloud();
-      if (remote && activeCallbacks) {
-        activeCallbacks.onRemoteData(remote);
-      }
-    } catch (e) {}
     return;
   }
-
-  const deviceId = getDeviceId();
-  const dataToSave = {
-    ...queue,
-    lastDeviceId: deviceId,
-    updatedAt: new Date().toISOString(),
-  };
 
   try {
     const { auth, db } = getCloudServices();
     await ensureCloudAuth(auth);
     const storeDocRef = doc(db, 'stores', STORE_DOC_ID);
-    await setDoc(storeDocRef, dataToSave, { merge: true });
+
+    // Lire l'état distant actuel (avec timeout court) pour fusionner sans écraser les autres appareils
+    let mergedPayload: Partial<CloudStoreData> = { ...queue };
+    try {
+      const remoteSnap = await withTimeout(getDoc(storeDocRef), 6000, 'getDoc timeout');
+      if (remoteSnap.exists()) {
+        const remoteData = remoteSnap.data() as CloudStoreData;
+        mergedPayload = mergeOfflineQueueOverRemote(remoteData);
+      }
+    } catch (e) {
+      // Si la lecture préalable expire mais que l'écriture peut passer, on envoie directement queue
+    }
+
+    const deviceId = getDeviceId();
+    const dataToSave = {
+      ...mergedPayload,
+      lastDeviceId: deviceId,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await withTimeout(setDoc(storeDocRef, dataToSave, { merge: true }), 8000, 'setDoc timeout');
     clearOfflineQueue();
 
-    // Pull remote update to merge
-    const remote = await pullFromCloud();
-    if (remote && activeCallbacks) {
-      activeCallbacks.onRemoteData(remote);
+    if (activeCallbacks) {
+      activeCallbacks.onStatusChange('connected', 'Connecté au Cloud (Synchronisé)');
+      activeCallbacks.onRemoteData(dataToSave);
     }
   } catch (err) {
-    console.warn('flushOfflineQueue failed, will retry upon next connection:', err);
+    console.warn('flushOfflineQueue reporté (réseau Sahel trop faible, données conservées en local):', err);
     throw err;
   }
 }
@@ -326,14 +472,14 @@ let pushTimer: any = null;
 
 /**
  * Envoie les données modifiées au Cloud Firestore.
- * Si l'appareil est hors-ligne, les données sont immédiatement stockées
- * dans la file locale persistante et seront envoyées automatiquement dès la reconnexion.
+ * Si l'appareil est hors-ligne ou sur un réseau Sahel très faible, les données sont immédiatement
+ * stockées dans la file locale persistante et seront envoyées automatiquement dès que le réseau répond.
  */
 export async function pushToCloud(partialData: Partial<CloudStoreData>): Promise<void> {
   const deviceId = getDeviceId();
   const timestamp = new Date().toISOString();
 
-  // 1. Toujours enregistrer immédiatement dans la file locale hors-ligne
+  // 1. Toujours enregistrer IMMÉDIATEMENT (0 ms) dans la file locale hors-ligne (localStorage + IndexedDB Dexie)
   saveOfflineQueue({
     ...partialData,
     lastDeviceId: deviceId,
@@ -347,12 +493,23 @@ export async function pushToCloud(partialData: Partial<CloudStoreData>): Promise
     updatedAt: timestamp,
   };
 
-  // 2. Si hors-ligne, informer l'utilisateur sans erreur bloquante
+  // Demander au Service Worker une synchronisation en arrière-plan dès que possible
+  if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
+    navigator.serviceWorker.ready
+      .then((reg: any) => {
+        if (reg && reg.sync && typeof reg.sync.register === 'function') {
+          reg.sync.register('visiontech-sync').catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }
+
+  // 2. Si hors-ligne, informer l'utilisateur sans aucune erreur ni attente
   if (!navigator.onLine) {
     if (activeCallbacks) {
       activeCallbacks.onStatusChange(
         'offline',
-        'Mode Hors-Ligne : Données enregistrées localement (synchronisation auto au retour du réseau)'
+        'Mode Hors-Ligne : Saisie enregistrée sur l’appareil (envoi auto dès le retour du réseau)'
       );
     }
     return;
@@ -368,18 +525,18 @@ export async function pushToCloud(partialData: Partial<CloudStoreData>): Promise
         const { auth, db } = getCloudServices();
         await ensureCloudAuth(auth);
         const storeDocRef = doc(db, 'stores', STORE_DOC_ID);
-        await setDoc(storeDocRef, dataToSave, { merge: true });
+        await withTimeout(setDoc(storeDocRef, dataToSave, { merge: true }), 8000, 'Push timeout');
         clearOfflineQueue();
         if (activeCallbacks) {
           activeCallbacks.onStatusChange('connected', 'Connecté au Cloud (En direct)');
         }
         resolve();
       } catch (err) {
-        console.warn('Cloud sync push warning (stored in offline queue for next connection):', err);
+        console.warn('Cloud sync push warning (conservé dans la file hors-ligne pour le prochain réseau):', err);
         if (activeCallbacks) {
           activeCallbacks.onStatusChange(
             'offline',
-            'Enregistré hors-ligne (en attente de réseau)'
+            'Saisie enregistrée hors-ligne (en attente de réseau stable)'
           );
         }
         resolve();
@@ -411,7 +568,7 @@ export async function forcePushToCloud(partialData: Partial<CloudStoreData>): Pr
     if (activeCallbacks) {
       activeCallbacks.onStatusChange(
         'offline',
-        'Mode Hors-Ligne : Données enregistrées localement (synchronisation auto au retour du réseau)'
+        'Mode Hors-Ligne : Données enregistrées sur l’appareil (synchronisation auto au retour du réseau)'
       );
     }
     return;
@@ -421,7 +578,7 @@ export async function forcePushToCloud(partialData: Partial<CloudStoreData>): Pr
     const { auth, db } = getCloudServices();
     await ensureCloudAuth(auth);
     const storeDocRef = doc(db, 'stores', STORE_DOC_ID);
-    await setDoc(storeDocRef, dataToSave, { merge: true });
+    await withTimeout(setDoc(storeDocRef, dataToSave, { merge: true }), 8000, 'ForcePush timeout');
     clearOfflineQueue();
     if (activeCallbacks) {
       activeCallbacks.onStatusChange('connected', 'Connecté au Cloud (En direct)');
@@ -429,7 +586,7 @@ export async function forcePushToCloud(partialData: Partial<CloudStoreData>): Pr
   } catch (err) {
     console.warn('forcePushToCloud offline warning:', err);
     if (activeCallbacks) {
-      activeCallbacks.onStatusChange('offline', 'Données sécurisées localement');
+      activeCallbacks.onStatusChange('offline', 'Données sécurisées localement (en attente de réseau)');
     }
   }
 }
@@ -445,7 +602,7 @@ export async function pullFromCloud(): Promise<CloudStoreData | null> {
     const { auth, db } = getCloudServices();
     await ensureCloudAuth(auth);
     const storeDocRef = doc(db, 'stores', STORE_DOC_ID);
-    const snap = await getDoc(storeDocRef);
+    const snap = await withTimeout(getDoc(storeDocRef), 8000, 'pullFromCloud timeout');
     if (snap.exists()) {
       const data = snap.data() as CloudStoreData;
       if (data.products && data.products.length > 0) {

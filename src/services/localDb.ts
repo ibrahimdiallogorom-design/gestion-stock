@@ -248,49 +248,37 @@ export async function syncStateToDexie(data: {
         db.kvStore,
       ],
       async () => {
-        if (data.products) {
+        if (data.products && data.products.length > 0) {
           await db.products.clear();
           await db.produits.clear();
-          if (data.products.length > 0) {
-            await db.products.bulkPut(data.products);
-            const mappedProduits: ProduitOfflineRow[] = data.products.map((p) => ({
-              ...p,
-              nom: p.name,
-              categorie: p.category,
-              prix: p.salePrice,
-            }));
-            await db.produits.bulkPut(mappedProduits);
-          }
+          await db.products.bulkPut(data.products);
+          const mappedProduits: ProduitOfflineRow[] = data.products.map((p) => ({
+            ...p,
+            nom: p.name,
+            categorie: p.category,
+            prix: p.salePrice,
+          }));
+          await db.produits.bulkPut(mappedProduits);
         }
-        if (data.movements) {
+        if (data.movements && data.movements.length > 0) {
           await db.movements.clear();
-          if (data.movements.length > 0) {
-            await db.movements.bulkPut(data.movements);
-          }
+          await db.movements.bulkPut(data.movements);
         }
-        if (data.expenses) {
+        if (data.expenses && data.expenses.length > 0) {
           await db.expenses.clear();
-          if (data.expenses.length > 0) {
-            await db.expenses.bulkPut(data.expenses);
-          }
+          await db.expenses.bulkPut(data.expenses);
         }
-        if (data.purchases) {
+        if (data.purchases && data.purchases.length > 0) {
           await db.purchases.clear();
-          if (data.purchases.length > 0) {
-            await db.purchases.bulkPut(data.purchases);
-          }
+          await db.purchases.bulkPut(data.purchases);
         }
-        if (data.surveys) {
+        if (data.surveys && data.surveys.length > 0) {
           await db.surveys.clear();
-          if (data.surveys.length > 0) {
-            await db.surveys.bulkPut(data.surveys);
-          }
+          await db.surveys.bulkPut(data.surveys);
         }
-        if (data.appUsers) {
+        if (data.appUsers && data.appUsers.length > 0) {
           await db.appUsers.clear();
-          if (data.appUsers.length > 0) {
-            await db.appUsers.bulkPut(data.appUsers);
-          }
+          await db.appUsers.bulkPut(data.appUsers);
         }
         if (data.activeUser !== undefined) {
           await db.kvStore.put({

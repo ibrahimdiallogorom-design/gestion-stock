@@ -18,7 +18,7 @@
     <link rel="apple-touch-icon" href="./icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     
     <script>
       // 1. Détection ouverture locale file:// (double-clic direct sur PC)
@@ -44,33 +44,25 @@
         });
       }
     </script>
-    <script type="module" crossorigin src="./assets/index-BcsRXssf.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-72cRzbE0.css">
+    <script type="module" crossorigin src="./assets/index-BwMVYM8p.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-uJL0Cj8H.css">
   </head>
   <body class="bg-slate-50 text-slate-900 antialiased font-sans">
     <div id="root"></div>
     <script>
-      // Enregistrement du Service Worker pour fonctionnement 100% Hors-Ligne + Mise à jour instantanée
+      // Enregistrement du Service Worker pour fonctionnement 100% Hors-Ligne (Spécial Sahel)
       if ('serviceWorker' in navigator) {
-        let refreshing = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if (!refreshing) {
-            refreshing = true;
-            window.location.reload();
-          }
-        });
-
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((registration) => {
+          navigator.serviceWorker.register('./sw.js').then((registration) => {
             if (navigator.onLine) {
               registration.update().catch(() => {});
             }
           }).catch((err) => {
-            console.warn('Service worker registration failed:', err);
+            console.warn('Service worker registration warning:', err);
           });
 
           navigator.serviceWorker.addEventListener('message', (event) => {
-            if (event.data && event.data.action === 'RELOAD_NOW') {
+            if (event.data && event.data.action === 'RELOAD_NOW' && navigator.onLine) {
               window.location.reload();
             }
           });
