@@ -15,6 +15,7 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { AppUser, Product, StockMovement, Expense, PurchaseBatch, VisitorSurvey } from '../types';
+import { addCommandeOffline, getPendingCommandesOffline, clearCommandesOffline } from './localDb';
 
 export interface CloudStoreData {
   appUsers?: AppUser[];
@@ -97,12 +98,15 @@ export function saveOfflineQueue(data: Partial<CloudStoreData>) {
     const merged = { ...current, ...data };
     localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(merged));
   } catch (e) {}
+  // Enregistre également dans la table Dexie VisionTechOfflineDB.commandesOffline
+  addCommandeOffline(data);
 }
 
 export function clearOfflineQueue() {
   try {
     localStorage.removeItem(OFFLINE_QUEUE_KEY);
   } catch (e) {}
+  clearCommandesOffline();
 }
 
 export function hasPendingOfflineData(): boolean {
@@ -263,7 +267,18 @@ export function initCloudSync(callbacks: {
  * Récupère également les dernières données distantes.
  */
 export async function flushOfflineQueue(): Promise<void> {
-  const queue = getOfflineQueue();
+  let queue = getOfflineQueue();
+  if (!queue || Object.keys(queue).length === 0) {
+    const dexieRows = await getPendingCommandesOffline();
+    if (dexieRows.length > 0) {
+      queue = dexieRows.reduce<Partial<CloudStoreData>>((acc, row) => {
+        if (row.details && typeof row.details === 'object') {
+          return { ...acc, ...(row.details as Partial<CloudStoreData>) };
+        }
+        return acc;
+      }, {});
+    }
+  }
   if (!queue || Object.keys(queue).length === 0) {
     // Si pas de données à envoyer, on tire simplement les données fraîches
     try {
