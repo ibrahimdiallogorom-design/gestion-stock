@@ -80,26 +80,27 @@ export const TopBar: React.FC = () => {
   };
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 px-3 sm:px-6 flex items-center justify-between shrink-0 gap-2">
-      {/* Breadcrumbs Trail & Mobile Menu Button */}
-      <div className="flex items-center gap-2 min-w-0">
+    <header className="min-h-14 py-1.5 bg-white border-b border-slate-200 px-3 sm:px-5 flex items-center justify-between shrink-0 gap-3 z-20 overflow-x-auto no-scrollbar">
+      {/* Left Zone: Breadcrumbs & Status Pills */}
+      <div className="flex items-center gap-2 min-w-0 shrink-0">
         {/* Bouton MENU Indépendant pour Mobile (Accès Stock, Caisse, Comptabilité, Paramètres...) */}
         <button
           type="button"
           onClick={openMobileMenu}
-          className="md:hidden flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl font-bold text-xs shadow-md shadow-blue-500/20 transition-all shrink-0 cursor-pointer"
+          className="md:hidden flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl font-bold text-xs shadow-md shadow-blue-500/20 transition-all shrink-0 whitespace-nowrap cursor-pointer"
           title="Ouvrir le Menu (Stock, Caisse, Comptabilité, Rapports, Paramètres...)"
         >
-          <Menu className="w-4 h-4 text-white" />
+          <Menu className="w-4 h-4 text-white shrink-0" />
           <span className="tracking-tight uppercase">Menu</span>
         </button>
 
-        <span className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight truncate">
+        <span className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight truncate max-w-[160px] sm:max-w-[220px] xl:max-w-[280px] 2xl:max-w-none">
           {getBreadcrumbs()}
         </span>
+
         {sheetsSync.lastSyncedAt && activeTab !== 'design_system' && (
-          <span className="hidden lg:inline-flex text-xs text-slate-400 items-center gap-1.5 ml-3 pl-3 border-l border-slate-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          <span className="hidden 2xl:inline-flex text-xs text-slate-400 items-center gap-1.5 pl-2 border-l border-slate-200 shrink-0 whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
             <span className="font-mono tabular-nums">
               Synchro :{' '}
               {new Date(sheetsSync.lastSyncedAt).toLocaleTimeString('fr-FR', {
@@ -114,7 +115,7 @@ export const TopBar: React.FC = () => {
         <button
           type="button"
           onClick={forceSyncCloud}
-          className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all ${
+          className={`hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all shrink-0 whitespace-nowrap cursor-pointer ${
             cloudStatus === 'connected'
               ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
               : cloudStatus === 'connecting'
@@ -133,8 +134,8 @@ export const TopBar: React.FC = () => {
             }`}
           />
           <Cloud className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-          <span>
-            {cloudStatus === 'connected' ? 'Cloud Synchro En Direct' : cloudStatusMessage}
+          <span className="hidden xl:inline">
+            {cloudStatus === 'connected' ? 'Cloud Direct' : cloudStatusMessage}
           </span>
         </button>
 
@@ -156,197 +157,167 @@ export const TopBar: React.FC = () => {
             }
             window.location.reload();
           }}
-          className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-950 transition-colors shadow-2xs"
+          className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-950 transition-colors shadow-2xs shrink-0 whitespace-nowrap cursor-pointer"
           title="Forcer le rechargement de la dernière version du code (vider le cache PWA et rafraîchir)"
         >
-          <RefreshCw className="w-3 h-3 text-slate-600" />
-          <span>Actualiser l'App</span>
+          <RefreshCw className="w-3 h-3 text-slate-600 shrink-0" />
+          <span>Actualiser</span>
         </button>
       </div>
 
-      {/* Action Zone */}
-      <div className="flex items-center gap-2 sm:gap-3">
-        {/* Prominent VISEUR Button (Synchronisation Cloud, Entrées, Sorties) - Desktop only since it is now in the mobile bottom bar */}
+      {/* Right Action Zone: Non-wrapping, properly spaced pills */}
+      <div className="flex items-center gap-1.5 xl:gap-2 shrink-0">
+        {/* Prominent VISEUR Button (Synchronisation Cloud, Entrées, Sorties) */}
         <button
           type="button"
           onClick={openViser}
-          className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-xl font-black text-xs shadow-md shadow-emerald-600/30 active:scale-95 transition-all shrink-0 cursor-pointer"
+          className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-xl font-black text-xs shadow-sm shadow-emerald-600/25 active:scale-95 transition-all shrink-0 whitespace-nowrap cursor-pointer"
           title="Viseur : Synchronisation Cloud, Entrées et Sorties de Stock"
         >
-          <Target className="w-4 h-4 text-white" />
+          <Target className="w-3.5 h-3.5 text-white shrink-0" />
           <span className="tracking-tight uppercase">Viseur</span>
         </button>
 
-        {/* Direct Link to Caisse / POS (Desktop only) */}
+        {/* Direct Link to Caisse / POS */}
         <button
           onClick={() => setActiveTab('caisse')}
-          className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border ${
+          className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-all border shrink-0 whitespace-nowrap cursor-pointer ${
             activeTab === 'caisse'
               ? 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-2xs'
               : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
           }`}
           title="Accéder au terminal de caisse enregistreuse"
         >
-          <ShoppingCart className="w-3.5 h-3.5 text-emerald-600" />
+          <ShoppingCart className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
           <span>Caisse</span>
           {isCashierUnlocked ? (
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Caisse ouverte" />
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" title="Caisse ouverte" />
           ) : (
-            <span title="Protégée par code PIN" className="inline-flex items-center">
+            <span title="Protégée par code PIN" className="inline-flex items-center shrink-0">
               <Lock className="w-3 h-3 text-slate-400" />
             </span>
           )}
         </button>
 
-        {/* Direct Link to Reports (Desktop only) */}
+        {/* Direct Link to Reports */}
         <button
           onClick={() => setActiveTab('reports')}
-          className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border ${
+          className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-all border shrink-0 whitespace-nowrap cursor-pointer ${
             activeTab === 'reports'
               ? 'bg-blue-50 border-blue-300 text-blue-700 shadow-2xs'
               : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
           }`}
           title="Consulter les rapports de vente et Z de caisse"
         >
-          <Receipt className="w-3.5 h-3.5 text-blue-600" />
+          <Receipt className="w-3.5 h-3.5 text-blue-600 shrink-0" />
           <span>Rapports</span>
         </button>
 
-        {/* APPS Modal Button (Desktop only) */}
+        {/* APPS Modal Button */}
         <button
           onClick={openInstallModal}
-          className="hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xs"
+          className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold rounded-lg transition-all bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xs shrink-0 whitespace-nowrap cursor-pointer"
           title="Installer l'application sur votre téléphone ou partager l'accès"
         >
-          <Smartphone className="w-3.5 h-3.5 text-white" />
+          <Smartphone className="w-3.5 h-3.5 text-white shrink-0" />
           <span>APPS</span>
         </button>
 
-        {/* Direct Link to Design System & Theme Inspector (Admin only, Desktop only) */}
+        {/* Direct Link to Design System & Theme Inspector (Admin only) */}
         {!isCashier && (
           <button
             onClick={() => setActiveTab('design_system')}
-            className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border ${
+            className={`hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-all border shrink-0 whitespace-nowrap cursor-pointer ${
               activeTab === 'design_system'
                 ? 'bg-indigo-50 border-indigo-300 text-indigo-700 shadow-2xs'
                 : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
             }`}
             title="Consulter les choix graphiques, tokens et univers"
           >
-            <Palette className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Explorer le Design</span>
+            <Palette className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+            <span>Design</span>
             <span
-              className="w-2 h-2 rounded-full ml-0.5"
+              className="w-2 h-2 rounded-full shrink-0"
               style={{ backgroundColor: currentTheme.accentColor }}
             />
           </button>
         )}
 
-        {/* Google Sheets Quick Sync Button (Admin only, Desktop only) */}
+        {/* Google Sheets Quick Sync Button (Admin only) */}
         {!isCashier && hasGoogleToken && sheetsSync.spreadsheetId && (
           <button
             onClick={syncToSheetsAction}
             disabled={sheetsSync.status === 'syncing'}
-            className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors border border-slate-200"
+            className="hidden 2xl:inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors border border-slate-200 shrink-0 whitespace-nowrap cursor-pointer"
             title="Synchroniser immédiatement avec Google Sheets"
           >
             <RefreshCw
-              className={`w-3.5 h-3.5 text-slate-600 ${
+              className={`w-3.5 h-3.5 text-slate-600 shrink-0 ${
                 sheetsSync.status === 'syncing' ? 'animate-spin text-blue-600' : ''
               }`}
             />
             <span>
-              {sheetsSync.status === 'syncing' ? 'Synchro en cours...' : 'Synchroniser Sheets'}
+              {sheetsSync.status === 'syncing' ? 'Synchro...' : 'Sheets'}
             </span>
           </button>
         )}
 
-        {/* Quick Movements (Admin only, Desktop only) */}
+        {/* Quick Movements (Admin only) */}
         {!isCashier && (
-          <div className="hidden md:flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+          <div className="hidden md:flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 shrink-0">
             <button
               onClick={() => openDirectSaleModal()}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md shadow-xs transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md shadow-xs transition-colors shrink-0 whitespace-nowrap cursor-pointer"
               title="Vendre directement depuis le Grand Magasin (sans passer par la caisse)"
             >
-              <ShoppingCart className="w-3.5 h-3.5 text-white" />
+              <ShoppingCart className="w-3.5 h-3.5 text-white shrink-0" />
               <span>Vendre</span>
             </button>
             <button
               onClick={() => openMovementModal(undefined, 'IN')}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-emerald-800 bg-white hover:bg-emerald-50 rounded-md shadow-xs transition-colors"
+              className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-emerald-800 bg-white hover:bg-emerald-50 rounded-md shadow-xs transition-colors shrink-0 whitespace-nowrap cursor-pointer"
               title="Enregistrer une entrée en stock (réception fournisseur)"
             >
-              <ArrowDownRight className="w-3.5 h-3.5 text-emerald-600" />
+              <ArrowDownRight className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
               <span>Entrée</span>
             </button>
             <button
               onClick={() => openMovementModal(undefined, 'OUT')}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-rose-800 bg-white hover:bg-rose-50 rounded-md shadow-xs transition-colors"
+              className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-rose-800 bg-white hover:bg-rose-50 rounded-md shadow-xs transition-colors shrink-0 whitespace-nowrap cursor-pointer"
               title="Enregistrer une sortie de stock (vente ou prélèvement)"
             >
-              <ArrowUpRight className="w-3.5 h-3.5 text-rose-600" />
+              <ArrowUpRight className="w-3.5 h-3.5 text-rose-600 shrink-0" />
               <span>Sortie</span>
             </button>
           </div>
         )}
 
-        {/* Add Product CTA (Admin only, Desktop only) */}
+        {/* Add Product CTA (Admin only) */}
         {!isCashier && (
           <button
             onClick={() => openProductModal()}
-            className="hidden md:flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs shadow-blue-600/20 transition-colors whitespace-nowrap"
+            className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs shadow-blue-600/20 transition-colors shrink-0 whitespace-nowrap cursor-pointer"
+            title="Ajouter un nouvel article au catalogue"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Nouvel Article</span>
+            <Plus className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden lg:inline">Nouvel Article</span>
           </button>
         )}
 
-        {/* Direct Settings Shortcut (Admin only, Desktop only) */}
+        {/* Direct Settings Shortcut (Admin only) */}
         {!isCashier && (
           <button
             onClick={() => setActiveTab('settings')}
-            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+            className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all shrink-0 whitespace-nowrap cursor-pointer ${
               activeTab === 'settings'
                 ? 'bg-blue-50 border-blue-300 text-blue-700 shadow-2xs'
                 : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
             }`}
             title="Ouvrir les Paramètres de la boutique"
           >
-            <Settings className="w-3.5 h-3.5 text-slate-600" />
-            <span>Paramètres</span>
+            <Settings className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+            <span className="hidden 2xl:inline">Paramètres</span>
           </button>
-        )}
-
-        {/* Active Application User Profile & Switch Account / Logout (Desktop only) */}
-        {activeAppUser && (
-          <div className="hidden md:flex items-center gap-2 pl-2 border-l border-slate-200">
-            <div className="flex flex-col text-right">
-              <span className="text-xs font-bold text-slate-900 leading-tight">
-                {activeAppUser.fullName || activeAppUser.username}
-              </span>
-              <span className="text-[10px] text-slate-500 font-mono">
-                {activeAppUser.storeName || (activeAppUser.role === 'ADMIN' ? 'Gérant' : 'Caisse')}
-              </span>
-            </div>
-
-            <button
-              onClick={openSwitchAccountModal}
-              title="Changer de compte ou de boutique"
-              className="px-2 py-1.5 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors flex items-center gap-1.5 text-xs font-semibold shadow-2xs"
-            >
-              <Users className="w-3.5 h-3.5 text-blue-600" />
-              <span className="text-[11px]">Changer de compte</span>
-            </button>
-
-            <button
-              onClick={logoutAppUser}
-              title="Verrouiller la session / Se déconnecter"
-              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg border border-slate-200 transition-colors shrink-0"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-            </button>
-          </div>
         )}
       </div>
     </header>

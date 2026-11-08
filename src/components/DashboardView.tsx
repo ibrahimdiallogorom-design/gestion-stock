@@ -346,33 +346,33 @@ export const DashboardView: React.FC = () => {
   }
 
   return (
-    <div className="p-8 space-y-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
       {/* Welcome Banner / Overview Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
             Tableau de Bord Logistique & Boutique
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
             Supervision des niveaux de stock, alertes de réapprovisionnement et valorisation financière.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 shrink-0">
           <button
             onClick={() => {
               setStockFilter('low');
               setActiveTab('inventory');
             }}
-            className="flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors"
+            className="flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors shrink-0 whitespace-nowrap cursor-pointer"
           >
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
             <span>{lowStockCount} Articles à surveiller</span>
           </button>
           <button
             onClick={() => openProductModal()}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs shadow-blue-600/20 transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs shadow-blue-600/20 transition-colors shrink-0 whitespace-nowrap cursor-pointer"
           >
-            <PlusCircle className="w-4 h-4" />
+            <PlusCircle className="w-4 h-4 shrink-0" />
             <span>Ajouter une référence</span>
           </button>
         </div>
@@ -397,7 +397,7 @@ export const DashboardView: React.FC = () => {
           <div className="flex items-center gap-2 shrink-0 w-full md:w-auto">
             <button
               onClick={() => repairInflatedPrices()}
-              className="flex-1 md:flex-initial px-3.5 py-2 text-xs font-semibold bg-white text-slate-800 border border-slate-300 hover:bg-slate-50 rounded-lg shadow-2xs transition-colors"
+              className="flex-1 md:flex-initial px-3.5 py-2 text-xs font-semibold bg-white text-slate-800 border border-slate-300 hover:bg-slate-50 rounded-lg shadow-2xs transition-colors whitespace-nowrap cursor-pointer"
             >
               Corriger les prix (÷ 650)
             </button>
@@ -411,7 +411,7 @@ export const DashboardView: React.FC = () => {
                   'Vider le stock (0 F)'
                 );
               }}
-              className="flex-1 md:flex-initial px-3.5 py-2 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-2xs transition-colors"
+              className="flex-1 md:flex-initial px-3.5 py-2 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-2xs transition-colors whitespace-nowrap cursor-pointer"
             >
               Vider le stock (0 F)
             </button>
@@ -422,28 +422,28 @@ export const DashboardView: React.FC = () => {
       {/* 4 Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Valorisation Financière du Stock */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 flex flex-col justify-between">
+        <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-              <span>Valeur Marchande (Prix Vente)</span>
-              <TrendingUp className="w-4 h-4 text-blue-600" />
+            <div className="flex items-center justify-between gap-2 text-slate-500 text-xs font-medium">
+              <span className="truncate">Valeur Marchande (Prix Vente)</span>
+              <TrendingUp className="w-4 h-4 text-blue-600 shrink-0" />
             </div>
             <div className="mt-2.5">
-              <span className="text-2xl font-bold text-slate-900 font-mono tabular-nums">
+              <span className="text-xl xl:text-2xl font-bold text-slate-900 font-mono tabular-nums whitespace-nowrap">
                 {Math.round(totalSaleValue).toLocaleString('fr-FR')} FCFA
               </span>
             </div>
           </div>
           <div className="mt-3 text-xs text-slate-500 space-y-1 pt-2 border-t border-slate-100 font-mono">
-            <div className="flex items-center justify-between">
-              <span className="font-sans text-[11px] text-slate-500">Coût d'Achat Réel :</span>
-              <span className="font-semibold text-slate-700">
-                {Math.round(totalCostValue).toLocaleString('fr-FR')} FCFA
+            <div className="flex items-center justify-between gap-1">
+              <span className="font-sans text-[11px] text-slate-500 truncate">Coût d'Achat :</span>
+              <span className="font-semibold text-slate-700 whitespace-nowrap">
+                {Math.round(totalCostValue).toLocaleString('fr-FR')} F
               </span>
             </div>
-            <div className="flex items-center justify-between text-emerald-700 font-semibold">
-              <span className="font-sans text-[11px]">Bénéfice estimé :</span>
-              <span>
+            <div className="flex items-center justify-between gap-1 text-emerald-700 font-semibold">
+              <span className="font-sans text-[11px] truncate">Bénéfice estimé :</span>
+              <span className="whitespace-nowrap">
                 +{Math.round(totalProfitExpected).toLocaleString('fr-FR')} F ({marginPercentage.toFixed(0)}%)
               </span>
             </div>
@@ -451,20 +451,22 @@ export const DashboardView: React.FC = () => {
         </div>
 
         {/* Card 2: Total Units & SKUs */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Catalogue & Pièces</span>
-            <Boxes className="w-4 h-4 text-indigo-600" />
+        <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between gap-2 text-slate-500 text-xs font-medium">
+              <span className="truncate">Catalogue & Pièces</span>
+              <Boxes className="w-4 h-4 text-indigo-600 shrink-0" />
+            </div>
+            <div className="mt-2.5 flex items-baseline gap-2">
+              <span className="text-xl xl:text-2xl font-bold text-slate-900 font-mono tabular-nums whitespace-nowrap">
+                {totalUnits}
+              </span>
+              <span className="text-xs text-slate-500 truncate">unités en stock</span>
+            </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900 font-mono tabular-nums">
-              {totalUnits}
-            </span>
-            <span className="text-xs text-slate-500">unités en stock</span>
-          </div>
-          <div className="mt-2 text-xs text-slate-500 flex items-center justify-between pt-2 border-t border-slate-100">
+          <div className="mt-3 text-xs text-slate-500 flex items-center justify-between pt-2 border-t border-slate-100">
             <span>Références actives :</span>
-            <span className="font-mono tabular-nums font-semibold text-slate-700">
+            <span className="font-mono tabular-nums font-semibold text-slate-700 whitespace-nowrap">
               {products.length} articles
             </span>
           </div>
@@ -476,49 +478,53 @@ export const DashboardView: React.FC = () => {
             setStockFilter(outOfStockProducts.length > 0 ? 'out_of_stock' : 'low');
             setActiveTab('inventory');
           }}
-          className="bg-white p-5 rounded-xl border border-slate-200 hover:border-amber-300 transition-colors cursor-pointer group"
+          className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 hover:border-amber-300 transition-colors cursor-pointer group flex flex-col justify-between"
         >
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Alertes Seuil & Ruptures</span>
-            <PackageX className="w-4 h-4 text-rose-600" />
+          <div>
+            <div className="flex items-center justify-between gap-2 text-slate-500 text-xs font-medium">
+              <span className="truncate">Alertes Seuil & Ruptures</span>
+              <PackageX className="w-4 h-4 text-rose-600 shrink-0" />
+            </div>
+            <div className="mt-2.5 flex items-baseline gap-2">
+              <span
+                className={`text-xl xl:text-2xl font-bold font-mono tabular-nums whitespace-nowrap ${
+                  lowStockCount > 0 ? 'text-rose-600' : 'text-emerald-600'
+                }`}
+              >
+                {lowStockCount}
+              </span>
+              <span className="text-xs text-slate-500 truncate">articles sous seuil</span>
+            </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span
-              className={`text-2xl font-bold font-mono tabular-nums ${
-                lowStockCount > 0 ? 'text-rose-600' : 'text-emerald-600'
-              }`}
-            >
-              {lowStockCount}
-            </span>
-            <span className="text-xs text-slate-500">articles sous seuil</span>
-          </div>
-          <div className="mt-2 text-xs text-slate-500 flex items-center justify-between pt-2 border-t border-slate-100">
-            <span>Dont {outOfStockProducts.length} rupture(s)</span>
-            <span className="text-blue-600 font-medium group-hover:underline flex items-center gap-0.5">
+          <div className="mt-3 text-xs text-slate-500 flex items-center justify-between pt-2 border-t border-slate-100">
+            <span className="truncate">Dont {outOfStockProducts.length} rupture(s)</span>
+            <span className="text-blue-600 font-medium group-hover:underline flex items-center gap-0.5 shrink-0">
               Voir <ChevronRight className="w-3 h-3" />
             </span>
           </div>
         </div>
 
         {/* Card 4: Monthly Flow Volume */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Flux d'Entrées / Sorties</span>
-            <ShoppingBag className="w-4 h-4 text-emerald-600" />
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <div className="flex items-center gap-1.5 text-emerald-700">
-              <ArrowDownRight className="w-4 h-4" />
-              <span className="text-lg font-bold font-mono tabular-nums">+{totalIn}</span>
+        <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between gap-2 text-slate-500 text-xs font-medium">
+              <span className="truncate">Flux d'Entrées / Sorties</span>
+              <ShoppingBag className="w-4 h-4 text-emerald-600 shrink-0" />
             </div>
-            <div className="flex items-center gap-1.5 text-rose-700">
-              <ArrowUpRight className="w-4 h-4" />
-              <span className="text-lg font-bold font-mono tabular-nums">-{totalOut}</span>
+            <div className="mt-2.5 flex items-baseline justify-between gap-2">
+              <div className="flex items-center gap-1 text-emerald-700 whitespace-nowrap">
+                <ArrowDownRight className="w-4 h-4 shrink-0" />
+                <span className="text-lg xl:text-xl font-bold font-mono tabular-nums">+{totalIn}</span>
+              </div>
+              <div className="flex items-center gap-1 text-rose-700 whitespace-nowrap">
+                <ArrowUpRight className="w-4 h-4 shrink-0" />
+                <span className="text-lg xl:text-xl font-bold font-mono tabular-nums">-{totalOut}</span>
+              </div>
             </div>
           </div>
-          <div className="mt-2 text-xs text-slate-500 flex items-center justify-between pt-2 border-t border-slate-100">
+          <div className="mt-3 text-xs text-slate-500 flex items-center justify-between pt-2 border-t border-slate-100">
             <span>Opérations tracées :</span>
-            <span className="font-mono tabular-nums font-semibold text-slate-700">
+            <span className="font-mono tabular-nums font-semibold text-slate-700 whitespace-nowrap">
               {movements.length} mouvements
             </span>
           </div>
