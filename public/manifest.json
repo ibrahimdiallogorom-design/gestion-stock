@@ -15,10 +15,45 @@
   "categories": ["business", "finance", "productivity", "shopping"],
   "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
   "prefer_related_applications": false,
+  "related_applications": [],
   "launch_handler": {
-    "client_mode": ["navigate-existing", "auto"]
+    "client_mode": "navigate-existing"
   },
   "handle_links": "preferred",
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "share_target": {
+    "action": "./",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+visiontech",
+      "url": "/gestion-stock/?q=%s"
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "./",
+      "accept": {
+        "text/csv": [".csv"]
+      }
+    }
+  ],
+  "scope_extensions": [
+    {
+      "origin": "https://ibrahimdiallogorom-design.github.io"
+    }
+  ],
+  "note_taking": {
+    "new_note_url": "./?view=surveys"
+  },
   "icons": [
     {
       "src": "./icon-192.png",
@@ -51,14 +86,16 @@
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Tableau de bord VisionTech Gestion de Stock"
+      "label": "Tableau de bord VisionTech Gestion de Stock",
+      "description": "Tableau de bord VisionTech Gestion de Stock"
     },
     {
       "src": "./screenshot-narrow.png",
       "sizes": "720x1280",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Caisse mobile et inventaire VisionTech"
+      "label": "Caisse mobile et inventaire VisionTech",
+      "description": "Caisse mobile et inventaire VisionTech"
     }
   ],
   "shortcuts": [

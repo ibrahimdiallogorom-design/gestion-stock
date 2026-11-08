@@ -153,6 +153,43 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+// 5. Synchronisation en arrière-plan (Background Sync & Periodic Sync pour PWABuilder)
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'visiontech-sync' || event.tag === 'sync-stock') {
+    event.waitUntil(Promise.resolve());
+  }
+});
+
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag === 'visiontech-periodic-sync') {
+    event.waitUntil(Promise.resolve());
+  }
+});
+
+// 6. Notifications Push (Web Push & Notification Click)
+self.addEventListener('push', (event) => {
+  const data = event.data ? event.data.json() : { title: 'VisionTech StockFlow', body: 'Mise à jour du stock disponible.' };
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'VisionTech StockFlow', {
+      body: data.body || 'Notification Boutique VisionTech',
+      icon: './icon-192.png',
+      badge: './icon-192.png',
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      if (clientList.length > 0) {
+        return clientList[0].focus();
+      }
+      return self.clients.openWindow('./');
+    })
+  );
+});
 `;
 
 // Fix dist/index.html so manifest.json points to ./manifest.json (not ./assets/manifest-*.json)
