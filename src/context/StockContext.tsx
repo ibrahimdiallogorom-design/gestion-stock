@@ -963,27 +963,37 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           setProducts([]);
         }
 
-        // 3. Stock Movements Reconciliation
-        const RECONCILIATION_CUTOFF = new Date('2026-11-08T19:50:00.000Z').getTime();
+        // 3. Stock Movements Reconciliation & Self-Healing Deduplication
+        const RECONCILIATION_CUTOFF = new Date('2026-11-08T21:35:00.000Z').getTime();
+        const isLegacyDuplicateMovement = (m: StockMovement): boolean => {
+          if (!m || !m.id) return true;
+          if (m.id.startsWith('mov-100')) return true;
+          if (m.reason === 'Réassort rapide comptoir (+1)' || m.reason === 'Retrait rapide comptoir (-1)') return true;
+          if (m.createdAt && m.createdAt.startsWith('2026-10-13')) return true;
+          if (m.type === 'RETURN' && Number(m.quantityDelta) < 0) return true;
+          const mTime = new Date(m.createdAt || 0).getTime();
+          if (mTime < RECONCILIATION_CUTOFF) {
+            // Before cutoff, only consolidated mov-init-*, mov-dot-*, real OUT sales, and positive client RETURN are valid
+            if (m.type === 'IN' && !m.id.startsWith('mov-init-')) return true;
+            if (m.type === 'TRANSFER' && !m.id.startsWith('mov-dot-')) return true;
+          }
+          return false;
+        };
+
         const localMovsJson = localStorage.getItem(STORAGE_KEYS.MOVEMENTS);
         let localMovs: StockMovement[] = [];
         try {
           if (localMovsJson) {
             const parsedMovs: StockMovement[] = JSON.parse(localMovsJson);
             if (Array.isArray(parsedMovs)) {
-              localMovs = parsedMovs.filter(
-                (m) =>
-                  !m.id.startsWith('mov-100') &&
-                  m.reason !== 'Réassort rapide comptoir (+1)' &&
-                  m.reason !== 'Retrait rapide comptoir (-1)' &&
-                  !(m.createdAt && m.createdAt.startsWith('2026-10-13')) &&
-                  !(m.type === 'RETURN' && Number(m.quantityDelta) < 0)
-              );
+              localMovs = parsedMovs.filter((m) => !isLegacyDuplicateMovement(m));
             }
           }
         } catch (e) {}
 
-        const remoteMovs = Array.isArray(remote.movements) ? remote.movements : [];
+        const rawRemoteMovs = Array.isArray(remote.movements) ? remote.movements : [];
+        const remoteMovs = rawRemoteMovs.filter((m) => !isLegacyDuplicateMovement(m));
+        const remoteHadDuplicates = remoteMovs.length !== rawRemoteMovs.length;
 
         if (remoteMovs.length > 0) {
           const movMap = new Map<string, StockMovement>();
@@ -1004,8 +1014,8 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           setMovements(mergedMovements);
           localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(mergedMovements));
 
-          if (localHadUnsyncedMovs) {
-            pushToCloud({ movements: mergedMovements });
+          if (localHadUnsyncedMovs || remoteHadDuplicates) {
+            forcePushToCloud({ movements: mergedMovements });
           }
         } else if (localMovs.length > 0) {
           forcePushToCloud({ movements: localMovs });

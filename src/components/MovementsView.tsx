@@ -14,11 +14,82 @@ import { useStock } from '../context/StockContext';
 import { MovementType } from '../types';
 
 export const MovementsView: React.FC = () => {
-  const { movements, openMovementModal, activeAppUser, clearAllMovements, openConfirmModal } = useStock();
+  const { products, movements, openMovementModal, activeAppUser, clearAllMovements, openConfirmModal } = useStock();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<MovementType | 'all'>('all');
 
   const isCashier = activeAppUser?.role === 'CASHIER';
+
+  // Calcul du Bilan global des Entrées, Sorties, Retours, Dotations et Stock Actuel
+  const bilan = useMemo(() => {
+    const productMap = new Map<string, (typeof products)[number]>(products.map((p) => [p.id, p]));
+
+    let inQty = 0;
+    let inCostValue = 0;
+    let returnQty = 0;
+    let outQty = 0;
+    let outSaleValue = 0;
+    let outCostValue = 0;
+    let transferQty = 0;
+    let adjustmentNet = 0;
+
+    movements.forEach((m) => {
+      const prod = productMap.get(m.productId);
+      const unitCost = Number(m.unitCostAtSale ?? prod?.costPrice ?? 0);
+      const unitSale = Number(prod?.salePrice ?? 0);
+      const absDelta = Math.abs(Number(m.quantityDelta) || 0);
+
+      if (m.type === 'IN') {
+        inQty += absDelta;
+        inCostValue += absDelta * unitCost;
+      } else if (m.type === 'RETURN' && Number(m.quantityDelta) > 0) {
+        returnQty += absDelta;
+        inCostValue += absDelta * unitCost;
+      } else if (m.type === 'OUT') {
+        outQty += absDelta;
+        const saleAmt = m.saleAmount !== undefined ? Number(m.saleAmount) : absDelta * unitSale;
+        const costAmt = absDelta * unitCost;
+        outSaleValue += saleAmt;
+        outCostValue += costAmt;
+      } else if (m.type === 'TRANSFER') {
+        transferQty += absDelta;
+      } else if (m.type === 'ADJUSTMENT') {
+        adjustmentNet += Number(m.quantityDelta) || 0;
+      }
+    });
+
+    const currentStockUnits = products.reduce((acc, p) => acc + (Number(p.quantity) || 0), 0);
+    const currentStockCost = products.reduce(
+      (acc, p) => acc + (Number(p.quantity) || 0) * (Number(p.costPrice) || 0),
+      0
+    );
+    const currentStockSale = products.reduce(
+      (acc, p) => acc + (Number(p.quantity) || 0) * (Number(p.salePrice) || 0),
+      0
+    );
+
+    const totalEntriesQty = inQty + returnQty;
+    const theoreticalStock = totalEntriesQty - outQty + adjustmentNet;
+    const discrepancy = currentStockUnits - theoreticalStock;
+
+    return {
+      inQty,
+      returnQty,
+      totalEntriesQty,
+      inCostValue,
+      outQty,
+      outSaleValue,
+      outCostValue,
+      outProfit: outSaleValue - outCostValue,
+      transferQty,
+      adjustmentNet,
+      currentStockUnits,
+      currentStockCost,
+      currentStockSale,
+      theoreticalStock,
+      discrepancy,
+    };
+  }, [products, movements]);
 
   const filteredMovements = useMemo(() => {
     return movements.filter((m) => {
@@ -91,20 +162,20 @@ export const MovementsView: React.FC = () => {
   };
 
   return (
-    <div className="p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Title & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            {isCashier ? 'Mes Opérations & Historique Ventes' : 'Grand Livre des Mouvements de Stock'}
+            {isCashier ? 'Mes Opérations & Historique Ventes' : 'Bilan des Entrées / Sorties & Grand Livre'}
           </h1>
           <p className="text-sm text-slate-500 mt-1">
             {isCashier
               ? `Historique de vos ventes et réceptions pour ${activeAppUser?.storeName || 'votre boutique'}.`
-              : 'Traçabilité complète et inaltérable de toutes les entrées, sorties, retours et inventaires.'}
+              : 'Synthèse comptable des flux de marchandises et traçabilité certifiée de chaque opération.'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={exportCsv}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-colors"
@@ -144,6 +215,122 @@ export const MovementsView: React.FC = () => {
         </div>
       </div>
 
+      {/* BILAN DES ENTRÉES ET SORTIES (Synthèse en 4 cartes) */}
+      {!isCashier && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Carte 1 : Bilan des Entrées */}
+          <div className="bg-white p-4 rounded-xl border border-emerald-200 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
+                Total Entrées (+ Retours)
+              </span>
+              <span className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
+                <ArrowDownRight className="w-4 h-4" />
+              </span>
+            </div>
+            <div className="mt-2 text-2xl font-black text-emerald-700 font-mono tabular-nums">
+              +{bilan.totalEntriesQty.toLocaleString('fr-FR')} <span className="text-sm font-semibold">pcs</span>
+            </div>
+            <div className="mt-1 text-xs text-slate-600 space-y-0.5">
+              <div>
+                Réceptions : <strong className="font-mono">+{bilan.inQty}</strong> | Retours clients :{' '}
+                <strong className="font-mono">+{bilan.returnQty}</strong>
+              </div>
+              <div>
+                Valeur d'achat entrée :{' '}
+                <strong className="font-mono text-slate-900">
+                  {bilan.inCostValue.toLocaleString('fr-FR')} FCFA
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          {/* Carte 2 : Bilan des Sorties (Ventes) */}
+          <div className="bg-white p-4 rounded-xl border border-rose-200 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-rose-700">
+                Total Sorties (Ventes)
+              </span>
+              <span className="p-1.5 rounded-lg bg-rose-50 text-rose-600">
+                <ArrowUpRight className="w-4 h-4" />
+              </span>
+            </div>
+            <div className="mt-2 text-2xl font-black text-rose-600 font-mono tabular-nums">
+              -{bilan.outQty.toLocaleString('fr-FR')} <span className="text-sm font-semibold">pcs</span>
+            </div>
+            <div className="mt-1 text-xs text-slate-600 space-y-0.5">
+              <div>
+                Chiffre d'affaires :{' '}
+                <strong className="font-mono text-slate-900">
+                  {bilan.outSaleValue.toLocaleString('fr-FR')} FCFA
+                </strong>
+              </div>
+              <div>
+                Bénéfice sur sorties :{' '}
+                <strong className="font-mono text-emerald-700">
+                  +{bilan.outProfit.toLocaleString('fr-FR')} FCFA
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          {/* Carte 3 : Dotations Internes aux Boutiques */}
+          <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-blue-700">
+                Dotations Boutiques
+              </span>
+              <span className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
+                <ArrowLeftRight className="w-4 h-4" />
+              </span>
+            </div>
+            <div className="mt-2 text-2xl font-black text-blue-700 font-mono tabular-nums">
+              {bilan.transferQty.toLocaleString('fr-FR')} <span className="text-sm font-semibold">pcs</span>
+            </div>
+            <div className="mt-1 text-xs text-slate-600 space-y-0.5">
+              <div>Répartition interne vers les caissiers</div>
+              <div className="text-[11px] text-blue-700 font-medium">
+                Ne diminue pas le stock global de l'entreprise
+              </div>
+            </div>
+          </div>
+
+          {/* Carte 4 : Solde & Équilibre du Stock */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                Solde Stock Actuel
+              </span>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  bilan.discrepancy === 0
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-amber-100 text-amber-800'
+                }`}
+              >
+                {bilan.discrepancy === 0 ? '100% Équilibré' : `Écart: ${bilan.discrepancy}`}
+              </span>
+            </div>
+            <div className="mt-2 text-2xl font-black text-slate-900 font-mono tabular-nums">
+              {bilan.currentStockUnits.toLocaleString('fr-FR')} <span className="text-sm font-semibold">pcs</span>
+            </div>
+            <div className="mt-1 text-xs text-slate-600 space-y-0.5">
+              <div>
+                Calcul : <strong className="font-mono">{bilan.totalEntriesQty}</strong> (Entrées){' '}
+                <strong className="font-mono">-{bilan.outQty}</strong> (Sorties) ={' '}
+                <strong className="font-mono">{bilan.theoreticalStock}</strong>
+              </div>
+              <div>
+                Valeur marchande :{' '}
+                <strong className="font-mono text-slate-900">
+                  {bilan.currentStockSale.toLocaleString('fr-FR')} FCFA
+                </strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Filter and Search Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
         <div className="flex flex-col md:flex-row items-center justify-between gap-3">
@@ -179,7 +366,7 @@ export const MovementsView: React.FC = () => {
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Entrées (Réceptions)
+              Entrées ({movements.filter((m) => m.type === 'IN').length})
             </button>
             <button
               onClick={() => setTypeFilter('OUT')}
@@ -189,17 +376,17 @@ export const MovementsView: React.FC = () => {
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Sorties (Ventes/Pertes)
+              Sorties / Ventes ({movements.filter((m) => m.type === 'OUT').length})
             </button>
             <button
-              onClick={() => setTypeFilter('ADJUSTMENT')}
+              onClick={() => setTypeFilter('TRANSFER')}
               className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors ${
-                typeFilter === 'ADJUSTMENT'
-                  ? 'bg-white text-indigo-800 shadow-xs'
+                typeFilter === 'TRANSFER'
+                  ? 'bg-white text-blue-800 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Ajustements
+              Dotations Boutiques ({movements.filter((m) => m.type === 'TRANSFER').length})
             </button>
             <button
               onClick={() => setTypeFilter('RETURN')}
@@ -209,7 +396,17 @@ export const MovementsView: React.FC = () => {
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Retours
+              Retours ({movements.filter((m) => m.type === 'RETURN').length})
+            </button>
+            <button
+              onClick={() => setTypeFilter('ADJUSTMENT')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors ${
+                typeFilter === 'ADJUSTMENT'
+                  ? 'bg-white text-indigo-800 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Ajustements ({movements.filter((m) => m.type === 'ADJUSTMENT').length})
             </button>
           </div>
         </div>
@@ -223,9 +420,9 @@ export const MovementsView: React.FC = () => {
               <tr className="border-b border-slate-200 bg-slate-50/75 text-[11px] text-slate-500 font-semibold uppercase tracking-wider">
                 <th className="py-3 px-4">Date & Heure</th>
                 <th className="py-3 px-4">Article & SKU</th>
-                <th className="py-3 px-4">Type</th>
-                <th className="py-3 px-4 text-right">Variation</th>
-                <th className="py-3 px-4 text-right">Évolution Stock</th>
+                <th className="py-3 px-4">Type d'Opération</th>
+                <th className="py-3 px-4 text-right">Quantité</th>
+                <th className="py-3 px-4 text-right">Impact Stock Global</th>
                 <th className="py-3 px-4">Motif & Opérateur</th>
                 <th className="py-3 px-4">Commentaire</th>
               </tr>
@@ -275,53 +472,73 @@ export const MovementsView: React.FC = () => {
                       <td className="py-3 px-4 whitespace-nowrap">
                         <div className="flex items-center gap-1.5 font-medium text-slate-700">
                           {m.type === 'IN' ? (
-                            <>
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-semibold">
                               <ArrowDownRight className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>Entrée</span>
-                            </>
+                              <span>Entrée Stock</span>
+                            </span>
                           ) : m.type === 'OUT' ? (
-                            <>
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 font-semibold">
                               <ArrowUpRight className="w-3.5 h-3.5 text-rose-600" />
-                              <span>Sortie</span>
-                            </>
+                              <span>Sortie / Vente</span>
+                            </span>
+                          ) : m.type === 'TRANSFER' ? (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-semibold">
+                              <ArrowLeftRight className="w-3.5 h-3.5 text-blue-600" />
+                              <span>Dotation Boutique</span>
+                            </span>
                           ) : m.type === 'RETURN' ? (
-                            <>
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-semibold">
                               <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
-                              <span>Retour</span>
-                            </>
+                              <span>Retour Client</span>
+                            </span>
                           ) : (
-                            <>
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-semibold">
                               <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-600" />
                               <span>Ajustement</span>
-                            </>
+                            </span>
                           )}
                         </div>
                       </td>
 
                       {/* Delta Quantity (Tabular numbers) */}
-                      <td className="py-3 px-4 text-right">
-                        <span
-                          className={`font-mono tabular-nums font-bold text-sm ${
-                            isPositive
-                              ? 'text-emerald-600'
-                              : m.quantityDelta < 0
-                              ? 'text-rose-600'
-                              : 'text-slate-600'
-                          }`}
-                        >
-                          {isPositive ? `+${m.quantityDelta}` : m.quantityDelta}
-                        </span>
+                      <td className="py-3 px-4 text-right whitespace-nowrap">
+                        {m.type === 'TRANSFER' ? (
+                          <span className="font-mono tabular-nums font-bold text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                            Dotation : {Math.abs(m.quantityDelta)} pcs
+                          </span>
+                        ) : (
+                          <span
+                            className={`font-mono tabular-nums font-bold text-sm ${
+                              isPositive
+                                ? 'text-emerald-600'
+                                : m.quantityDelta < 0
+                                ? 'text-rose-600'
+                                : 'text-slate-600'
+                            }`}
+                          >
+                            {isPositive ? `+${m.quantityDelta}` : m.quantityDelta}
+                          </span>
+                        )}
                       </td>
 
                       {/* Stock Evolution */}
                       <td className="py-3 px-4 text-right font-mono tabular-nums text-slate-500 whitespace-nowrap">
-                        <span>{m.previousStock}</span>
-                        <span className="text-slate-300 mx-1">→</span>
-                        <span className="font-semibold text-slate-800">{m.newStock}</span>
+                        {m.type === 'TRANSFER' ? (
+                          <span className="text-xs text-slate-500">
+                            Stock global : <strong className="text-slate-800">{m.newStock}</strong>{' '}
+                            <span className="text-[10px] text-blue-600">(interne)</span>
+                          </span>
+                        ) : (
+                          <>
+                            <span>{m.previousStock}</span>
+                            <span className="text-slate-300 mx-1">→</span>
+                            <span className="font-semibold text-slate-800">{m.newStock}</span>
+                          </>
+                        )}
                       </td>
 
                       {/* Reason & Operator */}
-                      <td className="py-3 px-4 max-w-[200px]">
+                      <td className="py-3 px-4 max-w-[220px]">
                         <div className="text-slate-800 truncate font-medium">
                           {m.reason}
                         </div>

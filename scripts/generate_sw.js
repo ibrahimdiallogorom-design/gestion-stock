@@ -155,9 +155,35 @@ self.addEventListener('fetch', (event) => {
 });
 `;
 
+// Fix dist/index.html so manifest.json points to ./manifest.json (not ./assets/manifest-*.json)
+const distIndexPath = path.resolve(distDir, 'index.html');
+if (fs.existsSync(distIndexPath)) {
+  let html = fs.readFileSync(distIndexPath, 'utf-8');
+  html = html.replace(/href="\.\/assets\/manifest-[^"]+\.json"/g, 'href="./manifest.json"');
+  html = html.replace(/href="\.\/assets\/icon-[^"]+\.png"/g, 'href="./icon.png"');
+  fs.writeFileSync(distIndexPath, html, 'utf-8');
+}
+
+// Ensure manifest.json and all PWA icons/screenshots are present in both dist/ and rootDir
+const pwaFiles = [
+  'manifest.json',
+  'icon.png',
+  'icon-192.png',
+  'icon-512.png',
+  'screenshot-wide.png',
+  'screenshot-narrow.png',
+];
+pwaFiles.forEach((f) => {
+  const srcFile = path.resolve(rootDir, 'public', f);
+  if (fs.existsSync(srcFile)) {
+    fs.copyFileSync(srcFile, path.resolve(distDir, f));
+    fs.copyFileSync(srcFile, path.resolve(rootDir, f));
+  }
+});
+
 // Write to dist/sw.js, public/sw.js and root sw.js
 fs.writeFileSync(path.resolve(distDir, 'sw.js'), swContent, 'utf-8');
 fs.writeFileSync(path.resolve(rootDir, 'public', 'sw.js'), swContent, 'utf-8');
 fs.writeFileSync(path.resolve(rootDir, 'sw.js'), swContent, 'utf-8');
 
-console.log('✓ Service Worker généré avec succès dans dist/sw.js, public/sw.js et sw.js !');
+console.log('✓ Service Worker et Manifest PWA générés avec succès dans dist/, public/ et racine !');
