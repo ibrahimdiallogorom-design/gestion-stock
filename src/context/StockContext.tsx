@@ -30,7 +30,12 @@ import {
   CloudSyncStatus,
   getDeviceId,
 } from '../services/cloudSync';
-import { syncStateToDexie, loadStateFromDexie } from '../services/localDb';
+import {
+  syncStateToDexie,
+  loadStateFromDexie,
+  registerAfficherSurInterface,
+  chargerProduitsPourAffichage,
+} from '../services/localDb';
 import { User } from 'firebase/auth';
 
 interface StockContextType {
@@ -724,6 +729,13 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Hydratation initiale depuis Dexie.js (IndexedDB) si des données plus complètes y sont présentes
   useEffect(() => {
     let mounted = true;
+    registerAfficherSurInterface((listeProduits) => {
+      if (!mounted) return;
+      if (listeProduits && listeProduits.length > 0) {
+        setProducts(listeProduits);
+      }
+    });
+    chargerProduitsPourAffichage();
     loadStateFromDexie().then((dexieData) => {
       if (!mounted || !dexieData) return;
       if (dexieData.products.length > products.length) {
@@ -747,6 +759,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
     return () => {
       mounted = false;
+      registerAfficherSurInterface(null);
     };
   }, []);
 

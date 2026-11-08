@@ -176,8 +176,49 @@ export async function synchroniserCatalogue(
   }
 }
 
+let _uiDisplayCallback: ((listeProduits: ProduitOfflineRow[]) => void) | null = null;
+
+/**
+ * Enregistre le callback React permettant de mettre à jour l'interface avec les produits chargés depuis IndexedDB.
+ */
+export function registerAfficherSurInterface(
+  callback: ((listeProduits: ProduitOfflineRow[]) => void) | null
+): void {
+  _uiDisplayCallback = callback;
+}
+
+/**
+ * Fonction personnalisée pour afficher les produits dans l'interface React
+ */
+export function afficherSurInterface(listeProduits: ProduitOfflineRow[]): void {
+  if (_uiDisplayCallback && Array.isArray(listeProduits)) {
+    _uiDisplayCallback(listeProduits);
+  }
+}
+
+/**
+ * Récupération instantanée de tous les produits stockés en local dans `db.produits`
+ * et affichage immédiat dans l'interface.
+ */
+export async function chargerProduitsPourAffichage(): Promise<ProduitOfflineRow[]> {
+  try {
+    // Récupération instantanée de tous les produits stockés en local
+    const listeProduits = await db.produits.toArray();
+
+    // Fonction personnalisée pour afficher les produits dans votre interface
+    afficherSurInterface(listeProduits);
+    return listeProduits;
+  } catch (error) {
+    console.error('Erreur lors de la lecture de la base locale :', error);
+    return [];
+  }
+}
+
 if (typeof window !== 'undefined') {
-  (window as unknown as Record<string, unknown>).synchroniserCatalogue = synchroniserCatalogue;
+  const win = window as unknown as Record<string, unknown>;
+  win.synchroniserCatalogue = synchroniserCatalogue;
+  win.chargerProduitsPourAffichage = chargerProduitsPourAffichage;
+  win.afficherSurInterface = afficherSurInterface;
 }
 
 /**
