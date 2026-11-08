@@ -30,6 +30,7 @@ import {
   CloudSyncStatus,
   getDeviceId,
 } from '../services/cloudSync';
+import { syncStateToDexie, loadStateFromDexie } from '../services/localDb';
 import { User } from 'firebase/auth';
 
 interface StockContextType {
@@ -674,30 +675,80 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [isLargeTextMode]);
 
-  // Sync to localStorage
+  // Sync to localStorage & Dexie.js (IndexedDB 100% Hors-Ligne illimité)
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(products));
+    try {
+      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(products));
+    } catch (e) {}
+    syncStateToDexie({ products });
   }, [products]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(movements));
+    try {
+      localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(movements));
+    } catch (e) {}
+    syncStateToDexie({ movements });
   }, [movements]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.SHEETS_CONFIG, JSON.stringify(sheetsSync));
+    try {
+      localStorage.setItem(STORAGE_KEYS.SHEETS_CONFIG, JSON.stringify(sheetsSync));
+    } catch (e) {}
   }, [sheetsSync]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(expenses));
+    try {
+      localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(expenses));
+    } catch (e) {}
+    syncStateToDexie({ expenses });
   }, [expenses]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.PURCHASES, JSON.stringify(purchases));
+    try {
+      localStorage.setItem(STORAGE_KEYS.PURCHASES, JSON.stringify(purchases));
+    } catch (e) {}
+    syncStateToDexie({ purchases });
   }, [purchases]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.SURVEYS, JSON.stringify(surveys));
+    try {
+      localStorage.setItem(STORAGE_KEYS.SURVEYS, JSON.stringify(surveys));
+    } catch (e) {}
+    syncStateToDexie({ surveys });
   }, [surveys]);
+
+  useEffect(() => {
+    syncStateToDexie({ appUsers, activeUser: activeAppUser });
+  }, [appUsers, activeAppUser]);
+
+  // Hydratation initiale depuis Dexie.js (IndexedDB) si des données plus complètes y sont présentes
+  useEffect(() => {
+    let mounted = true;
+    loadStateFromDexie().then((dexieData) => {
+      if (!mounted || !dexieData) return;
+      if (dexieData.products.length > products.length) {
+        setProducts(dexieData.products);
+      }
+      if (dexieData.movements.length > movements.length) {
+        setMovements(dexieData.movements);
+      }
+      if (dexieData.expenses.length > expenses.length) {
+        setExpenses(dexieData.expenses);
+      }
+      if (dexieData.purchases.length > purchases.length) {
+        setPurchases(dexieData.purchases);
+      }
+      if (dexieData.surveys.length > surveys.length) {
+        setSurveys(dexieData.surveys);
+      }
+      if (!activeAppUser && dexieData.activeUser) {
+        setActiveAppUser(dexieData.activeUser);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Cloud Sync Status states
   const [cloudStatus, setCloudStatus] = useState<CloudSyncStatus>('connecting');
