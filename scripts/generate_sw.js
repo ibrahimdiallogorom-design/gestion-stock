@@ -109,37 +109,24 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // A. Navigation HTML (Ouverture de l'application ou rechargement de page hors-ligne)
+  // A. Navigation HTML : Network-First en ligne (pour afficher immédiatement les mises à jour), Cache-First hors-ligne
   if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) {
     event.respondWith(
-      caches.match('./index.html').then((cachedIndex) => {
-        if (cachedIndex) {
-          // Si en ligne, tenter de mettre à jour index.html en tâche de fond
-          if (navigator.onLine) {
-            fetch(request).then((networkRes) => {
-              if (networkRes && networkRes.status === 200) {
-                caches.open(CACHE_NAME).then((cache) => {
-                  cache.put(request, networkRes.clone());
-                  cache.put('./index.html', networkRes);
-                });
-              }
-            }).catch(() => {});
-          }
-          return cachedIndex;
-        }
-
-        // Si pas en cache (première visite absolue), aller sur le réseau
-        return fetch(request).then((networkRes) => {
+      fetch(request, { cache: 'no-store' })
+        .then((networkRes) => {
           if (networkRes && networkRes.status === 200) {
             const clone = networkRes.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(request, clone.clone());
               cache.put('./index.html', clone);
             });
+            return networkRes;
           }
-          return networkRes;
-        });
-      })
+          return caches.match('./index.html');
+        })
+        .catch(() => {
+          return caches.match('./index.html');
+        })
     );
     return;
   }

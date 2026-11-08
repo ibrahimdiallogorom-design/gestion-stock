@@ -49,10 +49,18 @@
   <body class="bg-slate-50 text-slate-900 antialiased font-sans">
     <div id="root"></div>
     <script>
-      // Enregistrement du Service Worker pour fonctionnement 100% Hors-Ligne
+      // Enregistrement du Service Worker pour fonctionnement 100% Hors-Ligne + Mise à jour instantanée
       if ('serviceWorker' in navigator) {
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) {
+            refreshing = true;
+            window.location.reload();
+          }
+        });
+
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js').then((registration) => {
+          navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((registration) => {
             if (navigator.onLine) {
               registration.update().catch(() => {});
             }

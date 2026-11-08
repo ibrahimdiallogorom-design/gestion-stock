@@ -260,23 +260,20 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const sanitized = parsed.filter(
             (p) => !p.id.startsWith('prod-00') && !p.id.startsWith('prod-010')
           );
-          // Clean products: heal any prices that were artificially multiplied by 650
+          // Clean products: preserve exact FCFA prices and remove allocations to deleted cashiers
           const cleanProducts = sanitized.map((p) => {
-            let cost = Number(p.costPrice) || 0;
-            let sale = Number(p.salePrice) || 0;
-
-            // Auto-heal prices that were inflated by the 650 bug
-            while (cost >= 650 && cost % 650 === 0 && cost > 50000) {
-              cost = Math.round(cost / 650);
-            }
-            while (sale >= 650 && sale % 650 === 0 && sale > 50000) {
-              sale = Math.round(sale / 650);
-            }
+            const cost = Math.max(0, Number(p.costPrice) || 0);
+            const sale = Math.max(0, Number(p.salePrice) || 0);
 
             const distributed = { ...(p.distributedQuantities || {}) };
-            // Purge allocations to fictitious deleted cashiers and return to central stock
-            const FICTITIOUS_IDS = ['user-caissier-1', 'user-caissier-2', 'user-caissier-3'];
-            FICTITIOUS_IDS.forEach((fid) => {
+            // Purge allocations to fictitious or deleted cashiers
+            const DELETED_IDS = [
+              'user-caissier-1',
+              'user-caissier-2',
+              'user-caissier-3',
+              'user-1791922593737',
+            ];
+            DELETED_IDS.forEach((fid) => {
               delete distributed[fid];
             });
 
@@ -290,8 +287,8 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               centralQuantity: centralQty,
               distributedQuantities: distributed,
               minThreshold: Math.max(0, Number(p.minThreshold) || 0),
-              costPrice: Math.max(0, cost),
-              salePrice: Math.max(0, sale),
+              costPrice: cost,
+              salePrice: sale,
             };
           });
           localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(cleanProducts));
@@ -310,8 +307,15 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (saved) {
         const parsed: StockMovement[] = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          // Purge all fictional demo movements (mov-1001 to mov-1006)
-          const sanitized = parsed.filter((m) => !m.id.startsWith('mov-100'));
+          // Purge all fictional demo movements and legacy Oct-13 rapid-click test spam
+          const sanitized = parsed.filter(
+            (m) =>
+              !m.id.startsWith('mov-100') &&
+              m.reason !== 'Réassort rapide comptoir (+1)' &&
+              m.reason !== 'Retrait rapide comptoir (-1)' &&
+              !(m.createdAt && m.createdAt.startsWith('2026-10-13')) &&
+              !(m.type === 'RETURN' && Number(m.quantityDelta) < 0)
+          );
           localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(sanitized));
           return sanitized;
         }
@@ -738,19 +742,27 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     chargerProduitsPourAffichage();
     loadStateFromDexie().then((dexieData) => {
       if (!mounted || !dexieData) return;
-      if (dexieData.products.length > products.length) {
+      if (products.length === 0 && dexieData.products.length > 0) {
         setProducts(dexieData.products);
       }
-      if (dexieData.movements.length > movements.length) {
-        setMovements(dexieData.movements);
+      if (movements.length === 0 && dexieData.movements.length > 0) {
+        const cleanDexieMovs = dexieData.movements.filter(
+          (m) =>
+            !m.id.startsWith('mov-100') &&
+            m.reason !== 'Réassort rapide comptoir (+1)' &&
+            m.reason !== 'Retrait rapide comptoir (-1)' &&
+            !(m.createdAt && m.createdAt.startsWith('2026-10-13')) &&
+            !(m.type === 'RETURN' && Number(m.quantityDelta) < 0)
+        );
+        setMovements(cleanDexieMovs);
       }
-      if (dexieData.expenses.length > expenses.length) {
+      if (expenses.length === 0 && dexieData.expenses.length > 0) {
         setExpenses(dexieData.expenses);
       }
-      if (dexieData.purchases.length > purchases.length) {
+      if (purchases.length === 0 && dexieData.purchases.length > 0) {
         setPurchases(dexieData.purchases);
       }
-      if (dexieData.surveys.length > surveys.length) {
+      if (surveys.length === 0 && dexieData.surveys.length > 0) {
         setSurveys(dexieData.surveys);
       }
       if (!activeAppUser && dexieData.activeUser) {
@@ -848,7 +860,13 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const rawRemoteProds = Array.isArray(remote.products) ? remote.products : [];
         let hadFictitiousDist = false;
 
-        // Auto-heal remote products: transfer allocations from fictitious cashiers to Moussa Vision
+        const activeUserIds = new Set(
+          (remote.appUsers && Array.isArray(remote.appUsers) ? remote.appUsers : appUsers).map(
+            (u) => u.id
+          )
+        );
+
+        // Auto-heal remote products: clean allocations to deleted or fictitious cashiers
         const remoteProds = rawRemoteProds.map((p) => {
           const dist = { ...(p.distributedQuantities || {}) };
           let changed = false;
@@ -858,14 +876,17 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             delete dist['user-caissier-1'];
             changed = true;
           }
-          if (dist['user-caissier-2'] !== undefined) {
-            delete dist['user-caissier-2'];
-            changed = true;
-          }
-          if (dist['user-caissier-3'] !== undefined) {
-            delete dist['user-caissier-3'];
-            changed = true;
-          }
+          Object.keys(dist).forEach((uid) => {
+            if (
+              uid === 'user-caissier-2' ||
+              uid === 'user-caissier-3' ||
+              uid === 'user-1791922593737' ||
+              (activeUserIds.size > 0 && !activeUserIds.has(uid))
+            ) {
+              delete dist[uid];
+              changed = true;
+            }
+          });
 
           const totalQty = Math.max(0, Number(p.quantity) || 0);
           const centralQty = totalQty; // Le stock central conserve le grand total
@@ -896,7 +917,22 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           remoteProds.forEach((p) => prodMap.set(p.id, p));
 
           let localHadNewerOrUnsynced = false;
-          localProds.forEach((lp) => {
+          localProds.forEach((rawLp) => {
+            const cleanDist = { ...(rawLp.distributedQuantities || {}) };
+            Object.keys(cleanDist).forEach((uid) => {
+              if (
+                uid === 'user-caissier-2' ||
+                uid === 'user-caissier-3' ||
+                uid === 'user-1791922593737' ||
+                (activeUserIds.size > 0 && !activeUserIds.has(uid))
+              ) {
+                delete cleanDist[uid];
+              }
+            });
+            const lp: Product = {
+              ...rawLp,
+              distributedQuantities: cleanDist,
+            };
             if (!prodMap.has(lp.id)) {
               prodMap.set(lp.id, lp);
               localHadNewerOrUnsynced = true;
@@ -928,10 +964,23 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
 
         // 3. Stock Movements Reconciliation
+        const RECONCILIATION_CUTOFF = new Date('2026-11-08T19:50:00.000Z').getTime();
         const localMovsJson = localStorage.getItem(STORAGE_KEYS.MOVEMENTS);
         let localMovs: StockMovement[] = [];
         try {
-          if (localMovsJson) localMovs = JSON.parse(localMovsJson);
+          if (localMovsJson) {
+            const parsedMovs: StockMovement[] = JSON.parse(localMovsJson);
+            if (Array.isArray(parsedMovs)) {
+              localMovs = parsedMovs.filter(
+                (m) =>
+                  !m.id.startsWith('mov-100') &&
+                  m.reason !== 'Réassort rapide comptoir (+1)' &&
+                  m.reason !== 'Retrait rapide comptoir (-1)' &&
+                  !(m.createdAt && m.createdAt.startsWith('2026-10-13')) &&
+                  !(m.type === 'RETURN' && Number(m.quantityDelta) < 0)
+              );
+            }
+          }
         } catch (e) {}
 
         const remoteMovs = Array.isArray(remote.movements) ? remote.movements : [];
@@ -942,7 +991,8 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
           let localHadUnsyncedMovs = false;
           localMovs.forEach((lm) => {
-            if (!movMap.has(lm.id)) {
+            const lmTime = new Date(lm.createdAt || 0).getTime();
+            if (!movMap.has(lm.id) && lmTime > RECONCILIATION_CUTOFF) {
               movMap.set(lm.id, lm);
               localHadUnsyncedMovs = true;
             }
@@ -1746,7 +1796,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       productId: prod.id,
       productSku: prod.sku,
       productName: prod.name,
-      type: 'RETURN',
+      type: 'TRANSFER',
       quantityDelta: -quantityToRecall,
       previousStock: prod.quantity,
       newStock: prod.quantity,
@@ -2115,9 +2165,19 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return { success: false, message: 'Impossible de supprimer le dernier utilisateur restant.' };
     }
     const nextUsers = appUsers.filter((u) => u.id !== id);
+    const cleanedProducts = products.map((p) => {
+      if (p.distributedQuantities && p.distributedQuantities[id] !== undefined) {
+        const nextDist = { ...p.distributedQuantities };
+        delete nextDist[id];
+        return { ...p, distributedQuantities: nextDist };
+      }
+      return p;
+    });
     setAppUsers(nextUsers);
+    setProducts(cleanedProducts);
     localStorage.setItem(STORAGE_KEYS.APP_USERS, JSON.stringify(nextUsers));
-    pushToCloud({ appUsers: nextUsers });
+    localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(cleanedProducts));
+    pushToCloud({ appUsers: nextUsers, products: cleanedProducts });
     if (activeAppUser?.id === id) {
       logoutAppUser();
     }

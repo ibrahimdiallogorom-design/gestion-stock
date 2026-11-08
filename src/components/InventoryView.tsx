@@ -437,7 +437,13 @@ export const InventoryView: React.FC = () => {
                           </div>
                           {!isCashier && (
                             <div className="text-[10px] text-slate-500 font-mono">
-                              Magasin: {product.quantity} · Dotations: {Object.values(product.distributedQuantities || {}).reduce((a, b) => a + (Number(b) || 0), 0)}
+                              Magasin: {product.quantity} · Dotations:{' '}
+                              {appUsers
+                                .filter((u) => u.role === 'CASHIER')
+                                .reduce(
+                                  (a, u) => a + (Number(product.distributedQuantities?.[u.id]) || 0),
+                                  0
+                                )}
                             </div>
                           )}
                         </td>

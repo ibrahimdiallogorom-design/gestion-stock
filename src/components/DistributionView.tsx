@@ -78,7 +78,7 @@ export const DistributionView: React.FC = () => {
     products.forEach((p) => {
       const cQty = p.quantity;
       const dMap = p.distributedQuantities || {};
-      const dQty = Object.values(dMap).reduce((acc, val) => acc + (Number(val) || 0), 0);
+      const dQty = cashiers.reduce((acc, c) => acc + (Number(dMap[c.id]) || 0), 0);
 
       totalUnits += cQty;
       totalCost += cQty * p.costPrice;
@@ -104,7 +104,7 @@ export const DistributionView: React.FC = () => {
       distributedCost,
       distributedSale,
     };
-  }, [products]);
+  }, [products, cashiers]);
 
   // 2. Breakdown per Cashier / Sub-Boutique
   const storesData = useMemo(() => {
