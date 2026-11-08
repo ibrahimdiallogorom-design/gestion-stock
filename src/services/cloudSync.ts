@@ -15,7 +15,12 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { AppUser, Product, StockMovement, Expense, PurchaseBatch, VisitorSurvey } from '../types';
-import { addCommandeOffline, getPendingCommandesOffline, clearCommandesOffline } from './localDb';
+import {
+  addCommandeOffline,
+  getPendingCommandesOffline,
+  clearCommandesOffline,
+  synchroniserCatalogue,
+} from './localDb';
 
 export interface CloudStoreData {
   appUsers?: AppUser[];
@@ -442,11 +447,26 @@ export async function pullFromCloud(): Promise<CloudStoreData | null> {
     const storeDocRef = doc(db, 'stores', STORE_DOC_ID);
     const snap = await getDoc(storeDocRef);
     if (snap.exists()) {
-      return snap.data() as CloudStoreData;
+      const data = snap.data() as CloudStoreData;
+      if (data.products && data.products.length > 0) {
+        synchroniserCatalogue(async () => data.products || null).catch(() => {});
+      }
+      return data;
     }
     return null;
   } catch (err) {
     console.error('pullFromCloud error:', err);
     throw err;
   }
+}
+
+if (typeof window !== 'undefined') {
+  (window as unknown as Record<string, unknown>).synchroniserCatalogue = (apiUrl?: string) =>
+    synchroniserCatalogue(
+      apiUrl ||
+        (async () => {
+          const remote = await pullFromCloud();
+          return remote?.products || null;
+        })
+    );
 }

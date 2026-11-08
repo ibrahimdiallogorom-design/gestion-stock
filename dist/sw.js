@@ -1,6 +1,6 @@
 // VisionTech StockFlow - Service Worker 100% Offline-First
 // Généré automatiquement lors de la compilation
-const CACHE_NAME = 'visiontech-cache-v20261108190557';
+const CACHE_NAME = 'visiontech-cache-v20261108191037';
 
 const PRECACHE_ASSETS = [
   "./",
@@ -10,7 +10,7 @@ const PRECACHE_ASSETS = [
   "./favicon.png",
   "./assets/icon-pnxEVMeK.png",
   "./assets/index-CJ1ZCOm2.css",
-  "./assets/index-D9O2M67j.js",
+  "./assets/index-DfBTpqtq.js",
   "./assets/manifest-Cu8MOF-8.json"
 ];
 

@@ -108,6 +108,79 @@ export async function clearCommandesOffline(): Promise<void> {
 }
 
 /**
+ * Synchronise le catalogue de produits depuis le serveur / Cloud vers IndexedDB (`db.produits`).
+ * Si la connexion est indisponible ou trop faible, conserve et retourne les données locales existantes.
+ */
+export async function synchroniserCatalogue(
+  apiUrlOrFetcher?: string | (() => Promise<Product[] | null>)
+): Promise<ProduitOfflineRow[]> {
+  try {
+    if (!navigator.onLine) {
+      throw new Error('Hors-ligne');
+    }
+
+    let rawProducts: Array<Partial<Product> & Record<string, unknown>> = [];
+
+    if (typeof apiUrlOrFetcher === 'function') {
+      const res = await apiUrlOrFetcher();
+      if (!res) throw new Error('Erreur réseau');
+      rawProducts = res as unknown as Array<Partial<Product> & Record<string, unknown>>;
+    } else if (typeof apiUrlOrFetcher === 'string' && apiUrlOrFetcher.trim() !== '') {
+      const response = await fetch(apiUrlOrFetcher);
+      if (!response.ok) throw new Error('Erreur réseau');
+      rawProducts = await response.json();
+    } else {
+      // Par défaut, utilise les produits déjà présents ou synchronisés via Cloud
+      rawProducts = (await db.products.toArray()) as unknown as Array<
+        Partial<Product> & Record<string, unknown>
+      >;
+    }
+
+    const produitsDuServeur: ProduitOfflineRow[] = rawProducts.map((p) => {
+      const nom = String(p.nom ?? p.name ?? 'Article');
+      const categorie = String(p.categorie ?? p.category ?? 'Divers & Général');
+      const prix = Number(p.prix ?? p.salePrice ?? 0) || 0;
+      return {
+        id: String(p.id ?? `prod-${Date.now()}`),
+        sku: String(p.sku ?? p.id ?? 'SKU'),
+        name: nom,
+        category: categorie,
+        quantity: Number(p.quantity ?? 0) || 0,
+        centralQuantity: Number(p.centralQuantity ?? p.quantity ?? 0) || 0,
+        distributedQuantities: (p.distributedQuantities as Record<string, number>) || {},
+        minThreshold: Number(p.minThreshold ?? 5) || 5,
+        costPrice: Number(p.costPrice ?? 0) || 0,
+        salePrice: prix,
+        supplier: String(p.supplier ?? 'Fournisseur'),
+        lastUpdated: String(p.lastUpdated ?? new Date().toISOString()),
+        imageUrl: p.imageUrl as string | undefined,
+        description: p.description as string | undefined,
+        nom,
+        categorie,
+        prix,
+      };
+    });
+
+    if (produitsDuServeur.length > 0) {
+      // Enregistrement rapide de tous les produits dans IndexedDB
+      await db.produits.bulkPut(produitsDuServeur);
+      await db.products.bulkPut(produitsDuServeur);
+      console.log('Catalogue mis à jour avec succès en local !');
+    }
+    return await db.produits.toArray();
+  } catch (error) {
+    console.log(
+      'Connexion indisponible ou trop faible. Utilisation des données locales existantes.'
+    );
+    return await db.produits.toArray();
+  }
+}
+
+if (typeof window !== 'undefined') {
+  (window as unknown as Record<string, unknown>).synchroniserCatalogue = synchroniserCatalogue;
+}
+
+/**
  * Synchronise l'état de l'application dans `VisionTechOfflineDB` (incluant la table `produits`).
  */
 export async function syncStateToDexie(data: {
