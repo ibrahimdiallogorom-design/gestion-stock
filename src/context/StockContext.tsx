@@ -140,7 +140,9 @@ interface StockContextType {
     productId: string,
     targetUserId: string,
     quantity: number,
-    notes?: string
+    notes?: string,
+    customTransferPrice?: number,
+    customMarketPrice?: number
   ) => Promise<{ success: boolean; message: string }>;
   recallProduct: (
     productId: string,
@@ -152,6 +154,12 @@ interface StockContextType {
     productId: string,
     targetUserId: string,
     newQuantity: number
+  ) => Promise<{ success: boolean; message: string }>;
+  setBoutiquePricing: (
+    productId: string,
+    targetUserId: string,
+    transferPrice: number,
+    marketPrice: number
   ) => Promise<{ success: boolean; message: string }>;
   removeFromBoutique: (
     productId: string,
@@ -1708,7 +1716,9 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     productId: string,
     targetUserId: string,
     quantityToDistribute: number,
-    notes?: string
+    notes?: string,
+    customTransferPrice?: number,
+    customMarketPrice?: number
   ): Promise<{ success: boolean; message: string }> => {
     if (quantityToDistribute <= 0) {
       return { success: false, message: 'La quantité à distribuer doit être supérieure à 0.' };
@@ -1737,10 +1747,31 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const newDistributed = { ...(prod.distributedQuantities || {}) };
     newDistributed[targetUserId] = (newDistributed[targetUserId] || 0) + quantityToDistribute;
 
+    // Prix remis à la caisse (ex: 4000 FCFA) et Prix final sur le marché (ex: 4500 FCFA)
+    const effectiveTransferPrice =
+      customTransferPrice !== undefined && Number.isFinite(Number(customTransferPrice)) && Number(customTransferPrice) >= 0
+        ? Math.round(Number(customTransferPrice))
+        : prod.distributedTransferPrices?.[targetUserId] ?? prod.cashierTransferPrice ?? prod.salePrice;
+
+    const effectiveMarketPrice =
+      customMarketPrice !== undefined && Number.isFinite(Number(customMarketPrice)) && Number(customMarketPrice) >= 0
+        ? Math.round(Number(customMarketPrice))
+        : prod.distributedMarketPrices?.[targetUserId] ?? prod.salePrice;
+
+    const newTransferPrices = { ...(prod.distributedTransferPrices || {}) };
+    newTransferPrices[targetUserId] = effectiveTransferPrice;
+
+    const newMarketPrices = { ...(prod.distributedMarketPrices || {}) };
+    newMarketPrices[targetUserId] = effectiveMarketPrice;
+
+    const unitCashierProfit = effectiveMarketPrice - effectiveTransferPrice;
+
     const updatedProduct: Product = {
       ...prod,
       centralQuantity: currentCentral,
       distributedQuantities: newDistributed,
+      distributedTransferPrices: newTransferPrices,
+      distributedMarketPrices: newMarketPrices,
       quantity: currentCentral,
       lastUpdated: now,
     };
@@ -1757,12 +1788,18 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       quantityDelta: quantityToDistribute,
       previousStock: currentCentral,
       newStock: currentCentral,
-      reason: `Dotation vers ${targetUser.fullName} (${targetUser.storeName || targetUser.username})`,
+      reason: `Dotation vers ${targetUser.fullName} (Prix caisse: ${effectiveTransferPrice.toLocaleString('fr-FR')} F | Marché: ${effectiveMarketPrice.toLocaleString('fr-FR')} F)`,
       operator: activeAppUser?.fullName || 'Responsable Stock',
       storeName: targetUser.storeName || 'Boutique VisionTech',
       targetUserId: targetUser.id,
       targetUserName: targetUser.fullName,
-      notes: notes || `Dotation de ${quantityToDistribute} unité(s) allouée(s) à ${targetUser.fullName} (Stock central maintenu à ${currentCentral})`,
+      transferPriceAtSale: effectiveTransferPrice,
+      marketPriceAtSale: effectiveMarketPrice,
+      cashierProfit: unitCashierProfit * quantityToDistribute,
+      mainStoreAmount: effectiveTransferPrice * quantityToDistribute,
+      notes:
+        notes ||
+        `Dotation de ${quantityToDistribute} u à ${targetUser.fullName} — Prix remis caisse: ${effectiveTransferPrice.toLocaleString('fr-FR')} F/u | Prix marché: ${effectiveMarketPrice.toLocaleString('fr-FR')} F/u (Bénéfice caissier: ${unitCashierProfit >= 0 ? '+' : ''}${unitCashierProfit.toLocaleString('fr-FR')} F/u)`,
       createdAt: now,
     };
 
@@ -1779,7 +1816,45 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     return {
       success: true,
-      message: `${quantityToDistribute} unité(s) de "${prod.name}" octroyée(s) à ${targetUser.fullName}. Le stock central reste à ${currentCentral}.`,
+      message: `${quantityToDistribute} unité(s) de "${prod.name}" octroyée(s) à ${targetUser.fullName} au prix caisse de ${effectiveTransferPrice.toLocaleString('fr-FR')} F (Prix marché: ${effectiveMarketPrice.toLocaleString('fr-FR')} F, Bénéfice caissier: ${unitCashierProfit.toLocaleString('fr-FR')} F/u).`,
+    };
+  };
+
+  const setBoutiquePricing = async (
+    productId: string,
+    targetUserId: string,
+    transferPrice: number,
+    marketPrice: number
+  ): Promise<{ success: boolean; message: string }> => {
+    const prod = products.find((p) => p.id === productId);
+    if (!prod) return { success: false, message: 'Article introuvable.' };
+
+    const targetUser = appUsers.find((u) => u.id === targetUserId);
+    const cleanTransfer = Math.max(0, Math.round(Number(transferPrice) || 0));
+    const cleanMarket = Math.max(0, Math.round(Number(marketPrice) || 0));
+
+    const now = new Date().toISOString();
+    const newTransferPrices = { ...(prod.distributedTransferPrices || {}) };
+    newTransferPrices[targetUserId] = cleanTransfer;
+
+    const newMarketPrices = { ...(prod.distributedMarketPrices || {}) };
+    newMarketPrices[targetUserId] = cleanMarket;
+
+    const updatedProduct: Product = {
+      ...prod,
+      distributedTransferPrices: newTransferPrices,
+      distributedMarketPrices: newMarketPrices,
+      lastUpdated: now,
+    };
+
+    const updatedProducts = products.map((p) => (p.id === productId ? updatedProduct : p));
+    setProducts(updatedProducts);
+    pushToCloud({ products: updatedProducts });
+
+    const profitPerUnit = cleanMarket - cleanTransfer;
+    return {
+      success: true,
+      message: `Tarifs mis à jour pour ${targetUser?.fullName || 'la caisse'} : Prix remis caisse = ${cleanTransfer.toLocaleString('fr-FR')} F | Prix marché = ${cleanMarket.toLocaleString('fr-FR')} F (Bénéfice caissier : ${profitPerUnit >= 0 ? '+' : ''}${profitPerUnit.toLocaleString('fr-FR')} F/u).`,
     };
   };
 
@@ -2001,12 +2076,32 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const soldItem = items.find((it) => it.product.id === prod.id);
       if (!soldItem) return prod;
 
+      const defaultBoutiqueMarketPrice =
+        isBoutiqueSale && effectiveSellerId && prod.distributedMarketPrices?.[effectiveSellerId] !== undefined
+          ? prod.distributedMarketPrices[effectiveSellerId]
+          : prod.salePrice;
+
       const unitPriceUsed =
         soldItem.product.salePrice !== undefined && Number.isFinite(Number(soldItem.product.salePrice))
           ? Number(soldItem.product.salePrice)
-          : prod.salePrice;
+          : defaultBoutiqueMarketPrice;
       const subtotal = unitPriceUsed * soldItem.quantity;
       totalAmount += subtotal;
+
+      // Calcul du prix remis à la caisse (ex: 4000 F) et du bénéfice du caissier (ex: 500 F)
+      const transferPriceUnit =
+        isBoutiqueSale && effectiveSellerId && prod.distributedTransferPrices?.[effectiveSellerId] !== undefined
+          ? prod.distributedTransferPrices[effectiveSellerId]
+          : prod.cashierTransferPrice !== undefined && prod.cashierTransferPrice > 0
+          ? prod.cashierTransferPrice
+          : prod.salePrice;
+
+      const cashierProfitTotal = isBoutiqueSale
+        ? (unitPriceUsed - transferPriceUnit) * soldItem.quantity
+        : 0;
+      const mainStoreAmountTotal = isBoutiqueSale
+        ? transferPriceUnit * soldItem.quantity
+        : subtotal;
 
       let centralQty = prod.quantity;
       const distributed = { ...(prod.distributedQuantities || {}) };
@@ -2028,6 +2123,11 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         ? sellerUser?.storeName || 'Boutique Moussa Vision'
         : 'Grand Magasin Central';
 
+      const isWholesaleUsed =
+        prod.wholesalePrice !== undefined &&
+        prod.wholesalePrice > 0 &&
+        unitPriceUsed === prod.wholesalePrice;
+
       newMovements.push({
         id: `mov-${Date.now()}-${prod.id}`,
         productId: prod.id,
@@ -2039,14 +2139,19 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         newStock: newQty,
         reason: isBoutiqueSale
           ? `Vente Caisse #${ticketNumber} (${paymentLabel}${customerName ? ` - ${customerName}` : ''})`
-          : `Vente Directe Grand Magasin #${ticketNumber} (${paymentLabel}${customerName ? ` - ${customerName}` : ''})`,
+          : `Vente Directe Grand Magasin${isWholesaleUsed ? ' [EN GROS]' : ''} #${ticketNumber} (${paymentLabel}${customerName ? ` - ${customerName}` : ''})`,
         operator: sellerDisplayName,
-        notes: `Règlement ${paymentLabel}${paymentMethod === 'ACOMPTE' ? ` (Acompte payé: ${acompteAmount ?? 0} F, Restant: ${remainingAmount ?? 0} F)` : paymentMethod === 'CREDIT' ? ` (Crédit restant: ${remainingAmount ?? totalAmount} F)` : ''}${customerName ? ` - Client: ${customerName}` : ''} - Ticket ${ticketNumber}`,
+        notes: `Règlement ${paymentLabel}${isWholesaleUsed ? ' (Tarif en Gros)' : ''}${isBoutiqueSale ? ` [Remis caisse: ${transferPriceUnit.toLocaleString('fr-FR')} F/u | Vendu: ${unitPriceUsed.toLocaleString('fr-FR')} F/u | Bénéfice caissier: ${cashierProfitTotal.toLocaleString('fr-FR')} F]` : ''}${paymentMethod === 'ACOMPTE' ? ` (Acompte payé: ${acompteAmount ?? 0} F, Restant: ${remainingAmount ?? 0} F)` : paymentMethod === 'CREDIT' ? ` (Crédit restant: ${remainingAmount ?? totalAmount} F)` : ''}${customerName ? ` - Client: ${customerName}` : ''} - Ticket ${ticketNumber}`,
         createdAt: now,
         storeName: boutiqueDisplayName,
         ticketNumber: ticketNumber,
         saleAmount: subtotal,
         unitCostAtSale: Math.max(0, Number(prod.costPrice) || 0),
+        transferPriceAtSale: isBoutiqueSale ? transferPriceUnit : undefined,
+        marketPriceAtSale: defaultBoutiqueMarketPrice,
+        cashierProfit: isBoutiqueSale ? cashierProfitTotal : undefined,
+        mainStoreAmount: mainStoreAmountTotal,
+        priceTier: isWholesaleUsed ? 'WHOLESALE' : unitPriceUsed !== defaultBoutiqueMarketPrice ? 'CUSTOM' : 'RETAIL',
         paymentMethod: paymentMethod,
         acompteAmount: acompteAmount,
         remainingAmount: remainingAmount,
@@ -2529,6 +2634,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         distributeProduct,
         recallProduct,
         setBoutiqueQuantity,
+        setBoutiquePricing,
         removeFromBoutique,
         distributionModal,
         openDistributionModal,

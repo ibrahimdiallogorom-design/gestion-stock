@@ -103,19 +103,41 @@ export const CashierView: React.FC = () => {
     return 0;
   };
 
+  // Prix final sur le marché fixé pour cette caisse (ex: 4500 FCFA)
+  const getBoutiqueMarketPrice = (prod: Product) => {
+    if (!isCentralSelected && effectiveCashierId && prod.distributedMarketPrices?.[effectiveCashierId] !== undefined) {
+      return prod.distributedMarketPrices[effectiveCashierId];
+    }
+    return prod.salePrice;
+  };
+
+  // Prix auquel la Boutique Principale a remis l'article à la caisse (ex: 4000 FCFA)
+  const getBoutiqueTransferPrice = (prod: Product) => {
+    if (!isCentralSelected && effectiveCashierId && prod.distributedTransferPrices?.[effectiveCashierId] !== undefined) {
+      return prod.distributedTransferPrices[effectiveCashierId];
+    }
+    return prod.cashierTransferPrice ?? prod.salePrice;
+  };
+
   // Compute total stock assigned to this cashier boutique (or Grand Magasin)
   const cashierInventoryStats = useMemo(() => {
     if (!effectiveCashierId) return null;
     let units = 0;
     let value = 0;
+    let transferValue = 0;
+    let cashierProfitValue = 0;
     products.forEach((p) => {
       const q = isCentralSelected ? (p.quantity || 0) : (p.distributedQuantities?.[effectiveCashierId] || 0);
       if (q > 0) {
+        const mPrice = getBoutiqueMarketPrice(p);
+        const tPrice = getBoutiqueTransferPrice(p);
         units += q;
-        value += q * p.salePrice;
+        value += q * mPrice;
+        transferValue += q * tPrice;
+        cashierProfitValue += q * (mPrice - tPrice);
       }
     });
-    return { units, value };
+    return { units, value, transferValue, cashierProfitValue };
   }, [effectiveCashierId, isCentralSelected, products]);
 
   // Count total articles allocated to this boutique
@@ -127,6 +149,8 @@ export const CashierView: React.FC = () => {
 
   // POS Sub-Tab: 'CATALOG' (Vente standard) vs 'REASSORT' (Réassort & Diminuer le prix client)
   const [cashierSubTab, setCashierSubTab] = useState<'CATALOG' | 'REASSORT'>('CATALOG');
+  // POS Price Tier Mode: 'RETAIL' (Prix Détail / Marché) vs 'WHOLESALE' (Prix en Gros Grossiste)
+  const [posPriceMode, setPosPriceMode] = useState<'RETAIL' | 'WHOLESALE'>('RETAIL');
 
   // POS State
   const [search, setSearch] = useState('');
@@ -149,6 +173,8 @@ export const CashierView: React.FC = () => {
 
   // State inside the "Réassort & Diminuer Prix" tab
   const [reassortPriceInputs, setReassortPriceInputs] = useState<Record<string, string>>({});
+  const [reassortWholesaleInputs, setReassortWholesaleInputs] = useState<Record<string, string>>({});
+  const [reassortTransferInputs, setReassortTransferInputs] = useState<Record<string, string>>({});
   const [reassortQtyInputs, setReassortQtyInputs] = useState<Record<string, string>>({});
   const [reassortShowAllCatalog, setReassortShowAllCatalog] = useState<boolean>(true);
 
@@ -204,10 +230,46 @@ export const CashierView: React.FC = () => {
     });
   }, [products, search, selectedCategory, reassortShowAllCatalog, effectiveCashierId, isCentralSelected]);
 
-  // Get original catalog price for a product
+  // Get original catalog market price for a product in the current boutique
   const getCatalogSalePrice = (productId: string, fallbackPrice: number) => {
     const found = products.find((p) => p.id === productId);
-    return found ? found.salePrice : fallbackPrice;
+    return found ? getBoutiqueMarketPrice(found) : fallbackPrice;
+  };
+
+  // Get default price depending on posPriceMode ('RETAIL' vs 'WHOLESALE')
+  const getEffectiveDefaultPrice = (product: Product) => {
+    if (posPriceMode === 'WHOLESALE') {
+      if (product.wholesalePrice && product.wholesalePrice > 0) return product.wholesalePrice;
+      if (product.cashierTransferPrice && product.cashierTransferPrice > 0) return product.cashierTransferPrice;
+    }
+    return getBoutiqueMarketPrice(product);
+  };
+
+  const handleSwitchPosPriceMode = (newMode: 'RETAIL' | 'WHOLESALE') => {
+    setPosPriceMode(newMode);
+    if (cart.length > 0) {
+      setCart((prev) =>
+        prev.map((item) => {
+          const catalogProd = products.find((p) => p.id === item.product.id) || item.product;
+          const nextPrice =
+            newMode === 'WHOLESALE'
+              ? catalogProd.wholesalePrice || catalogProd.cashierTransferPrice || getBoutiqueMarketPrice(catalogProd)
+              : getBoutiqueMarketPrice(catalogProd);
+          return {
+            ...item,
+            product: {
+              ...item.product,
+              salePrice: nextPrice,
+            },
+          };
+        })
+      );
+      showTempToast(
+        newMode === 'WHOLESALE'
+          ? 'Tarifs du ticket basculés en Prix en Gros (Grossiste).'
+          : 'Tarifs du ticket basculés en Prix Détail / Marché.'
+      );
+    }
   };
 
   // Cart operations (supports optional customPrice for negotiated customer discount)
@@ -219,10 +281,11 @@ export const CashierView: React.FC = () => {
     }
     setSaleError(null);
 
+    const defaultUnitPrice = getEffectiveDefaultPrice(product);
     const effectivePrice =
       customUnitPrice !== undefined && Number.isFinite(customUnitPrice) && customUnitPrice >= 0
         ? Math.round(customUnitPrice)
-        : product.salePrice;
+        : defaultUnitPrice;
 
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
@@ -253,9 +316,9 @@ export const CashierView: React.FC = () => {
       ];
     });
 
-    if (customUnitPrice !== undefined && effectivePrice !== product.salePrice) {
+    if (customUnitPrice !== undefined && effectivePrice !== getBoutiqueMarketPrice(product)) {
       showTempToast(
-        `"${product.name}" ajouté au ticket au prix client négocié de ${formatFCFA(effectivePrice)} (au lieu de ${formatFCFA(product.salePrice)})`
+        `"${product.name}" ajouté au ticket au prix de ${formatFCFA(effectivePrice)} (Marché : ${formatFCFA(getBoutiqueMarketPrice(product))})`
       );
     }
   };
@@ -318,7 +381,7 @@ export const CashierView: React.FC = () => {
         },
       }))
     );
-    showTempToast('Prix du ticket réinitialisés aux tarifs catalogue.');
+    showTempToast('Prix du ticket réinitialisés aux tarifs marché.');
   };
 
   // Quick Reassort (add stock) directly from the Réassort tab in Caisse
@@ -340,7 +403,6 @@ export const CashierView: React.FC = () => {
         );
         showTempToast(`Réassort effectué : +${cleanQty} u ajoutées en stock pour "${product.name}".`);
       } else {
-        // If a specific boutique is selected, check if central stock has enough, otherwise add to central first then distribute
         const currentCentral = product.centralQuantity ?? product.quantity ?? 0;
         if (currentCentral < cleanQty) {
           const needed = cleanQty - currentCentral;
@@ -352,11 +414,20 @@ export const CashierView: React.FC = () => {
             cashierName || activeAppUser?.fullName || 'Caisse'
           );
         }
+        const customTransfer = reassortTransferInputs[product.id] !== undefined && reassortTransferInputs[product.id] !== ''
+          ? Number(reassortTransferInputs[product.id])
+          : getBoutiqueTransferPrice(product);
+        const customMarket = reassortPriceInputs[product.id] !== undefined && reassortPriceInputs[product.id] !== ''
+          ? Number(reassortPriceInputs[product.id])
+          : getBoutiqueMarketPrice(product);
+
         const res = await distributeProduct(
           product.id,
           effectiveCashierId,
           cleanQty,
-          'Réassort direct depuis l\'onglet Réassort de la Caisse'
+          'Réassort direct depuis l\'onglet Réassort de la Caisse',
+          customTransfer,
+          customMarket
         );
         if (res.success) {
           showTempToast(`Réassort boutique effectué : +${cleanQty} u pour "${product.name}".`);
@@ -370,24 +441,57 @@ export const CashierView: React.FC = () => {
     }
   };
 
-  // Update catalog salePrice permanently from the Réassort tab
-  const handleSaveCatalogPrice = async (product: Product, newPrice: number) => {
-    const cleanPrice = Math.max(0, Math.round(newPrice));
-    if (!Number.isFinite(cleanPrice) || cleanPrice <= 0) {
-      setSaleError('Veuillez saisir un prix valide supérieur à 0 FCFA.');
+  // Update catalog salePrice, wholesalePrice, and cashierTransferPrice permanently from the Réassort tab
+  const handleSaveCatalogPrice = async (
+    product: Product,
+    newMarketPrice: number,
+    newWholesalePrice?: number,
+    newTransferPrice?: number
+  ) => {
+    const cleanMarket = Math.max(0, Math.round(newMarketPrice));
+    if (!Number.isFinite(cleanMarket) || cleanMarket <= 0) {
+      setSaleError('Veuillez saisir un prix marché valide supérieur à 0 FCFA.');
       return;
     }
     setSaleError(null);
-    await updateProduct(product.id, { salePrice: cleanPrice });
-    // Also update in current cart if present
+
+    const updates: Partial<Product> = {
+      salePrice: cleanMarket,
+    };
+    if (newWholesalePrice !== undefined && Number.isFinite(newWholesalePrice) && newWholesalePrice >= 0) {
+      updates.wholesalePrice = Math.round(newWholesalePrice) > 0 ? Math.round(newWholesalePrice) : undefined;
+    }
+    if (newTransferPrice !== undefined && Number.isFinite(newTransferPrice) && newTransferPrice >= 0) {
+      const cleanT = Math.round(newTransferPrice);
+      updates.cashierTransferPrice = cleanT > 0 ? cleanT : undefined;
+      if (!isCentralSelected && effectiveCashierId && effectiveCashierId !== 'CENTRAL') {
+        updates.distributedTransferPrices = {
+          ...(product.distributedTransferPrices || {}),
+          [effectiveCashierId]: cleanT,
+        };
+        updates.distributedMarketPrices = {
+          ...(product.distributedMarketPrices || {}),
+          [effectiveCashierId]: cleanMarket,
+        };
+      }
+    } else if (!isCentralSelected && effectiveCashierId && effectiveCashierId !== 'CENTRAL') {
+      updates.distributedMarketPrices = {
+        ...(product.distributedMarketPrices || {}),
+        [effectiveCashierId]: cleanMarket,
+      };
+    }
+
+    await updateProduct(product.id, updates);
     setCart((prev) =>
       prev.map((item) =>
         item.product.id === product.id
-          ? { ...item, product: { ...item.product, salePrice: cleanPrice } }
+          ? { ...item, product: { ...item.product, ...updates, salePrice: cleanMarket } }
           : item
       )
     );
-    showTempToast(`Nouveau prix enregistré pour "${product.name}" : ${formatFCFA(cleanPrice)}`);
+    showTempToast(
+      `Grille tarifaire enregistrée pour "${product.name}" (Marché : ${formatFCFA(cleanMarket)}${updates.cashierTransferPrice ? ` | Remis caisse : ${formatFCFA(updates.cashierTransferPrice)}` : ''}${updates.wholesalePrice ? ` | Gros : ${formatFCFA(updates.wholesalePrice)}` : ''})`
+    );
   };
 
   const updateQuantity = (productId: string, delta: number) => {
@@ -440,7 +544,17 @@ export const CashierView: React.FC = () => {
       (sum, item) => sum + getCatalogSalePrice(item.product.id, item.product.salePrice) * item.quantity,
       0
     );
-  }, [cart, products]);
+  }, [cart, products, effectiveCashierId, isCentralSelected]);
+
+  // Montant qui revient à la Boutique Principale (Prix Remis Caisse * Qté) & Bénéfice du Caissier sur ce ticket
+  const cartTransferTotal = useMemo(() => {
+    return cart.reduce((sum, item) => {
+      const catalogProd = products.find((p) => p.id === item.product.id) || item.product;
+      return sum + getBoutiqueTransferPrice(catalogProd) * item.quantity;
+    }, 0);
+  }, [cart, products, effectiveCashierId, isCentralSelected]);
+
+  const cartCashierProfitTotal = cartTotal - cartTransferTotal;
 
   const totalDiscountGranted = Math.max(0, cartCatalogTotal - cartTotal);
 
@@ -580,13 +694,23 @@ export const CashierView: React.FC = () => {
           )}
 
           {cashierInventoryStats && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-900">
+            <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-900">
               <Store className="w-4 h-4 text-indigo-600" />
-              <span>Stock boutique : <strong>{cashierInventoryStats.units} pcs</strong></span>
+              <span>Stock : <strong>{cashierInventoryStats.units} pcs</strong></span>
               <span className="text-indigo-300">|</span>
-              <span className="font-mono font-bold text-indigo-700">
-                {formatFCFA(cashierInventoryStats.value)}
-              </span>
+              <span>Marché : <strong className="font-mono text-indigo-700">{formatFCFA(cashierInventoryStats.value)}</strong></span>
+              {!isCentralSelected && cashierInventoryStats.cashierProfitValue !== 0 && (
+                <>
+                  <span className="text-indigo-300">|</span>
+                  <span className="text-blue-800">
+                    Dû Magasin : <strong className="font-mono">{formatFCFA(cashierInventoryStats.transferValue)}</strong>
+                  </span>
+                  <span className="text-indigo-300">|</span>
+                  <span className="text-emerald-800 font-bold">
+                    Bénéf. Caisse : <strong className="font-mono">+{formatFCFA(cashierInventoryStats.cashierProfitValue)}</strong>
+                  </span>
+                </>
+              )}
             </div>
           )}
 
@@ -610,8 +734,8 @@ export const CashierView: React.FC = () => {
         </div>
       </div>
 
-      {/* Sub-Tabs Navigation Bar inside Caisse: Catalogue Vente vs Onglet Réassort & Diminuer Prix */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 shadow-2xs">
+      {/* Sub-Tabs Navigation Bar inside Caisse: Catalogue Vente vs Onglet Réassort & Mode Détail / Gros */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-2.5 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5 shadow-2xs">
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -636,18 +760,35 @@ export const CashierView: React.FC = () => {
             }`}
           >
             <BadgePercent className="w-4 h-4" />
-            <span>Onglet Réassort & Diminuer le Prix Client</span>
-            <span className="px-1.5 py-0.5 text-[10px] rounded-md bg-white/20 font-mono">
-              Remise & Stock
-            </span>
+            <span>Onglet Réassort, Prix en Gros & Remise Client</span>
           </button>
         </div>
 
-        <div className="flex items-center gap-2 px-2 text-[11px] text-slate-500">
-          <Tag className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-          <span>
-            Astuce : Vous pouvez diminuer le prix d'un client depuis l'onglet <strong>Réassort</strong> ou directement dans le <strong>Ticket en Cours</strong>.
-          </span>
+        {/* Mode de Tarif: Détail / Marché vs Vente en Gros (Grossiste) */}
+        <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+          <span className="text-[11px] font-bold text-slate-600 px-2">Mode tarif :</span>
+          <button
+            type="button"
+            onClick={() => handleSwitchPosPriceMode('RETAIL')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              posPriceMode === 'RETAIL'
+                ? 'bg-emerald-600 text-white shadow-2xs'
+                : 'bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            🏷️ Prix Détail / Marché
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSwitchPosPriceMode('WHOLESALE')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              posPriceMode === 'WHOLESALE'
+                ? 'bg-indigo-600 text-white shadow-2xs'
+                : 'bg-white text-indigo-800 hover:bg-indigo-50'
+            }`}
+          >
+            📦 Prix en Gros (Grossiste)
+          </button>
         </div>
       </div>
 
@@ -727,13 +868,17 @@ export const CashierView: React.FC = () => {
                   const inStock = liveQty > 0;
                   const isLow = liveQty > 0 && liveQty <= product.minThreshold;
                   const cartItem = cart.find((i) => i.product.id === product.id);
+                  const marketPrice = getBoutiqueMarketPrice(product);
+                  const transferPrice = getBoutiqueTransferPrice(product);
+                  const cashierProfitUnit = marketPrice - transferPrice;
+                  const activeModePrice = getEffectiveDefaultPrice(product);
                   const hasCustomCartPrice =
-                    cartItem && cartItem.product.salePrice !== product.salePrice;
+                    cartItem && cartItem.product.salePrice !== marketPrice;
 
                   return (
                     <div
                       key={product.id}
-                      className={`text-left p-3.5 rounded-2xl border transition-all relative flex flex-col justify-between min-h-36 ${
+                      className={`text-left p-3.5 rounded-2xl border transition-all relative flex flex-col justify-between min-h-40 ${
                         !inStock
                           ? 'bg-slate-50 border-slate-200 opacity-60'
                           : cartItem
@@ -754,43 +899,67 @@ export const CashierView: React.FC = () => {
                         className="text-left flex-1 flex flex-col justify-between w-full"
                       >
                         <div>
-                          <span className="text-[10px] font-semibold text-slate-400 block uppercase tracking-wider truncate">
-                            {product.sku}
-                          </span>
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-[10px] font-semibold text-slate-400 block uppercase tracking-wider truncate">
+                              {product.sku}
+                            </span>
+                            {product.wholesalePrice && product.wholesalePrice > 0 && (
+                              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+                                Gros: {product.wholesalePrice.toLocaleString('fr-FR')} F
+                              </span>
+                            )}
+                          </div>
                           <h3 className="text-xs font-bold text-slate-900 line-clamp-2 mt-0.5">
                             {product.name}
                           </h3>
                         </div>
 
-                        <div className="flex items-center justify-between pt-2 mt-2 border-t border-slate-100 w-full">
-                          <div>
-                            {hasCustomCartPrice ? (
-                              <div className="flex flex-col">
-                                <span className="font-mono text-[10px] text-slate-400 line-through">
-                                  {formatFCFA(product.salePrice)}
+                        <div className="pt-2 mt-2 border-t border-slate-100 w-full space-y-1">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              {hasCustomCartPrice ? (
+                                <div className="flex flex-col">
+                                  <span className="font-mono text-[10px] text-slate-400 line-through">
+                                    {formatFCFA(marketPrice)}
+                                  </span>
+                                  <span className="font-mono text-xs font-bold text-emerald-700">
+                                    {formatFCFA(cartItem.product.salePrice)}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span
+                                  className={`font-mono text-sm font-bold ${
+                                    posPriceMode === 'WHOLESALE' ? 'text-indigo-700' : 'text-blue-700'
+                                  }`}
+                                >
+                                  {formatFCFA(activeModePrice)}
                                 </span>
-                                <span className="font-mono text-xs font-bold text-emerald-700">
-                                  {formatFCFA(cartItem.product.salePrice)}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="font-mono text-sm font-bold text-blue-700">
-                                {formatFCFA(product.salePrice)}
-                              </span>
-                            )}
+                              )}
+                            </div>
+
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium ${
+                                !inStock
+                                  ? 'bg-rose-100 text-rose-800'
+                                  : isLow
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-emerald-100 text-emerald-800'
+                              }`}
+                            >
+                              {inStock ? `${liveQty} en caisse` : 'Rupture'}
+                            </span>
                           </div>
 
-                          <span
-                            className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium ${
-                              !inStock
-                                ? 'bg-rose-100 text-rose-800'
-                                : isLow
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'bg-emerald-100 text-emerald-800'
-                            }`}
-                          >
-                            {inStock ? `${liveQty} en caisse` : 'Rupture'}
-                          </span>
+                          {/* Cashier Transfer Price & Cashier Profit Indicator */}
+                          {transferPrice > 0 && transferPrice !== marketPrice && (
+                            <div className="flex items-center justify-between text-[10px] font-mono bg-emerald-50/80 text-emerald-900 px-1.5 py-0.5 rounded">
+                              <span>Caisse: {transferPrice.toLocaleString('fr-FR')} F</span>
+                              <span className="font-bold text-emerald-700">
+                                Bénéf: {cashierProfitUnit >= 0 ? '+' : ''}
+                                {cashierProfitUnit.toLocaleString('fr-FR')} F
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </button>
 
@@ -802,17 +971,17 @@ export const CashierView: React.FC = () => {
                             setReassortPriceInputs((prev) => ({
                               ...prev,
                               [product.id]: String(
-                                cartItem ? cartItem.product.salePrice : product.salePrice
+                                cartItem ? cartItem.product.salePrice : marketPrice
                               ),
                             }));
                             setSearch(product.name);
                             setCashierSubTab('REASSORT');
                           }}
                           className="w-full py-1 px-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 text-[10px] font-semibold flex items-center justify-center gap-1 transition-colors"
-                          title="Diminuer le prix pour le client ou réassortir cet article"
+                          title="Diminuer le prix pour le client, vendre en gros ou réassortir cet article"
                         >
                           <BadgePercent className="w-3 h-3 text-amber-600" />
-                          <span>Diminuer prix / Réassort</span>
+                          <span>Diminuer prix / Gros / Réassort</span>
                         </button>
                       </div>
                     </div>
@@ -838,7 +1007,7 @@ export const CashierView: React.FC = () => {
                   </p>
                   <p className="text-[12px] text-slate-500 max-w-md mx-auto">
                     Le Grand Magasin Central n'a pas encore alloué de stock à <strong>{effectiveCashier?.storeName || effectiveCashier?.fullName || 'cette boutique'}</strong>.
-                    Cliquez sur l'onglet <strong>Onglet Réassort & Diminuer le Prix Client</strong> ci-dessus pour réassortir immédiatement.
+                    Cliquez sur l'onglet <strong>Onglet Réassort, Prix en Gros & Remise Client</strong> ci-dessus pour réassortir immédiatement.
                   </p>
                 </div>
               ) : filteredProducts.length === 0 ? (
@@ -848,16 +1017,16 @@ export const CashierView: React.FC = () => {
               ) : null}
             </>
           ) : (
-            /* ONGLET RÉASSORT & DIMINUER LE PRIX CLIENT */
+            /* ONGLET RÉASSORT, PRIX EN GROS & DIMINUER LE PRIX CLIENT */
             <div className="space-y-3">
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 text-amber-900 font-bold text-xs sm:text-sm">
                     <BadgePercent className="w-4 h-4 text-amber-600" />
-                    <span>Espace Réassort & Négociation / Diminution de Prix Client</span>
+                    <span>Espace Réassort, Tarifs Grossiste (Prix en Gros), Prix Caisse & Remise Client</span>
                   </div>
                   <p className="text-[11px] text-amber-800">
-                    Si un client négocie une remise, diminuez le prix ci-dessous puis cliquez sur <strong>« Vendre à ce prix au client »</strong> pour l'ajouter directement au ticket avec le tarif réduit.
+                    Diminuez le prix pour un client, appliquez le <strong>Prix en Gros</strong>, ou définissez le <strong>Prix Remis à la Caisse</strong> (ex: 4 000 F) et le <strong>Prix Final sur le Marché</strong> (ex: 4 500 F, soit +500 F de bénéfice pour le caissier).
                   </p>
                 </div>
                 {search && (
@@ -871,18 +1040,32 @@ export const CashierView: React.FC = () => {
                 )}
               </div>
 
-              <div className="space-y-3 max-h-[640px] overflow-y-auto pr-1">
+              <div className="space-y-3 max-h-[680px] overflow-y-auto pr-1">
                 {reassortProducts.map((product) => {
                   const liveQty = getAvailableStock(product);
                   const inStock = liveQty > 0;
+                  const marketPrice = getBoutiqueMarketPrice(product);
+                  const transferPrice = getBoutiqueTransferPrice(product);
                   const rawPriceInput = reassortPriceInputs[product.id];
                   const currentNegotiatedPrice =
                     rawPriceInput !== undefined && rawPriceInput !== ''
                       ? Math.max(0, Math.round(Number(rawPriceInput) || 0))
-                      : product.salePrice;
-                  const priceDiff = product.salePrice - currentNegotiatedPrice;
+                      : marketPrice;
+                  const priceDiff = marketPrice - currentNegotiatedPrice;
                   const isBelowCost = !isRoleCashier && currentNegotiatedPrice < product.costPrice;
                   const rawQtyInput = reassortQtyInputs[product.id] ?? '';
+
+                  const rawWholesaleInput =
+                    reassortWholesaleInputs[product.id] !== undefined
+                      ? reassortWholesaleInputs[product.id]
+                      : String(product.wholesalePrice ?? '');
+                  const rawTransferInput =
+                    reassortTransferInputs[product.id] !== undefined
+                      ? reassortTransferInputs[product.id]
+                      : String(transferPrice ?? '');
+
+                  const previewTransferVal = Number(rawTransferInput) || 0;
+                  const previewCashierProfit = currentNegotiatedPrice - previewTransferVal;
 
                   return (
                     <div
@@ -906,14 +1089,23 @@ export const CashierView: React.FC = () => {
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <div className="text-right">
-                            <span className="text-[10px] text-slate-400 block">Prix Catalogue</span>
-                            <span className="font-mono text-sm font-bold text-slate-900">
-                              {formatFCFA(product.salePrice)}
+                          <div className="text-right space-y-0.5">
+                            <span className="text-[10px] text-slate-400 block">
+                              Prix Final Marché : <strong className="font-mono text-slate-900">{formatFCFA(marketPrice)}</strong>
                             </span>
+                            {transferPrice > 0 && (
+                              <span className="block text-[10px] font-mono text-blue-700 font-semibold">
+                                Remis Caisse : {formatFCFA(transferPrice)} (Bénéf. caisse : +{formatFCFA(marketPrice - transferPrice)})
+                              </span>
+                            )}
+                            {product.wholesalePrice && product.wholesalePrice > 0 && (
+                              <span className="block text-[10px] font-mono text-indigo-700 font-semibold">
+                                Prix en Gros : {formatFCFA(product.wholesalePrice)}
+                              </span>
+                            )}
                             {!isRoleCashier && (
                               <span className="block text-[10px] font-mono text-slate-400">
-                                Achat : {formatFCFA(product.costPrice)}
+                                Achat Fournisseur : {formatFCFA(product.costPrice)}
                               </span>
                             )}
                           </div>
@@ -935,7 +1127,7 @@ export const CashierView: React.FC = () => {
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
                             <ArrowDownRight className="w-4 h-4 text-amber-600" />
-                            <span>Diminuer le prix pour le client :</span>
+                            <span>Diminuer le prix pour le client (ou tarif en gros) :</span>
                           </span>
                           {priceDiff > 0 && (
                             <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
@@ -949,8 +1141,36 @@ export const CashierView: React.FC = () => {
                           )}
                         </div>
 
-                        {/* Quick Reduction Buttons */}
+                        {/* Quick Reduction & Tier Buttons */}
                         <div className="flex flex-wrap items-center gap-1.5">
+                          {product.wholesalePrice && product.wholesalePrice > 0 && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setReassortPriceInputs((prev) => ({
+                                  ...prev,
+                                  [product.id]: String(product.wholesalePrice),
+                                }))
+                              }
+                              className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-mono font-bold transition-colors"
+                            >
+                              📦 Prix en Gros ({product.wholesalePrice.toLocaleString('fr-FR')} F)
+                            </button>
+                          )}
+                          {transferPrice > 0 && transferPrice !== marketPrice && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setReassortPriceInputs((prev) => ({
+                                  ...prev,
+                                  [product.id]: String(transferPrice),
+                                }))
+                              }
+                              className="px-2.5 py-1 bg-blue-100 hover:bg-blue-200 text-blue-900 border border-blue-300 rounded-lg text-[11px] font-mono font-bold transition-colors"
+                            >
+                              🏢 Prix Caisse ({transferPrice.toLocaleString('fr-FR')} F)
+                            </button>
+                          )}
                           {[250, 500, 1000, 2000, 5000].map((StepDiscount) => (
                             <button
                               key={StepDiscount}
@@ -969,28 +1189,15 @@ export const CashierView: React.FC = () => {
                           ))}
                           <button
                             type="button"
-                            onClick={() => {
-                              const nextVal = Math.max(0, Math.round(product.salePrice * 0.9));
-                              setReassortPriceInputs((prev) => ({
-                                ...prev,
-                                [product.id]: String(nextVal),
-                              }));
-                            }}
-                            className="px-2.5 py-1 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-[11px] font-mono font-bold transition-colors"
-                          >
-                            -10%
-                          </button>
-                          <button
-                            type="button"
                             onClick={() =>
                               setReassortPriceInputs((prev) => ({
                                 ...prev,
-                                [product.id]: String(product.salePrice),
+                                [product.id]: String(marketPrice),
                               }))
                             }
                             className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-medium transition-colors"
                           >
-                            Prix initial
+                            Prix marché ({marketPrice.toLocaleString('fr-FR')} F)
                           </button>
                         </div>
 
@@ -1004,7 +1211,7 @@ export const CashierView: React.FC = () => {
                               value={
                                 rawPriceInput !== undefined
                                   ? rawPriceInput
-                                  : String(product.salePrice)
+                                  : String(marketPrice)
                               }
                               onChange={(e) =>
                                 setReassortPriceInputs((prev) => ({
@@ -1013,10 +1220,10 @@ export const CashierView: React.FC = () => {
                                 }))
                               }
                               className="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600"
-                              placeholder="Nouveau prix client en FCFA..."
+                              placeholder="Prix final client / marché en FCFA..."
                             />
                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-slate-400">
-                              FCFA
+                              FCFA (Prix Marché / Client)
                             </span>
                           </div>
 
@@ -1035,17 +1242,81 @@ export const CashierView: React.FC = () => {
                               Vendre à {formatFCFA(currentNegotiatedPrice)}
                             </span>
                           </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleSaveCatalogPrice(product, currentNegotiatedPrice)}
-                            className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition-colors"
-                            title="Enregistrer ce prix comme nouveau prix catalogue permanent"
-                          >
-                            <Check className="w-3.5 h-3.5 text-blue-600" />
-                            <span>Fixer au catalogue</span>
-                          </button>
                         </div>
+
+                        {/* Admin Grille Grossiste & Caisse : Prix en Gros + Prix Remis Caisse */}
+                        {!isRoleCashier && (
+                          <div className="pt-2 mt-2 border-t border-amber-200/70 grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
+                            <div>
+                              <label className="block text-[10px] font-bold text-indigo-900 mb-0.5">
+                                📦 Prix en Gros (Grossiste)
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="50"
+                                value={rawWholesaleInput}
+                                onChange={(e) =>
+                                  setReassortWholesaleInputs((prev) => ({
+                                    ...prev,
+                                    [product.id]: e.target.value,
+                                  }))
+                                }
+                                placeholder="Ex: 3800"
+                                className="w-full px-2.5 py-1.5 bg-white border border-indigo-200 rounded-lg text-xs font-mono font-bold text-indigo-900 focus:outline-none focus:border-indigo-600"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold text-blue-900 mb-0.5">
+                                🏢 Prix remis à la Caisse (ex: 4000)
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="50"
+                                value={rawTransferInput}
+                                onChange={(e) =>
+                                  setReassortTransferInputs((prev) => ({
+                                    ...prev,
+                                    [product.id]: e.target.value,
+                                  }))
+                                }
+                                placeholder="Ex: 4000"
+                                className="w-full px-2.5 py-1.5 bg-white border border-blue-200 rounded-lg text-xs font-mono font-bold text-blue-900 focus:outline-none focus:border-blue-600"
+                              />
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleSaveCatalogPrice(
+                                  product,
+                                  currentNegotiatedPrice,
+                                  rawWholesaleInput !== '' ? Number(rawWholesaleInput) : undefined,
+                                  rawTransferInput !== '' ? Number(rawTransferInput) : undefined
+                                )
+                              }
+                              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors h-[34px]"
+                              title="Enregistrer le Prix Marché, le Prix en Gros et le Prix Remis Caisse"
+                            >
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>Enregistrer ces prix</span>
+                            </button>
+                          </div>
+                        )}
+
+                        {previewTransferVal > 0 && (
+                          <div className="flex items-center justify-between text-[11px] bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-lg text-emerald-900 font-medium">
+                            <span>
+                              Remis à la caisse : <strong className="font-mono">{formatFCFA(previewTransferVal)}</strong> → Vendu marché : <strong className="font-mono">{formatFCFA(currentNegotiatedPrice)}</strong>
+                            </span>
+                            <span className="font-mono font-bold text-emerald-700">
+                              Bénéfice caissier : {previewCashierProfit >= 0 ? '+' : ''}
+                              {formatFCFA(previewCashierProfit)} / u
+                            </span>
+                          </div>
+                        )}
 
                         {isBelowCost && (
                           <p className="text-[11px] text-rose-600 font-semibold flex items-center gap-1">
@@ -1141,7 +1412,9 @@ export const CashierView: React.FC = () => {
           {/* Cart Items List with Per-Item Price Negotiation */}
           <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
             {cart.map((item) => {
+              const catalogProd = products.find((p) => p.id === item.product.id) || item.product;
               const catalogPrice = getCatalogSalePrice(item.product.id, item.product.salePrice);
+              const transferPriceUnit = getBoutiqueTransferPrice(catalogProd);
               const isDiscounted = item.product.salePrice < catalogPrice;
               const isEditingThisPrice = editingCartItemId === item.product.id;
 
@@ -1225,7 +1498,7 @@ export const CashierView: React.FC = () => {
                   {isEditingThisPrice && (
                     <div className="p-2.5 bg-white border border-amber-200 rounded-xl space-y-2">
                       <div className="flex items-center justify-between text-[11px] font-semibold text-amber-900">
-                        <span>Nouveau prix unitaire client (Catalogue : {formatFCFA(catalogPrice)})</span>
+                        <span>Nouveau prix unitaire client (Marché : {formatFCFA(catalogPrice)})</span>
                         <button
                           type="button"
                           onClick={() => {
@@ -1234,11 +1507,35 @@ export const CashierView: React.FC = () => {
                           }}
                           className="text-[10px] text-blue-600 hover:underline"
                         >
-                          Remettre prix initial
+                          Remettre prix marché
                         </button>
                       </div>
 
                       <div className="flex flex-wrap gap-1">
+                        {catalogProd.wholesalePrice && catalogProd.wholesalePrice > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              updateCartItemPrice(item.product.id, catalogProd.wholesalePrice!);
+                              setCustomCartPriceInput(String(catalogProd.wholesalePrice!));
+                            }}
+                            className="px-2 py-0.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-900 border border-indigo-200 rounded text-[10px] font-mono font-bold"
+                          >
+                            📦 Gros ({catalogProd.wholesalePrice.toLocaleString('fr-FR')} F)
+                          </button>
+                        )}
+                        {transferPriceUnit > 0 && transferPriceUnit !== catalogPrice && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              updateCartItemPrice(item.product.id, transferPriceUnit);
+                              setCustomCartPriceInput(String(transferPriceUnit));
+                            }}
+                            className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 rounded text-[10px] font-mono font-bold"
+                          >
+                            🏢 Caisse ({transferPriceUnit.toLocaleString('fr-FR')} F)
+                          </button>
+                        )}
                         {[250, 500, 1000, 2000].map((disc) => (
                           <button
                             key={disc}
@@ -1289,7 +1586,7 @@ export const CashierView: React.FC = () => {
               <div className="p-8 text-center text-slate-400 text-xs space-y-1">
                 <ShoppingCart className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                 <p className="font-medium text-slate-600">Le panier est vide</p>
-                <p className="text-[11px]">Touchez un article du catalogue ou utilisez l'onglet Réassort pour vendre à prix réduit.</p>
+                <p className="text-[11px]">Touchez un article du catalogue ou utilisez l'onglet Réassort pour vendre à prix réduit ou en gros.</p>
               </div>
             )}
           </div>
@@ -1327,7 +1624,7 @@ export const CashierView: React.FC = () => {
                   <div className="flex items-center justify-between text-[11px] font-bold text-amber-950">
                     <span>Saisir le nouveau total négocié avec le client :</span>
                     <span className="font-mono text-slate-500">
-                      Catalogue : {formatFCFA(cartCatalogTotal)}
+                      Marché : {formatFCFA(cartCatalogTotal)}
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
@@ -1373,12 +1670,29 @@ export const CashierView: React.FC = () => {
               {totalDiscountGranted > 0 && (
                 <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1 text-xs">
                   <div className="flex justify-between text-slate-600">
-                    <span>Total initial catalogue :</span>
+                    <span>Total initial marché :</span>
                     <span className="font-mono line-through">{formatFCFA(cartCatalogTotal)}</span>
                   </div>
                   <div className="flex justify-between font-bold text-emerald-800">
                     <span>Remise accordée au client :</span>
                     <span className="font-mono">-{formatFCFA(totalDiscountGranted)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Répartition Boutique Principale (Prix Remis Caisse) vs Bénéfice du Caissier */}
+              {(!isCentralSelected || cartTransferTotal !== cartTotal) && (
+                <div className="p-2.5 bg-indigo-50/70 border border-indigo-200/80 rounded-xl space-y-1 text-[11px]">
+                  <div className="flex justify-between text-slate-700">
+                    <span>🏢 Part Boutique Principale (Prix remis caisse) :</span>
+                    <span className="font-mono font-bold text-blue-800">{formatFCFA(cartTransferTotal)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-emerald-800">
+                    <span>💰 Bénéfice Caissier sur ce ticket :</span>
+                    <span className="font-mono">
+                      {cartCashierProfitTotal >= 0 ? '+' : ''}
+                      {formatFCFA(cartCashierProfitTotal)}
+                    </span>
                   </div>
                 </div>
               )}

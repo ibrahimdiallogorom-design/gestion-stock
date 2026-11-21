@@ -30,6 +30,7 @@ export const DirectSaleModal: React.FC = () => {
   const { products, directSaleModal, closeDirectSaleModal, processSale, activeAppUser } = useStock();
 
   const [lines, setLines] = useState<DirectSaleLine[]>([]);
+  const [salePriceMode, setSalePriceMode] = useState<'RETAIL' | 'WHOLESALE'>('RETAIL');
   const [searchQuery, setSearchQuery] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
   const [acompteInput, setAcompteInput] = useState<string>('');
@@ -46,6 +47,14 @@ export const DirectSaleModal: React.FC = () => {
     remaining?: number;
   } | null>(null);
 
+  const getEffectivePriceForMode = (prod: Product, mode: 'RETAIL' | 'WHOLESALE') => {
+    if (mode === 'WHOLESALE') {
+      if (prod.wholesalePrice && prod.wholesalePrice > 0) return Number(prod.wholesalePrice);
+      if (prod.cashierTransferPrice && prod.cashierTransferPrice > 0) return Number(prod.cashierTransferPrice);
+    }
+    return Number(prod.salePrice) || 0;
+  };
+
   useEffect(() => {
     if (directSaleModal.isOpen) {
       setError(null);
@@ -54,6 +63,7 @@ export const DirectSaleModal: React.FC = () => {
       setPaymentMethod('CASH');
       setAcompteInput('');
       setCustomerName('');
+      setSalePriceMode('RETAIL');
 
       if (directSaleModal.productId) {
         const found = products.find((p) => p.id === directSaleModal.productId);
@@ -73,6 +83,16 @@ export const DirectSaleModal: React.FC = () => {
       }
     }
   }, [directSaleModal.isOpen, directSaleModal.productId, products]);
+
+  const handleSwitchPriceMode = (newMode: 'RETAIL' | 'WHOLESALE') => {
+    setSalePriceMode(newMode);
+    setLines((prev) =>
+      prev.map((l) => ({
+        ...l,
+        unitPrice: getEffectivePriceForMode(l.product, newMode),
+      }))
+    );
+  };
 
   const availableProducts = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -101,6 +121,7 @@ export const DirectSaleModal: React.FC = () => {
 
   const addProductLine = (prod: Product) => {
     setError(null);
+    const targetPrice = getEffectivePriceForMode(prod, salePriceMode);
     setLines((prev) => {
       const existing = prev.find((l) => l.product.id === prod.id);
       if (existing) {
@@ -116,8 +137,8 @@ export const DirectSaleModal: React.FC = () => {
         ...prev,
         {
           product: prod,
-          quantity: 1,
-          unitPrice: Number(prod.salePrice) || 0,
+          quantity: salePriceMode === 'WHOLESALE' ? Math.min(prod.quantity, prod.wholesaleMinQty || 1) : 1,
+          unitPrice: targetPrice,
         },
       ];
     });
@@ -205,9 +226,9 @@ export const DirectSaleModal: React.FC = () => {
               <ShoppingBag className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold">Vente Directe — Grand Magasin Central</h2>
+              <h2 className="text-base font-bold">Vente Directe — Grand Magasin & Grossiste</h2>
               <p className="text-xs text-emerald-100">
-                Vendez directement sur le stock du Grand Magasin sans passer par la caisse
+                Vendez au détail (prix marché) ou en gros (tarif grossiste / autres boutiques)
               </p>
             </div>
           </div>
@@ -294,6 +315,37 @@ export const DirectSaleModal: React.FC = () => {
               </div>
             )}
 
+            {/* Mode de Tarification : Détail (Marché) vs Vente en Gros (Grossiste) */}
+            <div className="p-2.5 bg-slate-100 border border-slate-200 rounded-xl flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+              <span className="font-bold text-slate-700 px-1">
+                Grille tarifaire appliquée :
+              </span>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleSwitchPriceMode('RETAIL')}
+                  className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg font-bold transition-all ${
+                    salePriceMode === 'RETAIL'
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  🏷️ Prix Détail / Marché
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSwitchPriceMode('WHOLESALE')}
+                  className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg font-bold transition-all ${
+                    salePriceMode === 'WHOLESALE'
+                      ? 'bg-indigo-600 text-white shadow-2xs'
+                      : 'bg-white text-indigo-800 border border-indigo-200 hover:bg-indigo-50'
+                  }`}
+                >
+                  📦 Prix en Gros (Grossiste)
+                </button>
+              </div>
+            </div>
+
             {/* Recherche / Ajout d'un produit du Grand Magasin */}
             <div>
               <label className="block font-bold text-slate-700 mb-1.5">
@@ -328,10 +380,15 @@ export const DirectSaleModal: React.FC = () => {
                           <span className="font-bold text-slate-900">{p.name}</span>
                           <span className="ml-2 font-mono text-[11px] text-slate-500">{p.sku}</span>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           <span className="px-2 py-0.5 rounded bg-slate-200 text-slate-800 font-mono font-bold text-[11px]">
                             Stock: {p.quantity}
                           </span>
+                          {p.wholesalePrice && p.wholesalePrice > 0 && (
+                            <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 font-mono font-bold text-[10px]">
+                              Gros: {fmtFCFA(p.wholesalePrice)}
+                            </span>
+                          )}
                           <span className="font-mono font-bold text-emerald-700">
                             {fmtFCFA(p.salePrice)}
                           </span>
@@ -360,9 +417,26 @@ export const DirectSaleModal: React.FC = () => {
                     >
                       <div className="min-w-0">
                         <div className="font-bold text-slate-900 truncate">{line.product.name}</div>
-                        <div className="text-[11px] text-slate-500 font-mono">
-                          {line.product.sku} · Dispo Grand Magasin :{' '}
-                          <strong className="text-slate-800">{line.product.quantity}</strong>
+                        <div className="text-[11px] text-slate-500 font-mono flex flex-wrap items-center gap-1.5 mt-0.5">
+                          <span>
+                            {line.product.sku} · Dispo : <strong className="text-slate-800">{line.product.quantity}</strong>
+                          </span>
+                          {line.product.wholesalePrice && line.product.wholesalePrice > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => updateLinePrice(line.product.id, line.product.wholesalePrice!)}
+                              className="px-1.5 py-0.5 rounded bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-bold text-[10px]"
+                            >
+                              Gros ({line.product.wholesalePrice.toLocaleString('fr-FR')} F)
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => updateLinePrice(line.product.id, line.product.salePrice)}
+                            className="px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold text-[10px]"
+                          >
+                            Détail ({line.product.salePrice.toLocaleString('fr-FR')} F)
+                          </button>
                         </div>
                       </div>
 

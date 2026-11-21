@@ -27,9 +27,14 @@ export interface Product {
   quantity: number; // Stock total de l'entreprise (Grand Magasin + tous les vendeurs)
   centralQuantity?: number; // Stock disponible au Grand Magasin (Dépôt)
   distributedQuantities?: Record<string, number>; // Répartition du stock { [userId]: quantité }
+  distributedTransferPrices?: Record<string, number>; // Prix unitaire remis à chaque caisse { [userId]: ex 4000 FCFA }
+  distributedMarketPrices?: Record<string, number>; // Prix final sur le marché fixé pour chaque caisse { [userId]: ex 4500 FCFA }
   minThreshold: number;
-  costPrice: number; // Prix d'achat (FCFA)
-  salePrice: number; // Prix de vente (FCFA)
+  costPrice: number; // Prix d'achat fournisseur / revient (FCFA)
+  wholesalePrice?: number; // Prix de vente en Gros (Grossiste) (FCFA)
+  wholesaleMinQty?: number; // Quantité minimale pour appliquer le prix en gros
+  cashierTransferPrice?: number; // Prix de cession par défaut remis aux caisses/sous-boutiques (ex: 4000 FCFA)
+  salePrice: number; // Prix de vente final sur le marché / Détail (ex: 4500 FCFA)
   supplier: string;
   location?: string;
   lastUpdated: string;
@@ -54,6 +59,11 @@ export interface StockMovement {
   ticketNumber?: string;
   saleAmount?: number;
   unitCostAtSale?: number; // Prix d'achat unitaire figé au moment de la vente (marge historique fiable)
+  transferPriceAtSale?: number; // Prix unitaire auquel l'article a été remis à la caisse (ex: 4000 FCFA)
+  marketPriceAtSale?: number; // Prix final marché recommandé au moment de la vente (ex: 4500 FCFA)
+  cashierProfit?: number; // Bénéfice réalisé par le caissier sur la vente ((prixVendu - prixRemisCaisse) * qté)
+  mainStoreAmount?: number; // Montant revenant à la boutique principale (prixRemisCaisse * qté)
+  priceTier?: 'RETAIL' | 'WHOLESALE' | 'CUSTOM'; // Tarif appliqué : Détail, Gros ou Personnalisé
   paymentMethod?: PaymentMethod;
   acompteAmount?: number; // Acompte payé
   remainingAmount?: number; // Total restant (Crédit)

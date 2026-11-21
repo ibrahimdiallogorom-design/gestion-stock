@@ -19,6 +19,9 @@ export const ProductModal: React.FC = () => {
   const [quantity, setQuantity] = useState<number>(1);
   const [minThreshold, setMinThreshold] = useState<number>(2);
   const [costPrice, setCostPrice] = useState<number>(0);
+  const [wholesalePrice, setWholesalePrice] = useState<number>(0);
+  const [wholesaleMinQty, setWholesaleMinQty] = useState<number>(5);
+  const [cashierTransferPrice, setCashierTransferPrice] = useState<number>(0);
   const [salePrice, setSalePrice] = useState<number>(0);
   const [supplier, setSupplier] = useState('');
   const [location, setLocation] = useState('Rayon principal');
@@ -48,6 +51,9 @@ export const ProductModal: React.FC = () => {
         setQuantity(p.quantity);
         setMinThreshold(p.minThreshold);
         setCostPrice(p.costPrice);
+        setWholesalePrice(p.wholesalePrice ?? 0);
+        setWholesaleMinQty(p.wholesaleMinQty ?? 5);
+        setCashierTransferPrice(p.cashierTransferPrice ?? 0);
         setSalePrice(p.salePrice);
         setSupplier(p.supplier);
         setLocation(p.location || 'Rayon principal');
@@ -65,6 +71,9 @@ export const ProductModal: React.FC = () => {
         setQuantity(1);
         setMinThreshold(2);
         setCostPrice(0);
+        setWholesalePrice(0);
+        setWholesaleMinQty(5);
+        setCashierTransferPrice(0);
         setSalePrice(0);
         setSupplier('Fournisseur Direct');
         setLocation('Rayon A-01');
@@ -140,7 +149,7 @@ export const ProductModal: React.FC = () => {
       return;
     }
 
-    if (costPrice < 0 || salePrice < 0 || quantity < 0 || minThreshold < 0) {
+    if (costPrice < 0 || salePrice < 0 || wholesalePrice < 0 || cashierTransferPrice < 0 || quantity < 0 || minThreshold < 0) {
       setError('Les montants et quantités doivent être des valeurs positives ou nulles.');
       return;
     }
@@ -158,6 +167,9 @@ export const ProductModal: React.FC = () => {
         category: finalCategory,
         minThreshold,
         costPrice,
+        wholesalePrice: wholesalePrice > 0 ? wholesalePrice : undefined,
+        wholesaleMinQty: wholesalePrice > 0 ? Math.max(1, wholesaleMinQty || 1) : undefined,
+        cashierTransferPrice: cashierTransferPrice > 0 ? cashierTransferPrice : undefined,
         salePrice,
         supplier: supplier.trim(),
         location: location.trim(),
@@ -172,6 +184,9 @@ export const ProductModal: React.FC = () => {
         quantity,
         minThreshold,
         costPrice,
+        wholesalePrice: wholesalePrice > 0 ? wholesalePrice : undefined,
+        wholesaleMinQty: wholesalePrice > 0 ? Math.max(1, wholesaleMinQty || 1) : undefined,
+        cashierTransferPrice: cashierTransferPrice > 0 ? cashierTransferPrice : undefined,
         salePrice,
         supplier: supplier.trim() || 'Fournisseur direct',
         location: location.trim() || 'Rayon principal',
@@ -572,11 +587,11 @@ export const ProductModal: React.FC = () => {
             )}
           </div>
 
-          {/* Prices */}
+          {/* Prices: Achat & Prix Final Marché (Détail) */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="font-semibold text-slate-700 block mb-1">
-                Prix d'achat (FCFA)
+                Prix d'achat / revient (FCFA)
               </label>
               <input
                 type="number"
@@ -584,14 +599,14 @@ export const ProductModal: React.FC = () => {
                 min="0"
                 value={costPrice}
                 onChange={(e) => setCostPrice(parseFloat(e.target.value) || 0)}
-                placeholder="Ex: 750"
+                placeholder="Ex: 3000"
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 font-mono tabular-nums text-slate-900"
               />
             </div>
 
             <div>
               <label className="font-semibold text-slate-700 block mb-1">
-                Prix de vente (FCFA)
+                Prix final sur le marché / Détail (FCFA)
               </label>
               <input
                 type="number"
@@ -599,10 +614,120 @@ export const ProductModal: React.FC = () => {
                 min="0"
                 value={salePrice}
                 onChange={(e) => setSalePrice(parseFloat(e.target.value) || 0)}
-                placeholder="Ex: 1250"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 font-mono tabular-nums text-slate-900"
+                placeholder="Ex: 4500"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 font-mono tabular-nums font-bold text-slate-900"
               />
             </div>
+          </div>
+
+          {/* Tarification Grossiste & Cession aux Caisses / Sous-Boutiques */}
+          <div className="p-3.5 rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50/70 to-amber-50/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-indigo-950 text-xs flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-indigo-600" />
+                <span>Option Grossiste (Prix en Gros) & Prix Remis aux Caisses</span>
+              </span>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                Grossiste & Revendeurs
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1 text-[11px]">
+                  Prix en Gros (FCFA)
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={wholesalePrice}
+                  onChange={(e) => setWholesalePrice(parseFloat(e.target.value) || 0)}
+                  placeholder="Ex: 3800"
+                  className="w-full px-2.5 py-2 bg-white border border-indigo-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 font-mono tabular-nums text-slate-900 font-semibold"
+                />
+                <span className="text-[10px] text-slate-500 block mt-0.5">
+                  Tarif vente en gros aux boutiques
+                </span>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1 text-[11px]">
+                  Qté min. en Gros
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={wholesaleMinQty}
+                  onChange={(e) => setWholesaleMinQty(Math.max(1, parseInt(e.target.value) || 1))}
+                  placeholder="Ex: 5"
+                  className="w-full px-2.5 py-2 bg-white border border-indigo-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 font-mono tabular-nums text-slate-900"
+                />
+                <span className="text-[10px] text-slate-500 block mt-0.5">
+                  À partir de X pièces
+                </span>
+              </div>
+
+              <div>
+                <label className="font-semibold text-amber-900 block mb-1 text-[11px]">
+                  Prix remis aux Caisses (FCFA)
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={cashierTransferPrice}
+                  onChange={(e) => setCashierTransferPrice(parseFloat(e.target.value) || 0)}
+                  placeholder="Ex: 4000"
+                  className="w-full px-2.5 py-2 bg-white border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 font-mono tabular-nums font-bold text-amber-950"
+                />
+                <span className="text-[10px] text-amber-800 block mt-0.5">
+                  Ex: Remis à 4 000 F, vendu à 4 500 F
+                </span>
+              </div>
+            </div>
+
+            {/* Résumé en temps réel des marges Grossiste & Bénéfice Caissier */}
+            {(wholesalePrice > 0 || cashierTransferPrice > 0 || salePrice > 0) && (
+              <div className="bg-white/90 border border-indigo-100 rounded-lg p-2.5 space-y-1.5 text-[11px]">
+                {wholesalePrice > 0 && (
+                  <div className="flex items-center justify-between text-slate-700">
+                    <span>📦 Vente en Gros (dès {wholesaleMinQty} pcs) :</span>
+                    <span className="font-mono font-bold text-indigo-700">
+                      {wholesalePrice.toLocaleString('fr-FR')} F/u{' '}
+                      <span className="text-[10px] font-normal text-slate-500">
+                        (Marge Grossiste : {wholesalePrice - costPrice >= 0 ? '+' : ''}
+                        {(wholesalePrice - costPrice).toLocaleString('fr-FR')} F/u)
+                      </span>
+                    </span>
+                  </div>
+                )}
+
+                {cashierTransferPrice > 0 && salePrice > 0 && (
+                  <div className="pt-1 border-t border-slate-100 space-y-1">
+                    <div className="flex items-center justify-between text-slate-700">
+                      <span>🏢 Remis aux Caisses (revient Boutique Principale) :</span>
+                      <span className="font-mono font-bold text-blue-700">
+                        {cashierTransferPrice.toLocaleString('fr-FR')} FCFA / u
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-700">
+                      <span>🛒 Prix final sur le marché (vendu par la caisse) :</span>
+                      <span className="font-mono font-bold text-slate-900">
+                        {salePrice.toLocaleString('fr-FR')} FCFA / u
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between font-bold text-emerald-800 bg-emerald-50 px-2 py-1 rounded">
+                      <span>💰 Bénéfice du Caissier par article vendu :</span>
+                      <span className="font-mono text-xs">
+                        {salePrice - cashierTransferPrice >= 0 ? '+' : ''}
+                        {(salePrice - cashierTransferPrice).toLocaleString('fr-FR')} FCFA / unité
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Supplier */}

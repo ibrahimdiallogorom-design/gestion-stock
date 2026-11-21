@@ -23,19 +23,29 @@ export const DistributionModal: React.FC = () => {
   const cashiers = appUsers.filter((u) => u.role === 'CASHIER');
 
   const [isConfirming, setIsConfirming] = useState(false);
+  const [transferPriceInput, setTransferPriceInput] = useState<number | string>('');
+  const [marketPriceInput, setMarketPriceInput] = useState<number | string>('');
 
   useEffect(() => {
     if (distributionModal.isOpen) {
-      if (distributionModal.productId) {
-        setSelectedProductId(distributionModal.productId);
-      } else if (products.length > 0) {
-        setSelectedProductId(products[0].id);
-      }
+      const initialProdId = distributionModal.productId || (products.length > 0 ? products[0].id : '');
+      const initialTargetId = distributionModal.defaultTargetUserId || (cashiers.length > 0 ? cashiers[0].id : '');
 
-      if (distributionModal.defaultTargetUserId) {
-        setTargetUserId(distributionModal.defaultTargetUserId);
-      } else if (cashiers.length > 0) {
-        setTargetUserId(cashiers[0].id);
+      setSelectedProductId(initialProdId);
+      setTargetUserId(initialTargetId);
+
+      const prod = products.find((p) => p.id === initialProdId);
+      if (prod) {
+        const defTransfer =
+          (initialTargetId && prod.distributedTransferPrices?.[initialTargetId] !== undefined)
+            ? prod.distributedTransferPrices[initialTargetId]
+            : prod.cashierTransferPrice ?? prod.salePrice;
+        const defMarket =
+          (initialTargetId && prod.distributedMarketPrices?.[initialTargetId] !== undefined)
+            ? prod.distributedMarketPrices[initialTargetId]
+            : prod.salePrice;
+        setTransferPriceInput(defTransfer);
+        setMarketPriceInput(defMarket);
       }
 
       setQuantity(1);
@@ -46,6 +56,22 @@ export const DistributionModal: React.FC = () => {
       setIsConfirming(false);
     }
   }, [distributionModal.isOpen, distributionModal.productId, distributionModal.defaultTargetUserId, products]);
+
+  // Synchronize default transfer & market prices when user switches product or cashier
+  useEffect(() => {
+    const prod = products.find((p) => p.id === selectedProductId);
+    if (!prod) return;
+    const defTransfer =
+      (targetUserId && prod.distributedTransferPrices?.[targetUserId] !== undefined)
+        ? prod.distributedTransferPrices[targetUserId]
+        : prod.cashierTransferPrice ?? prod.salePrice;
+    const defMarket =
+      (targetUserId && prod.distributedMarketPrices?.[targetUserId] !== undefined)
+        ? prod.distributedMarketPrices[targetUserId]
+        : prod.salePrice;
+    setTransferPriceInput(defTransfer);
+    setMarketPriceInput(defMarket);
+  }, [selectedProductId, targetUserId, products]);
 
   if (!distributionModal.isOpen) return null;
 
@@ -66,8 +92,22 @@ export const DistributionModal: React.FC = () => {
     ? (quantity.trim() === '' ? 0 : parseInt(quantity, 10) || 0)
     : Number(quantity) || 0;
 
+  const unitTransferPrice =
+    transferPriceInput !== '' && Number.isFinite(Number(transferPriceInput))
+      ? Math.max(0, Math.round(Number(transferPriceInput)))
+      : currentProduct?.cashierTransferPrice ?? currentProduct?.salePrice ?? 0;
+
+  const unitMarketPrice =
+    marketPriceInput !== '' && Number.isFinite(Number(marketPriceInput))
+      ? Math.max(0, Math.round(Number(marketPriceInput)))
+      : currentProduct?.salePrice ?? 0;
+
+  const unitCashierProfit = unitMarketPrice - unitTransferPrice;
+
   const costTotal = (currentProduct?.costPrice || 0) * numericQuantity;
-  const saleTotal = (currentProduct?.salePrice || 0) * numericQuantity;
+  const transferTotal = unitTransferPrice * numericQuantity;
+  const saleTotal = unitMarketPrice * numericQuantity;
+  const cashierProfitTotal = unitCashierProfit * numericQuantity;
 
   const handlePreSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,7 +146,14 @@ export const DistributionModal: React.FC = () => {
 
     try {
       if (actionType === 'DISTRIBUTE') {
-        const res = await distributeProduct(selectedProductId, targetUserId, numericQuantity, notes);
+        const res = await distributeProduct(
+          selectedProductId,
+          targetUserId,
+          numericQuantity,
+          notes,
+          unitTransferPrice,
+          unitMarketPrice
+        );
         if (res.success) {
           setStatusMessage({ type: 'success', text: `Marchandises octroyées avec succès ! ${res.message}` });
           setTimeout(() => {
@@ -146,9 +193,9 @@ export const DistributionModal: React.FC = () => {
               <Share2 className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-base tracking-tight">Distribution de Marchandises</h3>
+              <h3 className="font-bold text-base tracking-tight">Distribution & Tarifs Caisses</h3>
               <p className="text-xs text-blue-200/80">
-                Grand Magasin Central ➔ Vendeurs & Sous-boutiques
+                Boutique Principale (Grossiste) ➔ Caisses & Sous-boutiques
               </p>
             </div>
           </div>
@@ -175,7 +222,7 @@ export const DistributionModal: React.FC = () => {
             }`}
           >
             <ArrowRight className="w-4 h-4" />
-            <span>Distribuer au Vendeur (Dotation)</span>
+            <span>Octroyer à une Caisse (Dotation)</span>
           </button>
           <button
             type="button"
@@ -205,7 +252,7 @@ export const DistributionModal: React.FC = () => {
                   </div>
                   <div>
                     <h4 className="text-sm font-bold text-emerald-950">
-                      {actionType === 'DISTRIBUTE' ? 'Confirmation d’Octroi de Marchandises' : 'Confirmation de Rapatriement'}
+                      {actionType === 'DISTRIBUTE' ? 'Confirmation d’Octroi & Tarification Caisse' : 'Confirmation de Rapatriement'}
                     </h4>
                     <p className="text-xs text-emerald-800 mt-0.5">
                       Veuillez cliquer sur <strong>"Confirmer définitivement"</strong> ci-dessous pour valider.
@@ -223,13 +270,35 @@ export const DistributionModal: React.FC = () => {
                     <span className="font-bold text-emerald-700">{currentCashier?.storeName || currentCashier?.fullName}</span>
                   </div>
                   <div className="flex justify-between items-center text-slate-700">
-                    <span className="text-slate-500">Quantité {actionType === 'DISTRIBUTE' ? 'offerte' : 'rapatriée'} :</span>
+                    <span className="text-slate-500">Quantité {actionType === 'DISTRIBUTE' ? 'octroyée' : 'rapatriée'} :</span>
                     <span className="font-bold font-mono text-base text-slate-900">{numericQuantity} unité(s)</span>
                   </div>
-                  <div className="flex justify-between items-center text-slate-700 border-t border-slate-100 pt-2">
-                    <span className="text-slate-500">Valeur marchande :</span>
-                    <span className="font-bold font-mono text-emerald-700 text-sm">{saleTotal.toLocaleString('fr-FR')} FCFA</span>
-                  </div>
+
+                  {actionType === 'DISTRIBUTE' && (
+                    <>
+                      <div className="flex justify-between items-center text-slate-700 border-t border-slate-100 pt-2">
+                        <span className="text-slate-500">Prix remis à la caisse :</span>
+                        <span className="font-bold font-mono text-blue-700">
+                          {unitTransferPrice.toLocaleString('fr-FR')} FCFA / u (Total : {transferTotal.toLocaleString('fr-FR')} F)
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-slate-700">
+                        <span className="text-slate-500">Prix final sur le marché :</span>
+                        <span className="font-bold font-mono text-slate-900">
+                          {unitMarketPrice.toLocaleString('fr-FR')} FCFA / u (Total : {saleTotal.toLocaleString('fr-FR')} F)
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-emerald-800 bg-emerald-50 px-2.5 py-1.5 rounded-lg font-bold">
+                        <span>Bénéfice prévu pour le caissier :</span>
+                        <span className="font-mono">
+                          {unitCashierProfit >= 0 ? '+' : ''}
+                          {unitCashierProfit.toLocaleString('fr-FR')} F/u (Total : {cashierProfitTotal >= 0 ? '+' : ''}
+                          {cashierProfitTotal.toLocaleString('fr-FR')} FCFA)
+                        </span>
+                      </div>
+                    </>
+                  )}
+
                   <div className="p-2 bg-emerald-50 rounded-lg text-[11px] text-emerald-800">
                     ℹ️ <strong>Règle de gestion :</strong> Le grand total reste conservé dans la boutique centrale ({currentProduct?.quantity} pièces). La déduction de stock interviendra lors des ventes en caisse.
                   </div>
@@ -462,17 +531,103 @@ export const DistributionModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Financial Value of Batch */}
-          {currentProduct && numericQuantity > 0 && (
+          {/* Pricing Configuration for Cashier Octroi (Prix Remis Caisse vs Prix Final Marché) */}
+          {currentProduct && actionType === 'DISTRIBUTE' && (
+            <div className="p-3.5 bg-gradient-to-br from-amber-50/80 to-indigo-50/50 border border-amber-200 rounded-xl space-y-3 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-1">
+                <span className="font-bold text-amber-950">
+                  💰 Tarification d'octroi à cette caisse
+                </span>
+                {currentProduct.wholesalePrice && currentProduct.wholesalePrice > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setTransferPriceInput(currentProduct.wholesalePrice!)}
+                    className="px-2 py-0.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-800 rounded-md text-[10px] font-bold transition-colors"
+                  >
+                    Remettre au Prix en Gros ({currentProduct.wholesalePrice.toLocaleString('fr-FR')} F)
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-[11px] font-bold text-blue-900 mb-1">
+                    Prix remis à la caisse (FCFA)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="50"
+                    value={transferPriceInput}
+                    onChange={(e) => setTransferPriceInput(e.target.value)}
+                    placeholder="Ex: 4000"
+                    className="w-full px-3 py-2 bg-white border border-blue-300 rounded-lg font-mono font-bold text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                  />
+                  <span className="text-[10px] text-slate-500 block mt-0.5">
+                    Montant dû au Grand Magasin (ex: 4 000 F)
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-emerald-900 mb-1">
+                    Prix final sur le marché (FCFA)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="50"
+                    value={marketPriceInput}
+                    onChange={(e) => setMarketPriceInput(e.target.value)}
+                    placeholder="Ex: 4500"
+                    className="w-full px-3 py-2 bg-white border border-emerald-300 rounded-lg font-mono font-bold text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                  />
+                  <span className="text-[10px] text-slate-500 block mt-0.5">
+                    Prix vendu par le caissier (ex: 4 500 F)
+                  </span>
+                </div>
+              </div>
+
+              {/* Financial breakdown */}
+              <div className="p-2.5 bg-white border border-amber-200/80 rounded-lg space-y-1.5 text-[11px]">
+                <div className="flex justify-between text-slate-600">
+                  <span>Coût d'achat fournisseur ({numericQuantity} pcs) :</span>
+                  <span className="font-mono font-semibold text-slate-700">
+                    {costTotal.toLocaleString('fr-FR')} FCFA ({currentProduct.costPrice.toLocaleString('fr-FR')} F/u)
+                  </span>
+                </div>
+                <div className="flex justify-between text-blue-900 font-semibold">
+                  <span>À verser à la Boutique Principale ({numericQuantity} × {unitTransferPrice.toLocaleString('fr-FR')} F) :</span>
+                  <span className="font-mono font-bold text-blue-700">
+                    {transferTotal.toLocaleString('fr-FR')} FCFA
+                  </span>
+                </div>
+                <div className="flex justify-between text-slate-900 font-semibold">
+                  <span>Valeur finale sur le marché ({numericQuantity} × {unitMarketPrice.toLocaleString('fr-FR')} F) :</span>
+                  <span className="font-mono font-bold">
+                    {saleTotal.toLocaleString('fr-FR')} FCFA
+                  </span>
+                </div>
+                <div className="flex justify-between items-center font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1.5 rounded-lg border-t border-emerald-100">
+                  <span>Bénéfice du Caissier ({unitCashierProfit >= 0 ? '+' : ''}{unitCashierProfit.toLocaleString('fr-FR')} F / u) :</span>
+                  <span className="font-mono text-xs">
+                    {cashierProfitTotal >= 0 ? '+' : ''}
+                    {cashierProfitTotal.toLocaleString('fr-FR')} FCFA
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {currentProduct && actionType === 'RECALL' && numericQuantity > 0 && (
             <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-1 text-xs">
               <div className="flex justify-between text-slate-600">
-                <span>Coût d'achat du lot :</span>
+                <span>Valeur de cession du lot rapatrié :</span>
                 <span className="font-mono font-semibold text-slate-900">
-                  {costTotal.toLocaleString('fr-FR')} FCFA
+                  {transferTotal.toLocaleString('fr-FR')} FCFA
                 </span>
               </div>
               <div className="flex justify-between font-bold text-blue-900 border-t border-blue-200/60 pt-1">
-                <span>Valeur marchande en vente :</span>
+                <span>Valeur marchande sur le marché :</span>
                 <span className="font-mono text-sm text-blue-700">
                   {saleTotal.toLocaleString('fr-FR')} FCFA
                 </span>

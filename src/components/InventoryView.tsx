@@ -359,8 +359,19 @@ export const InventoryView: React.FC = () => {
                   <th className="py-3 px-4">Catégorie</th>
                   <th className="py-3 px-4 text-right">{isCashier ? 'Stock en Boutique' : 'Stock Actuel'}</th>
                   <th className="py-3 px-4 text-right">Seuil Min.</th>
-                  {!isCashier && <th className="py-3 px-4 text-right">Prix d'Achat</th>}
-                  <th className="py-3 px-4 text-right">Prix de Vente</th>
+                  {!isCashier ? (
+                    <>
+                      <th className="py-3 px-4 text-right">Prix d'Achat</th>
+                      <th className="py-3 px-4 text-right">Prix en Gros / Caisse</th>
+                      <th className="py-3 px-4 text-right">Prix Final Marché</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="py-3 px-4 text-right">Prix Remis Caisse</th>
+                      <th className="py-3 px-4 text-right">Prix Final Marché</th>
+                      <th className="py-3 px-4 text-right">Mon Bénéfice / u</th>
+                    </>
+                  )}
                   {!isCashier && <th className="py-3 px-4">Fournisseur</th>}
                   <th className="py-3 px-4 text-center">{isCashier ? 'Vente' : 'Actions Rapides'}</th>
                 </tr>
@@ -368,7 +379,7 @@ export const InventoryView: React.FC = () => {
               <tbody className="divide-y divide-slate-100 text-xs">
                 {filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={isCashier ? 6 : 8} className="py-12 text-center text-slate-400">
+                    <td colSpan={isCashier ? 8 : 9} className="py-12 text-center text-slate-400">
                       <Package className="w-8 h-8 mx-auto text-slate-300 mb-2" />
                       <p className="font-medium text-slate-600">
                         {isCashier
@@ -386,6 +397,15 @@ export const InventoryView: React.FC = () => {
                   filteredProducts.map((product) => {
                     const isOutOfStock = product.quantity === 0;
                     const isCritical = product.quantity > 0 && product.quantity <= product.minThreshold;
+                    const myTransferPrice =
+                      myUserId && product.distributedTransferPrices?.[myUserId] !== undefined
+                        ? product.distributedTransferPrices[myUserId]
+                        : product.cashierTransferPrice ?? product.salePrice;
+                    const myMarketPrice =
+                      myUserId && product.distributedMarketPrices?.[myUserId] !== undefined
+                        ? product.distributedMarketPrices[myUserId]
+                        : product.salePrice;
+                    const myProfitUnit = myMarketPrice - myTransferPrice;
 
                     return (
                       <tr
@@ -453,17 +473,53 @@ export const InventoryView: React.FC = () => {
                           {product.minThreshold}
                         </td>
 
-                        {/* Cost Price: Strictly hidden for Cashier */}
-                        {!isCashier && (
-                          <td className={`${getRowPadding()} text-right font-mono tabular-nums text-slate-600`}>
-                            {Math.round(product.costPrice).toLocaleString('fr-FR')} F
-                          </td>
+                        {/* Prices for Admin vs Cashier */}
+                        {!isCashier ? (
+                          <>
+                            <td className={`${getRowPadding()} text-right font-mono tabular-nums text-slate-600`}>
+                              {Math.round(product.costPrice).toLocaleString('fr-FR')} F
+                            </td>
+                            <td className={`${getRowPadding()} text-right font-mono tabular-nums`}>
+                              <div className="space-y-0.5">
+                                {product.wholesalePrice && product.wholesalePrice > 0 ? (
+                                  <span className="block text-[11px] font-bold text-indigo-700">
+                                    Gros: {Math.round(product.wholesalePrice).toLocaleString('fr-FR')} F
+                                  </span>
+                                ) : (
+                                  <span className="block text-[10px] text-slate-400">Gros: —</span>
+                                )}
+                                {product.cashierTransferPrice && product.cashierTransferPrice > 0 ? (
+                                  <span className="block text-[10px] font-semibold text-blue-700">
+                                    Caisse: {Math.round(product.cashierTransferPrice).toLocaleString('fr-FR')} F
+                                  </span>
+                                ) : null}
+                              </div>
+                            </td>
+                            <td className={`${getRowPadding()} text-right font-mono tabular-nums`}>
+                              <div className="font-bold text-slate-900">
+                                {Math.round(product.salePrice).toLocaleString('fr-FR')} FCFA
+                              </div>
+                              {product.cashierTransferPrice && product.cashierTransferPrice > 0 && (
+                                <div className="text-[10px] font-semibold text-emerald-700">
+                                  Bénéf. caisse: +{Math.round(product.salePrice - product.cashierTransferPrice).toLocaleString('fr-FR')} F
+                                </div>
+                              )}
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className={`${getRowPadding()} text-right font-mono tabular-nums font-semibold text-blue-700`}>
+                              {Math.round(myTransferPrice).toLocaleString('fr-FR')} F
+                            </td>
+                            <td className={`${getRowPadding()} text-right font-mono tabular-nums font-bold text-slate-900`}>
+                              {Math.round(myMarketPrice).toLocaleString('fr-FR')} FCFA
+                            </td>
+                            <td className={`${getRowPadding()} text-right font-mono tabular-nums font-bold text-emerald-700`}>
+                              {myProfitUnit >= 0 ? '+' : ''}
+                              {Math.round(myProfitUnit).toLocaleString('fr-FR')} F
+                            </td>
+                          </>
                         )}
-
-                        {/* Sale Price: Visible to all */}
-                        <td className={`${getRowPadding()} text-right font-mono tabular-nums font-semibold text-slate-800`}>
-                          {Math.round(product.salePrice).toLocaleString('fr-FR')} FCFA
-                        </td>
 
                         {/* Supplier: Admin only */}
                         {!isCashier && (
