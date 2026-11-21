@@ -29,6 +29,9 @@ import {
   pullFromCloud,
   CloudSyncStatus,
   getDeviceId,
+  normalizeTimestamp,
+  getOfflineDirtyMeta,
+  mergeOfflineQueueOverRemote,
 } from '../services/cloudSync';
 import {
   syncStateToDexie,
@@ -288,6 +291,10 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             const totalQty = Math.max(0, Number(p.quantity) || 0);
             // Le stock de la boutique centrale reste toujours le grand total
             const centralQty = totalQty;
+            const safeLastUpdated =
+              p.lastUpdated && new Date(p.lastUpdated).getTime() > Date.now() + 5 * 60 * 1000
+                ? '2026-01-01T00:00:00.000Z'
+                : p.lastUpdated;
 
             return {
               ...p,
@@ -297,6 +304,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               minThreshold: Math.max(0, Number(p.minThreshold) || 0),
               costPrice: cost,
               salePrice: sale,
+              lastUpdated: safeLastUpdated,
             };
           });
           if (cleanProducts.length > 0) {
@@ -757,8 +765,8 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             if (!existing) {
               map.set(dp.id, dp);
             } else {
-              const dTime = new Date(dp.lastUpdated || 0).getTime();
-              const eTime = new Date(existing.lastUpdated || 0).getTime();
+              const dTime = normalizeTimestamp(dp.lastUpdated);
+              const eTime = normalizeTimestamp(existing.lastUpdated);
               if (dTime > eTime) {
                 map.set(dp.id, dp);
               }
@@ -886,6 +894,35 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (localProdsJson) localProds = JSON.parse(localProdsJson);
         } catch (e) {}
 
+        const isLegacyDuplicateMovement = (m: StockMovement): boolean => {
+          if (!m || !m.id) return true;
+          if (m.id.startsWith('mov-100')) return true;
+          if (m.reason === 'Réassort rapide comptoir (+1)' || m.reason === 'Retrait rapide comptoir (-1)') return true;
+          if (m.createdAt && m.createdAt.startsWith('2026-10-13')) return true;
+          if (m.type === 'RETURN' && Number(m.quantityDelta) < 0) return true;
+          return false;
+        };
+
+        const localMovsJson = localStorage.getItem(STORAGE_KEYS.MOVEMENTS);
+        let localMovs: StockMovement[] = [];
+        try {
+          if (localMovsJson) {
+            const parsedMovs: StockMovement[] = JSON.parse(localMovsJson);
+            if (Array.isArray(parsedMovs)) {
+              localMovs = parsedMovs.filter((m) => !isLegacyDuplicateMovement(m));
+            }
+          }
+        } catch (e) {}
+
+        const rawRemoteMovs = Array.isArray(remote.movements) ? remote.movements : [];
+        const remoteMovs = rawRemoteMovs.filter((m) => !isLegacyDuplicateMovement(m));
+        const remoteHadDuplicates = remoteMovs.length !== rawRemoteMovs.length;
+        const remoteMovIds = new Set(remoteMovs.map((m) => m.id));
+        const unsyncedLocalMovs = localMovs.filter((lm) => !remoteMovIds.has(lm.id));
+
+        const dirtyMeta = getOfflineDirtyMeta();
+        const dirtyProdIds = dirtyMeta?.dirtyProductIds || {};
+
         const rawRemoteProds = Array.isArray(remote.products) ? remote.products : [];
         let hadFictitiousDist = false;
 
@@ -895,7 +932,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           )
         );
 
-        // Auto-heal remote products: clean allocations to deleted or fictitious cashiers
+        // Auto-heal remote products: clean allocations to deleted or fictitious cashiers & normalize future timestamps
         const remoteProds = rawRemoteProds.map((p) => {
           const dist = { ...(p.distributedQuantities || {}) };
           let changed = false;
@@ -917,6 +954,18 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             }
           });
 
+          // Si un timestamp futur simulé (ex: 2026-10 ou 2026-11) était stocké sur le Cloud, le ramener à 2026-01-01
+          let safeLastUpdated = p.lastUpdated;
+          if (
+            safeLastUpdated &&
+            (safeLastUpdated.startsWith('2026-10-') ||
+              safeLastUpdated.startsWith('2026-11-') ||
+              new Date(safeLastUpdated).getTime() > Date.now() + 5 * 60 * 1000)
+          ) {
+            safeLastUpdated = '2026-01-01T00:00:00.000Z';
+            changed = true;
+          }
+
           const totalQty = Math.max(0, Number(p.quantity) || 0);
           const centralQty = totalQty; // Le stock central conserve le grand total
           if (changed || p.centralQuantity !== centralQty) {
@@ -926,6 +975,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               quantity: totalQty,
               centralQuantity: centralQty,
               distributedQuantities: dist,
+              lastUpdated: safeLastUpdated,
             };
           }
           return {
@@ -933,19 +983,18 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             quantity: totalQty,
             centralQuantity: centralQty,
             distributedQuantities: dist,
+            lastUpdated: safeLastUpdated,
           };
         });
 
-        if (hadFictitiousDist) {
-          forcePushToCloud({ products: remoteProds });
-        }
+        let finalMergedProducts: Product[] = [];
+        let localHadNewerOrUnsynced = false;
 
         if (remoteProds.length > 0) {
           // Merge local and remote products intelligently
           const prodMap = new Map<string, Product>();
           remoteProds.forEach((p) => prodMap.set(p.id, p));
 
-          let localHadNewerOrUnsynced = false;
           localProds.forEach((rawLp) => {
             const cleanDist = { ...(rawLp.distributedQuantities || {}) };
             Object.keys(cleanDist).forEach((uid) => {
@@ -967,89 +1016,60 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               localHadNewerOrUnsynced = true;
             } else {
               const remoteP = prodMap.get(lp.id)!;
-              const localTime = new Date(lp.lastUpdated || 0).getTime();
-              const remoteTime = new Date(remoteP.lastUpdated || 0).getTime();
-              if (localTime > remoteTime) {
+              const isDirtyOffline = Boolean(dirtyProdIds[lp.id]);
+              const hasUnsyncedMovForProd = unsyncedLocalMovs.some((m) => m.productId === lp.id);
+              const localTime = normalizeTimestamp(lp.lastUpdated);
+              const remoteTime = normalizeTimestamp(remoteP.lastUpdated);
+
+              if (isDirtyOffline || hasUnsyncedMovForProd || localTime > remoteTime) {
                 prodMap.set(lp.id, lp);
                 localHadNewerOrUnsynced = true;
               }
             }
           });
 
-          const mergedProducts = Array.from(prodMap.values());
-          setProducts(mergedProducts);
-          localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(mergedProducts));
-
-          // If this device had articles not yet in the cloud, upload them to the cloud!
-          if (localHadNewerOrUnsynced) {
-            pushToCloud({ products: mergedProducts });
-          }
+          finalMergedProducts = Array.from(prodMap.values());
+          setProducts(finalMergedProducts);
+          localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(finalMergedProducts));
         } else if (localProds.length > 0) {
-          // The cloud was empty, but THIS phone has existing products in local storage!
-          // Instantly send all phone products to the Cloud so the computer can see them!
-          forcePushToCloud({ products: localProds });
+          finalMergedProducts = localProds;
+          localHadNewerOrUnsynced = true;
         } else {
           setProducts([]);
         }
 
-        // 3. Stock Movements Reconciliation & Self-Healing Deduplication
-        const RECONCILIATION_CUTOFF = new Date('2026-11-08T21:35:00.000Z').getTime();
-        const isLegacyDuplicateMovement = (m: StockMovement): boolean => {
-          if (!m || !m.id) return true;
-          if (m.id.startsWith('mov-100')) return true;
-          if (m.reason === 'Réassort rapide comptoir (+1)' || m.reason === 'Retrait rapide comptoir (-1)') return true;
-          if (m.createdAt && m.createdAt.startsWith('2026-10-13')) return true;
-          if (m.type === 'RETURN' && Number(m.quantityDelta) < 0) return true;
-          const mTime = new Date(m.createdAt || 0).getTime();
-          if (mTime < RECONCILIATION_CUTOFF) {
-            // Before cutoff, only consolidated mov-init-*, mov-dot-*, real OUT sales, and positive client RETURN are valid
-            if (m.type === 'IN' && !m.id.startsWith('mov-init-')) return true;
-            if (m.type === 'TRANSFER' && !m.id.startsWith('mov-dot-')) return true;
-          }
-          return false;
-        };
+        // 3. Stock Movements Reconciliation (Union complète de tous les mouvements locaux hors-ligne et distants)
+        let finalMergedMovements: StockMovement[] = [];
+        let localHadUnsyncedMovs = false;
 
-        const localMovsJson = localStorage.getItem(STORAGE_KEYS.MOVEMENTS);
-        let localMovs: StockMovement[] = [];
-        try {
-          if (localMovsJson) {
-            const parsedMovs: StockMovement[] = JSON.parse(localMovsJson);
-            if (Array.isArray(parsedMovs)) {
-              localMovs = parsedMovs.filter((m) => !isLegacyDuplicateMovement(m));
-            }
-          }
-        } catch (e) {}
-
-        const rawRemoteMovs = Array.isArray(remote.movements) ? remote.movements : [];
-        const remoteMovs = rawRemoteMovs.filter((m) => !isLegacyDuplicateMovement(m));
-        const remoteHadDuplicates = remoteMovs.length !== rawRemoteMovs.length;
-
-        if (remoteMovs.length > 0) {
+        if (remoteMovs.length > 0 || localMovs.length > 0) {
           const movMap = new Map<string, StockMovement>();
           remoteMovs.forEach((m) => movMap.set(m.id, m));
 
-          let localHadUnsyncedMovs = false;
           localMovs.forEach((lm) => {
-            const lmTime = new Date(lm.createdAt || 0).getTime();
-            if (!movMap.has(lm.id) && lmTime > RECONCILIATION_CUTOFF) {
+            if (!movMap.has(lm.id)) {
               movMap.set(lm.id, lm);
               localHadUnsyncedMovs = true;
             }
           });
 
-          const mergedMovements = Array.from(movMap.values()).sort(
+          finalMergedMovements = Array.from(movMap.values()).sort(
             (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
           );
-          setMovements(mergedMovements);
-          localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(mergedMovements));
-
-          if (localHadUnsyncedMovs || remoteHadDuplicates) {
-            forcePushToCloud({ movements: mergedMovements });
-          }
-        } else if (localMovs.length > 0) {
-          forcePushToCloud({ movements: localMovs });
+          setMovements(finalMergedMovements);
+          localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(finalMergedMovements));
         } else {
           setMovements([]);
+        }
+
+        // Si cet appareil avait des ventes/produits/mouvements hors-ligne non présents sur le Cloud, les envoyer immédiatement !
+        if (localHadNewerOrUnsynced || localHadUnsyncedMovs || hadFictitiousDist || remoteHadDuplicates) {
+          const pushPayload: Record<string, any> = {};
+          if (finalMergedProducts.length > 0) pushPayload.products = finalMergedProducts;
+          if (finalMergedMovements.length > 0) pushPayload.movements = finalMergedMovements;
+          if (Object.keys(pushPayload).length > 0) {
+            pushToCloud(pushPayload);
+          }
         }
 
         // 4. Expenses & Purchases Reconciliation
@@ -1200,28 +1220,63 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const pullLatestFromCloud = async (): Promise<{ success: boolean; message: string }> => {
     try {
       setCloudStatus('connecting');
-      setCloudStatusMessage('Téléchargement depuis le Cloud...');
-      const data = await pullFromCloud();
-      if (!data) {
+      setCloudStatusMessage('Synchronisation & téléchargement depuis le Cloud...');
+      const rawData = await pullFromCloud();
+      if (!rawData) {
         setCloudStatus('connected');
         return { success: false, message: 'Aucune donnée trouvée sur le Cloud.' };
       }
 
+      const data = mergeOfflineQueueOverRemote(rawData);
+
       if (data.products && Array.isArray(data.products)) {
-        setProducts(data.products);
-        localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(data.products));
+        const prodMap = new Map<string, Product>();
+        data.products.forEach((p) => prodMap.set(p.id, p));
+        products.forEach((lp) => {
+          const rp = prodMap.get(lp.id);
+          if (!rp || normalizeTimestamp(lp.lastUpdated) > normalizeTimestamp(rp.lastUpdated)) {
+            prodMap.set(lp.id, lp);
+          }
+        });
+        const mergedProds = Array.from(prodMap.values());
+        setProducts(mergedProds);
+        localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(mergedProds));
       }
       if (data.movements && Array.isArray(data.movements)) {
-        setMovements(data.movements);
-        localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(data.movements));
+        const movMap = new Map<string, StockMovement>();
+        data.movements.forEach((m) => movMap.set(m.id, m));
+        movements.forEach((lm) => {
+          if (!movMap.has(lm.id)) movMap.set(lm.id, lm);
+        });
+        const mergedMovs = Array.from(movMap.values()).sort(
+          (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+        );
+        setMovements(mergedMovs);
+        localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(mergedMovs));
       }
       if (data.expenses && Array.isArray(data.expenses)) {
-        setExpenses(data.expenses);
-        localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(data.expenses));
+        const expMap = new Map<string, Expense>();
+        data.expenses.forEach((e) => expMap.set(e.id, e));
+        expenses.forEach((le) => {
+          if (!expMap.has(le.id)) expMap.set(le.id, le);
+        });
+        const mergedExps = Array.from(expMap.values()).sort(
+          (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+        );
+        setExpenses(mergedExps);
+        localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(mergedExps));
       }
       if (data.purchases && Array.isArray(data.purchases)) {
-        setPurchases(data.purchases);
-        localStorage.setItem(STORAGE_KEYS.PURCHASES, JSON.stringify(data.purchases));
+        const purMap = new Map<string, PurchaseBatch>();
+        data.purchases.forEach((p) => purMap.set(p.id, p));
+        purchases.forEach((lp) => {
+          if (!purMap.has(lp.id)) purMap.set(lp.id, lp);
+        });
+        const mergedPurs = Array.from(purMap.values()).sort(
+          (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+        );
+        setPurchases(mergedPurs);
+        localStorage.setItem(STORAGE_KEYS.PURCHASES, JSON.stringify(mergedPurs));
       }
       if (data.appUsers && Array.isArray(data.appUsers) && data.appUsers.length > 0) {
         setAppUsers(data.appUsers);
@@ -1489,6 +1544,11 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     setProducts(updatedProducts);
     setMovements(updatedMovements);
+    try {
+      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(updatedProducts));
+      localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(updatedMovements));
+    } catch (e) {}
+    syncStateToDexie({ products: updatedProducts, movements: updatedMovements });
     pushToCloud({ products: updatedProducts, movements: updatedMovements });
 
     // Auto-sync if configured and token available
@@ -1989,6 +2049,11 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const updatedMovements = [movement, ...movements];
     setMovements(updatedMovements);
+    try {
+      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(updatedProducts));
+      localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(updatedMovements));
+    } catch (e) {}
+    syncStateToDexie({ products: updatedProducts, movements: updatedMovements });
     pushToCloud({ products: updatedProducts, movements: updatedMovements });
 
     return {
@@ -2050,6 +2115,11 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const updatedMovements = [movement, ...movements];
     setMovements(updatedMovements);
+    try {
+      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(updatedProducts));
+      localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(updatedMovements));
+    } catch (e) {}
+    syncStateToDexie({ products: updatedProducts, movements: updatedMovements });
     pushToCloud({ products: updatedProducts, movements: updatedMovements });
 
     return {
@@ -2079,6 +2149,10 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const updatedProducts = products.map((p) => (p.id === productId ? updatedProduct : p));
     setProducts(updatedProducts);
+    try {
+      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(updatedProducts));
+    } catch (e) {}
+    syncStateToDexie({ products: updatedProducts });
     pushToCloud({ products: updatedProducts });
 
     return {
@@ -2202,35 +2276,37 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         prod.wholesalePrice > 0 &&
         unitPriceUsed === prod.wholesalePrice;
 
-      newMovements.push({
-        id: `mov-${Date.now()}-${prod.id}`,
-        productId: prod.id,
-        productSku: prod.sku,
-        productName: prod.name,
-        type: 'OUT',
-        quantityDelta: -soldItem.quantity,
-        previousStock: prod.quantity,
-        newStock: newQty,
-        reason: isBoutiqueSale
-          ? `Vente Caisse #${ticketNumber} (${paymentLabel}${customerName ? ` - ${customerName}` : ''})`
-          : `Vente Directe Grand Magasin${isWholesaleUsed ? ' [EN GROS]' : ''} #${ticketNumber} (${paymentLabel}${customerName ? ` - ${customerName}` : ''})`,
-        operator: sellerDisplayName,
-        notes: `Règlement ${paymentLabel}${isWholesaleUsed ? ' (Tarif en Gros)' : ''}${isBoutiqueSale ? ` [Remis caisse: ${transferPriceUnit.toLocaleString('fr-FR')} F/u | Vendu: ${unitPriceUsed.toLocaleString('fr-FR')} F/u | Bénéfice caissier: ${cashierProfitTotal.toLocaleString('fr-FR')} F]` : ''}${paymentMethod === 'ACOMPTE' ? ` (Acompte payé: ${acompteAmount ?? 0} F, Restant: ${remainingAmount ?? 0} F)` : paymentMethod === 'CREDIT' ? ` (Crédit restant: ${remainingAmount ?? totalAmount} F)` : ''}${customerName ? ` - Client: ${customerName}` : ''} - Ticket ${ticketNumber}`,
-        createdAt: now,
-        storeName: boutiqueDisplayName,
-        ticketNumber: ticketNumber,
-        saleAmount: subtotal,
-        unitCostAtSale: Math.max(0, Number(prod.costPrice) || 0),
-        transferPriceAtSale: isBoutiqueSale ? transferPriceUnit : undefined,
-        marketPriceAtSale: defaultBoutiqueMarketPrice,
-        cashierProfit: isBoutiqueSale ? cashierProfitTotal : undefined,
-        mainStoreAmount: mainStoreAmountTotal,
-        priceTier: isWholesaleUsed ? 'WHOLESALE' : unitPriceUsed !== defaultBoutiqueMarketPrice ? 'CUSTOM' : 'RETAIL',
-        paymentMethod: paymentMethod,
-        acompteAmount: acompteAmount,
-        remainingAmount: remainingAmount,
-        customerName: customerName,
-      });
+      newMovements.push(
+        stripUndefinedKeys({
+          id: `mov-${Date.now()}-${prod.id}`,
+          productId: prod.id,
+          productSku: prod.sku,
+          productName: prod.name,
+          type: 'OUT',
+          quantityDelta: -soldItem.quantity,
+          previousStock: prod.quantity,
+          newStock: newQty,
+          reason: isBoutiqueSale
+            ? `Vente Caisse #${ticketNumber} (${paymentLabel}${customerName ? ` - ${customerName}` : ''})`
+            : `Vente Directe Grand Magasin${isWholesaleUsed ? ' [EN GROS]' : ''} #${ticketNumber} (${paymentLabel}${customerName ? ` - ${customerName}` : ''})`,
+          operator: sellerDisplayName,
+          notes: `Règlement ${paymentLabel}${isWholesaleUsed ? ' (Tarif en Gros)' : ''}${isBoutiqueSale ? ` [Remis caisse: ${transferPriceUnit.toLocaleString('fr-FR')} F/u | Vendu: ${unitPriceUsed.toLocaleString('fr-FR')} F/u | Bénéfice caissier: ${cashierProfitTotal.toLocaleString('fr-FR')} F]` : ''}${paymentMethod === 'ACOMPTE' ? ` (Acompte payé: ${acompteAmount ?? 0} F, Restant: ${remainingAmount ?? 0} F)` : paymentMethod === 'CREDIT' ? ` (Crédit restant: ${remainingAmount ?? totalAmount} F)` : ''}${customerName ? ` - Client: ${customerName}` : ''} - Ticket ${ticketNumber}`,
+          createdAt: now,
+          storeName: boutiqueDisplayName,
+          ticketNumber: ticketNumber,
+          saleAmount: subtotal,
+          unitCostAtSale: Math.max(0, Number(prod.costPrice) || 0),
+          transferPriceAtSale: isBoutiqueSale ? transferPriceUnit : undefined,
+          marketPriceAtSale: defaultBoutiqueMarketPrice,
+          cashierProfit: isBoutiqueSale ? cashierProfitTotal : undefined,
+          mainStoreAmount: mainStoreAmountTotal,
+          priceTier: isWholesaleUsed ? 'WHOLESALE' : unitPriceUsed !== defaultBoutiqueMarketPrice ? 'CUSTOM' : 'RETAIL',
+          paymentMethod: paymentMethod,
+          acompteAmount: acompteAmount,
+          remainingAmount: remainingAmount,
+          customerName: customerName,
+        })
+      );
 
       return {
         ...prod,
@@ -2244,6 +2320,11 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setProducts(updatedProducts);
     const updatedMovements = [...newMovements, ...movements];
     setMovements(updatedMovements);
+    try {
+      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(updatedProducts));
+      localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(updatedMovements));
+    } catch (e) {}
+    syncStateToDexie({ products: updatedProducts, movements: updatedMovements });
     pushToCloud({ products: updatedProducts, movements: updatedMovements });
 
     setCashierSession((prev) => ({

@@ -137,10 +137,11 @@ export async function synchroniserCatalogue(
     }
 
     const produitsDuServeur: ProduitOfflineRow[] = rawProducts.map((p) => {
-      const nom = String(p.nom ?? p.name ?? 'Article');
-      const categorie = String(p.categorie ?? p.category ?? 'Divers & Général');
-      const prix = Number(p.prix ?? p.salePrice ?? 0) || 0;
+      const nom = String(p.name ?? p.nom ?? 'Article');
+      const categorie = String(p.category ?? p.categorie ?? 'Divers & Général');
+      const prix = Number(p.salePrice ?? p.prix ?? 0) || 0;
       return {
+        ...(p as unknown as Product),
         id: String(p.id ?? `prod-${Date.now()}`),
         sku: String(p.sku ?? p.id ?? 'SKU'),
         name: nom,
