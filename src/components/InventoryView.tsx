@@ -476,10 +476,18 @@ export const InventoryView: React.FC = () => {
                         {/* Prices for Admin vs Cashier */}
                         {!isCashier ? (
                           <>
-                            <td className={`${getRowPadding()} text-right font-mono tabular-nums text-slate-600`}>
+                            <td
+                              onClick={() => openProductModal(product)}
+                              title="Cliquez pour modifier les prix"
+                              className={`${getRowPadding()} text-right font-mono tabular-nums text-slate-600 cursor-pointer hover:bg-amber-50/60 transition-colors`}
+                            >
                               {Math.round(product.costPrice).toLocaleString('fr-FR')} F
                             </td>
-                            <td className={`${getRowPadding()} text-right font-mono tabular-nums`}>
+                            <td
+                              onClick={() => openProductModal(product)}
+                              title="Cliquez pour modifier le Prix en Gros et le Prix Caisse"
+                              className={`${getRowPadding()} text-right font-mono tabular-nums cursor-pointer hover:bg-amber-50/60 transition-colors`}
+                            >
                               <div className="space-y-0.5">
                                 {product.wholesalePrice && product.wholesalePrice > 0 ? (
                                   <span className="block text-[11px] font-bold text-indigo-700">
@@ -495,9 +503,14 @@ export const InventoryView: React.FC = () => {
                                 ) : null}
                               </div>
                             </td>
-                            <td className={`${getRowPadding()} text-right font-mono tabular-nums`}>
-                              <div className="font-bold text-slate-900">
-                                {Math.round(product.salePrice).toLocaleString('fr-FR')} FCFA
+                            <td
+                              onClick={() => openProductModal(product)}
+                              title="Cliquez pour modifier le Prix Final Marché"
+                              className={`${getRowPadding()} text-right font-mono tabular-nums cursor-pointer hover:bg-amber-50/60 transition-colors`}
+                            >
+                              <div className="font-bold text-slate-900 flex items-center justify-end gap-1">
+                                <span>{Math.round(product.salePrice).toLocaleString('fr-FR')} FCFA</span>
+                                <Edit2 className="w-3 h-3 text-amber-600 opacity-70 group-hover:opacity-100" />
                               </div>
                               {product.cashierTransferPrice && product.cashierTransferPrice > 0 && (
                                 <div className="text-[10px] font-semibold text-emerald-700">
@@ -553,6 +566,14 @@ export const InventoryView: React.FC = () => {
                                 <span>Vendre</span>
                               </button>
                               <button
+                                onClick={() => openProductModal(product)}
+                                title="Modifier les prix et la fiche article"
+                                className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-md text-[11px] font-bold flex items-center gap-1 transition-colors"
+                              >
+                                <Edit2 className="w-3 h-3 text-amber-700" />
+                                <span>Prix</span>
+                              </button>
+                              <button
                                 onClick={() => openDistributionModal(product.id)}
                                 title="Distribuer aux vendeurs (Dotation)"
                                 className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
@@ -573,13 +594,6 @@ export const InventoryView: React.FC = () => {
                                 className="p-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-md transition-colors disabled:opacity-30 disabled:pointer-events-none"
                               >
                                 <ArrowUpRight className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => openProductModal(product)}
-                                title="Modifier les informations"
-                                className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => handleDelete(product)}

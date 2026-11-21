@@ -1510,14 +1510,24 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const stripUndefinedKeys = <T extends Record<string, any>>(obj: T): T => {
+    const clean = { ...obj };
+    Object.keys(clean).forEach((k) => {
+      if (clean[k] === undefined) {
+        delete clean[k];
+      }
+    });
+    return clean;
+  };
+
   const addProduct = async (productData: Omit<Product, 'id' | 'lastUpdated'>) => {
     const now = new Date().toISOString();
     const newId = `prod-${Date.now()}`;
-    const newProd: Product = {
+    const newProd: Product = stripUndefinedKeys({
       ...productData,
       id: newId,
       lastUpdated: now,
-    };
+    });
 
     const updatedProducts = [newProd, ...products];
     let updatedMovements = movements;
@@ -1540,9 +1550,16 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       };
       updatedMovements = [initialMovement, ...movements];
       setMovements(updatedMovements);
+      try {
+        localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(updatedMovements));
+      } catch (e) {}
     }
 
     setProducts(updatedProducts);
+    try {
+      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(updatedProducts));
+    } catch (e) {}
+    syncStateToDexie({ products: updatedProducts, movements: updatedMovements });
     pushToCloud({ products: updatedProducts, movements: updatedMovements });
 
     if (sheetsSync.autoSync && sheetsSync.spreadsheetId && hasGoogleToken) {
@@ -1557,10 +1574,52 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const updateProduct = async (id: string, updates: Partial<Product>) => {
     const now = new Date().toISOString();
-    const updatedProducts = products.map((p) =>
-      p.id === id ? { ...p, ...updates, lastUpdated: now } : p
-    );
+    const updatedProducts = products.map((p) => {
+      if (p.id !== id) return p;
+
+      // Synchroniser automatiquement les tarifs caisses si le prix catalogue change
+      let nextMarketPrices = updates.distributedMarketPrices ?? p.distributedMarketPrices;
+      if (
+        updates.salePrice !== undefined &&
+        updates.distributedMarketPrices === undefined &&
+        p.distributedMarketPrices
+      ) {
+        nextMarketPrices = { ...p.distributedMarketPrices };
+        Object.keys(nextMarketPrices).forEach((uid) => {
+          nextMarketPrices![uid] = updates.salePrice!;
+        });
+      }
+
+      let nextTransferPrices = updates.distributedTransferPrices ?? p.distributedTransferPrices;
+      if (
+        'cashierTransferPrice' in updates &&
+        updates.distributedTransferPrices === undefined &&
+        p.distributedTransferPrices
+      ) {
+        nextTransferPrices = { ...p.distributedTransferPrices };
+        const effectiveT =
+          updates.cashierTransferPrice !== undefined && updates.cashierTransferPrice > 0
+            ? updates.cashierTransferPrice
+            : updates.salePrice ?? p.salePrice;
+        Object.keys(nextTransferPrices).forEach((uid) => {
+          nextTransferPrices![uid] = effectiveT;
+        });
+      }
+
+      return stripUndefinedKeys({
+        ...p,
+        ...updates,
+        distributedMarketPrices: nextMarketPrices,
+        distributedTransferPrices: nextTransferPrices,
+        lastUpdated: now,
+      });
+    });
+
     setProducts(updatedProducts);
+    try {
+      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(updatedProducts));
+    } catch (e) {}
+    syncStateToDexie({ products: updatedProducts });
     pushToCloud({ products: updatedProducts });
 
     if (sheetsSync.autoSync && sheetsSync.spreadsheetId && hasGoogleToken) {
@@ -1576,6 +1635,10 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const deleteProduct = async (id: string) => {
     const updatedProducts = products.filter((p) => p.id !== id);
     setProducts(updatedProducts);
+    try {
+      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(updatedProducts));
+    } catch (e) {}
+    syncStateToDexie({ products: updatedProducts });
     pushToCloud({ products: updatedProducts });
 
     if (sheetsSync.autoSync && sheetsSync.spreadsheetId && hasGoogleToken) {
@@ -1805,6 +1868,11 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const updatedMovements = [movement, ...movements];
     setMovements(updatedMovements);
+    try {
+      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(updatedProducts));
+      localStorage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify(updatedMovements));
+    } catch (e) {}
+    syncStateToDexie({ products: updatedProducts, movements: updatedMovements });
     pushToCloud({ products: updatedProducts, movements: updatedMovements });
 
     if (sheetsSync.autoSync && sheetsSync.spreadsheetId && hasGoogleToken) {
@@ -1840,15 +1908,21 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const newMarketPrices = { ...(prod.distributedMarketPrices || {}) };
     newMarketPrices[targetUserId] = cleanMarket;
 
-    const updatedProduct: Product = {
+    const updatedProduct: Product = stripUndefinedKeys({
       ...prod,
+      salePrice: cleanMarket > 0 ? cleanMarket : prod.salePrice,
+      cashierTransferPrice: cleanTransfer > 0 ? cleanTransfer : prod.cashierTransferPrice,
       distributedTransferPrices: newTransferPrices,
       distributedMarketPrices: newMarketPrices,
       lastUpdated: now,
-    };
+    });
 
     const updatedProducts = products.map((p) => (p.id === productId ? updatedProduct : p));
     setProducts(updatedProducts);
+    try {
+      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(updatedProducts));
+    } catch (e) {}
+    syncStateToDexie({ products: updatedProducts });
     pushToCloud({ products: updatedProducts });
 
     const profitPerUnit = cleanMarket - cleanTransfer;

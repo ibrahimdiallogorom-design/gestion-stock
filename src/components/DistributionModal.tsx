@@ -557,8 +557,9 @@ export const DistributionModal: React.FC = () => {
                   <input
                     type="number"
                     min="0"
-                    step="50"
+                    step="any"
                     value={transferPriceInput}
+                    onFocus={(e) => e.target.select()}
                     onChange={(e) => setTransferPriceInput(e.target.value)}
                     placeholder="Ex: 4000"
                     className="w-full px-3 py-2 bg-white border border-blue-300 rounded-lg font-mono font-bold text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
@@ -575,8 +576,9 @@ export const DistributionModal: React.FC = () => {
                   <input
                     type="number"
                     min="0"
-                    step="50"
+                    step="any"
                     value={marketPriceInput}
+                    onFocus={(e) => e.target.select()}
                     onChange={(e) => setMarketPriceInput(e.target.value)}
                     placeholder="Ex: 4500"
                     className="w-full px-3 py-2 bg-white border border-emerald-300 rounded-lg font-mono font-bold text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"

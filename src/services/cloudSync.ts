@@ -172,16 +172,29 @@ export function getPendingOfflineCount(): number {
   }
 }
 
+/**
+ * Nettoie récursivement toutes les propriétés `undefined` avant écriture dans Firestore
+ * (Firestore rejette `setDoc` si un objet dans un tableau contient une clé avec la valeur `undefined`).
+ */
+export function sanitizeForFirestore<T>(obj: T): T {
+  try {
+    return JSON.parse(JSON.stringify(obj));
+  } catch (e) {
+    return obj;
+  }
+}
+
 export function saveOfflineQueue(data: Partial<CloudStoreData>) {
+  const cleanData = sanitizeForFirestore(data);
   try {
     const current = getOfflineQueue() || {};
-    const merged = { ...current, ...data };
+    const merged = sanitizeForFirestore({ ...current, ...cleanData });
     localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(merged));
     const prevCount = Number(localStorage.getItem(OFFLINE_OPS_COUNT_KEY) || 0);
     localStorage.setItem(OFFLINE_OPS_COUNT_KEY, String(prevCount + 1));
   } catch (e) {}
   // Enregistre également dans la table Dexie VisionTechOfflineDB.commandesOffline
-  addCommandeOffline(data);
+  addCommandeOffline(cleanData);
 }
 
 export function clearOfflineQueue() {
@@ -499,11 +512,11 @@ export async function flushOfflineQueue(): Promise<void> {
     }
 
     const deviceId = getDeviceId();
-    const dataToSave = {
+    const dataToSave = sanitizeForFirestore({
       ...mergedPayload,
       lastDeviceId: deviceId,
       updatedAt: new Date().toISOString(),
-    };
+    });
 
     await withTimeout(setDoc(storeDocRef, dataToSave, { merge: true }), 8000, 'setDoc timeout');
     clearOfflineQueue();
@@ -530,20 +543,21 @@ let pushTimer: any = null;
 export async function pushToCloud(partialData: Partial<CloudStoreData>): Promise<void> {
   const deviceId = getDeviceId();
   const timestamp = new Date().toISOString();
+  const cleanPartial = sanitizeForFirestore(partialData);
 
   // 1. Toujours enregistrer IMMÉDIATEMENT (0 ms) dans la file locale hors-ligne (localStorage + IndexedDB Dexie)
   saveOfflineQueue({
-    ...partialData,
+    ...cleanPartial,
     lastDeviceId: deviceId,
     updatedAt: timestamp,
   });
 
-  pendingPushData = {
+  pendingPushData = sanitizeForFirestore({
     ...pendingPushData,
-    ...partialData,
+    ...cleanPartial,
     lastDeviceId: deviceId,
     updatedAt: timestamp,
-  };
+  });
 
   // Demander au Service Worker une synchronisation en arrière-plan dès que possible
   if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
@@ -571,7 +585,7 @@ export async function pushToCloud(partialData: Partial<CloudStoreData>): Promise
 
   return new Promise((resolve) => {
     pushTimer = setTimeout(async () => {
-      const dataToSave = { ...getOfflineQueue(), ...pendingPushData };
+      const dataToSave = sanitizeForFirestore({ ...getOfflineQueue(), ...pendingPushData });
       pendingPushData = {};
       try {
         const { auth, db } = getCloudServices();
@@ -606,13 +620,13 @@ export async function forcePushToCloud(partialData: Partial<CloudStoreData>): Pr
     pushTimer = null;
   }
   const deviceId = getDeviceId();
-  const dataToSave = {
+  const dataToSave = sanitizeForFirestore({
     ...getOfflineQueue(),
     ...pendingPushData,
     ...partialData,
     lastDeviceId: deviceId,
     updatedAt: new Date().toISOString(),
-  };
+  });
   pendingPushData = {};
   saveOfflineQueue(dataToSave);
 

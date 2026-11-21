@@ -18,14 +18,19 @@ export const ProductModal: React.FC = () => {
   const [customCategoryName, setCustomCategoryName] = useState('');
   const [quantity, setQuantity] = useState<number>(1);
   const [minThreshold, setMinThreshold] = useState<number>(2);
-  const [costPrice, setCostPrice] = useState<number>(0);
-  const [wholesalePrice, setWholesalePrice] = useState<number>(0);
+  const [costPriceInput, setCostPriceInput] = useState<string>('');
+  const [wholesalePriceInput, setWholesalePriceInput] = useState<string>('');
   const [wholesaleMinQty, setWholesaleMinQty] = useState<number>(5);
-  const [cashierTransferPrice, setCashierTransferPrice] = useState<number>(0);
-  const [salePrice, setSalePrice] = useState<number>(0);
+  const [cashierTransferPriceInput, setCashierTransferPriceInput] = useState<string>('');
+  const [salePriceInput, setSalePriceInput] = useState<string>('');
   const [supplier, setSupplier] = useState('');
   const [location, setLocation] = useState('Rayon principal');
   const [error, setError] = useState<string | null>(null);
+
+  const costPrice = Math.max(0, Math.round(Number(costPriceInput) || 0));
+  const wholesalePrice = Math.max(0, Math.round(Number(wholesalePriceInput) || 0));
+  const cashierTransferPrice = Math.max(0, Math.round(Number(cashierTransferPriceInput) || 0));
+  const salePrice = Math.max(0, Math.round(Number(salePriceInput) || 0));
 
   // Calculateur interactif de Coût de Revient (Achat + Transport)
   const [showCostCalculator, setShowCostCalculator] = useState(false);
@@ -42,21 +47,30 @@ export const ProductModal: React.FC = () => {
   useEffect(() => {
     if (productModal.isOpen) {
       if (productModal.product) {
-        const p = productModal.product;
-        setSku(p.sku);
-        setName(p.name);
-        setImageUrl(p.imageUrl || '');
-        setDescription(p.description || '');
-        setCategory(p.category);
-        setQuantity(p.quantity);
-        setMinThreshold(p.minThreshold);
-        setCostPrice(p.costPrice);
-        setWholesalePrice(p.wholesalePrice ?? 0);
-        setWholesaleMinQty(p.wholesaleMinQty ?? 5);
-        setCashierTransferPrice(p.cashierTransferPrice ?? 0);
-        setSalePrice(p.salePrice);
-        setSupplier(p.supplier);
-        setLocation(p.location || 'Rayon principal');
+        const liveProd =
+          products.find((item) => item.id === productModal.product?.id) || productModal.product;
+        setSku(liveProd.sku);
+        setName(liveProd.name);
+        setImageUrl(liveProd.imageUrl || '');
+        setDescription(liveProd.description || '');
+        setCategory(liveProd.category);
+        setQuantity(liveProd.quantity);
+        setMinThreshold(liveProd.minThreshold);
+        setCostPriceInput(String(liveProd.costPrice ?? 0));
+        setWholesalePriceInput(
+          liveProd.wholesalePrice && liveProd.wholesalePrice > 0
+            ? String(liveProd.wholesalePrice)
+            : ''
+        );
+        setWholesaleMinQty(liveProd.wholesaleMinQty ?? 5);
+        setCashierTransferPriceInput(
+          liveProd.cashierTransferPrice && liveProd.cashierTransferPrice > 0
+            ? String(liveProd.cashierTransferPrice)
+            : ''
+        );
+        setSalePriceInput(String(liveProd.salePrice ?? 0));
+        setSupplier(liveProd.supplier);
+        setLocation(liveProd.location || 'Rayon principal');
       } else {
         // Defaults for new product
         const prefix = 'ART';
@@ -70,17 +84,19 @@ export const ProductModal: React.FC = () => {
         setCustomCategoryName('');
         setQuantity(1);
         setMinThreshold(2);
-        setCostPrice(0);
-        setWholesalePrice(0);
+        setCostPriceInput('');
+        setWholesalePriceInput('');
         setWholesaleMinQty(5);
-        setCashierTransferPrice(0);
-        setSalePrice(0);
+        setCashierTransferPriceInput('');
+        setSalePriceInput('');
         setSupplier('Fournisseur Direct');
         setLocation('Rayon A-01');
       }
       setError(null);
     }
-  }, [productModal, products]);
+    // Only re-initialize when modal opens or edited product ID changes (never on background products sync)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productModal.isOpen, productModal.product?.id]);
 
   if (!productModal.isOpen) return null;
 
@@ -559,9 +575,9 @@ export const ProductModal: React.FC = () => {
                     type="button"
                     onClick={() => {
                       const unitCost = Math.round((calcTotalPurchase + calcShippingCost) / Math.max(1, calcQty));
-                      setCostPrice(unitCost);
+                      setCostPriceInput(String(unitCost));
                       if (!salePrice || salePrice <= unitCost) {
-                        setSalePrice(Math.round(unitCost * 1.3));
+                        setSalePriceInput(String(Math.round(unitCost * 1.3)));
                       }
                       setAppliedSuccess(true);
                       setTimeout(() => setAppliedSuccess(false), 2500);
@@ -597,8 +613,9 @@ export const ProductModal: React.FC = () => {
                 type="number"
                 step="any"
                 min="0"
-                value={costPrice}
-                onChange={(e) => setCostPrice(parseFloat(e.target.value) || 0)}
+                value={costPriceInput}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => setCostPriceInput(e.target.value)}
                 placeholder="Ex: 3000"
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 font-mono tabular-nums text-slate-900"
               />
@@ -612,8 +629,9 @@ export const ProductModal: React.FC = () => {
                 type="number"
                 step="any"
                 min="0"
-                value={salePrice}
-                onChange={(e) => setSalePrice(parseFloat(e.target.value) || 0)}
+                value={salePriceInput}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => setSalePriceInput(e.target.value)}
                 placeholder="Ex: 4500"
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 font-mono tabular-nums font-bold text-slate-900"
               />
@@ -641,8 +659,9 @@ export const ProductModal: React.FC = () => {
                   type="number"
                   step="any"
                   min="0"
-                  value={wholesalePrice}
-                  onChange={(e) => setWholesalePrice(parseFloat(e.target.value) || 0)}
+                  value={wholesalePriceInput}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => setWholesalePriceInput(e.target.value)}
                   placeholder="Ex: 3800"
                   className="w-full px-2.5 py-2 bg-white border border-indigo-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 font-mono tabular-nums text-slate-900 font-semibold"
                 />
@@ -659,6 +678,7 @@ export const ProductModal: React.FC = () => {
                   type="number"
                   min="1"
                   value={wholesaleMinQty}
+                  onFocus={(e) => e.target.select()}
                   onChange={(e) => setWholesaleMinQty(Math.max(1, parseInt(e.target.value) || 1))}
                   placeholder="Ex: 5"
                   className="w-full px-2.5 py-2 bg-white border border-indigo-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 font-mono tabular-nums text-slate-900"
@@ -676,8 +696,9 @@ export const ProductModal: React.FC = () => {
                   type="number"
                   step="any"
                   min="0"
-                  value={cashierTransferPrice}
-                  onChange={(e) => setCashierTransferPrice(parseFloat(e.target.value) || 0)}
+                  value={cashierTransferPriceInput}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => setCashierTransferPriceInput(e.target.value)}
                   placeholder="Ex: 4000"
                   className="w-full px-2.5 py-2 bg-white border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 font-mono tabular-nums font-bold text-amber-950"
                 />

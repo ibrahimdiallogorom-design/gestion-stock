@@ -1207,12 +1207,13 @@ export const CashierView: React.FC = () => {
                             <input
                               type="number"
                               min="0"
-                              step="50"
+                              step="any"
                               value={
                                 rawPriceInput !== undefined
                                   ? rawPriceInput
                                   : String(marketPrice)
                               }
+                              onFocus={(e) => e.target.select()}
                               onChange={(e) =>
                                 setReassortPriceInputs((prev) => ({
                                   ...prev,
@@ -1226,6 +1227,23 @@ export const CashierView: React.FC = () => {
                               FCFA (Prix Marché / Client)
                             </span>
                           </div>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleSaveCatalogPrice(
+                                product,
+                                currentNegotiatedPrice,
+                                rawWholesaleInput !== '' ? Number(rawWholesaleInput) : undefined,
+                                rawTransferInput !== '' ? Number(rawTransferInput) : undefined
+                              )
+                            }
+                            className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
+                            title="Enregistrer définitivement ce nouveau prix dans le catalogue"
+                          >
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Enregistrer ce prix</span>
+                          </button>
 
                           <button
                             type="button"
@@ -1254,8 +1272,9 @@ export const CashierView: React.FC = () => {
                               <input
                                 type="number"
                                 min="0"
-                                step="50"
+                                step="any"
                                 value={rawWholesaleInput}
+                                onFocus={(e) => e.target.select()}
                                 onChange={(e) =>
                                   setReassortWholesaleInputs((prev) => ({
                                     ...prev,
@@ -1274,8 +1293,9 @@ export const CashierView: React.FC = () => {
                               <input
                                 type="number"
                                 min="0"
-                                step="50"
+                                step="any"
                                 value={rawTransferInput}
+                                onFocus={(e) => e.target.select()}
                                 onChange={(e) =>
                                   setReassortTransferInputs((prev) => ({
                                     ...prev,
@@ -1297,11 +1317,11 @@ export const CashierView: React.FC = () => {
                                   rawTransferInput !== '' ? Number(rawTransferInput) : undefined
                                 )
                               }
-                              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors h-[34px]"
+                              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors h-[34px]"
                               title="Enregistrer le Prix Marché, le Prix en Gros et le Prix Remis Caisse"
                             >
-                              <Check className="w-3.5 h-3.5 text-emerald-400" />
-                              <span>Enregistrer ces prix</span>
+                              <Check className="w-3.5 h-3.5 text-white" />
+                              <span>Enregistrer Grille (Gros / Caisse)</span>
                             </button>
                           </div>
                         )}
@@ -1552,12 +1572,13 @@ export const CashierView: React.FC = () => {
                         ))}
                       </div>
 
-                      <div className="flex gap-1.5">
+                      <div className="flex flex-wrap gap-1.5">
                         <input
                           type="number"
                           min="0"
-                          step="50"
+                          step="any"
                           value={customCartPriceInput}
+                          onFocus={(e) => e.target.select()}
                           onChange={(e) => {
                             setCustomCartPriceInput(e.target.value);
                             const val = parseFloat(e.target.value);
@@ -1566,8 +1587,22 @@ export const CashierView: React.FC = () => {
                             }
                           }}
                           placeholder="Prix client..."
-                          className="flex-1 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-900 focus:bg-white focus:outline-none focus:border-amber-500"
+                          className="flex-1 min-w-[110px] px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-900 focus:bg-white focus:outline-none focus:border-amber-500"
                         />
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const val = Math.max(0, Math.round(parseFloat(customCartPriceInput) || item.product.salePrice));
+                            updateCartItemPrice(item.product.id, val);
+                            await handleSaveCatalogPrice(catalogProd, val);
+                            setEditingCartItemId(null);
+                          }}
+                          title="Enregistrer ce nouveau prix définitivement dans le catalogue"
+                          className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[10px] font-bold flex items-center gap-1"
+                        >
+                          <Check className="w-3 h-3 text-emerald-400" />
+                          <span>Fixer ce prix</span>
+                        </button>
                         <button
                           type="button"
                           onClick={() => setEditingCartItemId(null)}

@@ -33,6 +33,8 @@ export const DistributionView: React.FC = () => {
     movements,
     openDistributionModal,
     openDirectSaleModal,
+    openProductModal,
+    updateProduct,
     setBoutiqueQuantity,
     setBoutiquePricing,
     removeFromBoutique,
@@ -882,58 +884,76 @@ export const DistributionView: React.FC = () => {
                           )}
                           {/* Prix Remis Caisse */}
                           <td className="py-3 px-3 text-right">
-                            {activeStoreDetail.cashier ? (
-                              <input
-                                type="number"
-                                min="0"
-                                step="50"
-                                value={currentTransferEdit}
-                                onChange={(e) =>
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={currentTransferEdit}
+                              onFocus={(e) => {
+                                e.target.select();
+                                if (!editingPrices[item.product.id]) {
                                   setEditingPrices((prev) => ({
                                     ...prev,
                                     [item.product.id]: {
-                                      transfer: e.target.value,
+                                      transfer: currentTransferEdit,
                                       market: currentMarketEdit,
                                     },
-                                  }))
+                                  }));
                                 }
-                                className="w-20 text-right font-mono font-bold text-blue-800 bg-blue-50/60 border border-blue-200 rounded-lg px-2 py-1 text-xs focus:bg-white focus:outline-none focus:border-blue-600"
-                              />
-                            ) : (
-                              <span className="font-mono font-semibold text-blue-700">
-                                {item.transferPriceUnit.toLocaleString('fr-FR')} F
-                              </span>
-                            )}
+                              }}
+                              onChange={(e) =>
+                                setEditingPrices((prev) => ({
+                                  ...prev,
+                                  [item.product.id]: {
+                                    transfer: e.target.value,
+                                    market: currentMarketEdit,
+                                  },
+                                }))
+                              }
+                              className="w-24 text-right font-mono font-bold text-blue-800 bg-blue-50/60 border border-blue-200 rounded-lg px-2 py-1 text-xs focus:bg-white focus:outline-none focus:border-blue-600"
+                            />
                           </td>
                           {/* Prix Final Marché */}
                           <td className="py-3 px-3 text-right">
-                            {activeStoreDetail.cashier ? (
-                              <div className="inline-flex items-center justify-end gap-1">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="50"
-                                  value={currentMarketEdit}
-                                  onChange={(e) =>
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={currentMarketEdit}
+                                onFocus={(e) => {
+                                  e.target.select();
+                                  if (!editingPrices[item.product.id]) {
                                     setEditingPrices((prev) => ({
                                       ...prev,
                                       [item.product.id]: {
                                         transfer: currentTransferEdit,
-                                        market: e.target.value,
+                                        market: currentMarketEdit,
                                       },
-                                    }))
+                                    }));
                                   }
-                                  className="w-20 text-right font-mono font-bold text-slate-900 bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-emerald-600"
-                                />
-                                {isPriceDirty && (
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      const tVal = parseInt(currentTransferEdit, 10) || 0;
-                                      const mVal = parseInt(currentMarketEdit, 10) || 0;
+                                }}
+                                onChange={(e) =>
+                                  setEditingPrices((prev) => ({
+                                    ...prev,
+                                    [item.product.id]: {
+                                      transfer: currentTransferEdit,
+                                      market: e.target.value,
+                                    },
+                                  }))
+                                }
+                                className="w-24 text-right font-mono font-bold text-slate-900 bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-emerald-600"
+                              />
+                              {(isPriceDirty || priceEditState !== undefined) && (
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const tVal = Math.max(0, Math.round(Number(currentTransferEdit) || 0));
+                                    const mVal = Math.max(0, Math.round(Number(currentMarketEdit) || 0));
+                                    if (activeStoreDetail.cashier) {
                                       const res = await setBoutiquePricing(
                                         item.product.id,
-                                        activeStoreDetail.cashier!.id,
+                                        activeStoreDetail.cashier.id,
                                         tVal,
                                         mVal
                                       );
@@ -948,20 +968,31 @@ export const DistributionView: React.FC = () => {
                                       } else {
                                         setToastMessage({ type: 'error', text: res.message });
                                       }
-                                    }}
-                                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold flex items-center gap-0.5 shadow-2xs"
-                                    title="Enregistrer le prix remis caisse et le prix final marché"
-                                  >
-                                    <Check className="w-3 h-3" />
-                                    <span>OK</span>
-                                  </button>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="font-mono font-bold text-slate-900">
-                                {item.marketPriceUnit.toLocaleString('fr-FR')} F
-                              </span>
-                            )}
+                                    } else {
+                                      await updateProduct(item.product.id, {
+                                        salePrice: mVal,
+                                        cashierTransferPrice: tVal > 0 ? tVal : undefined,
+                                      });
+                                      setEditingPrices((prev) => {
+                                        const next = { ...prev };
+                                        delete next[item.product.id];
+                                        return next;
+                                      });
+                                      setToastMessage({
+                                        type: 'success',
+                                        text: `Prix catalogue enregistrés pour "${item.product.name}" (Caisse : ${tVal.toLocaleString('fr-FR')} F | Marché : ${mVal.toLocaleString('fr-FR')} F).`,
+                                      });
+                                      setTimeout(() => setToastMessage(null), 4000);
+                                    }
+                                  }}
+                                  className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold flex items-center gap-0.5 shadow-2xs"
+                                  title="Enregistrer le prix remis caisse et le prix final marché"
+                                >
+                                  <Check className="w-3 h-3" />
+                                  <span>OK</span>
+                                </button>
+                              )}
+                            </div>
                           </td>
                           {/* Bénéfice Caissier / u */}
                           <td className="py-3 px-3 text-right font-mono font-bold text-emerald-700">
