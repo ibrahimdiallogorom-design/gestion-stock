@@ -61,7 +61,7 @@ export const DistributionView: React.FC = () => {
   const [newStoreName, setNewStoreName] = useState('');
   const [newStoreSeller, setNewStoreSeller] = useState('');
   const [newStoreUsername, setNewStoreUsername] = useState('');
-  const [newStorePassword, setNewStorePassword] = useState('1234');
+  const [newStorePassword, setNewStorePassword] = useState('');
   const [storeFormError, setStoreFormError] = useState<string | null>(null);
 
   // 1. Overall Company Financials (Global Enterprise)
@@ -280,10 +280,15 @@ export const DistributionView: React.FC = () => {
 
           <button
             onClick={() => {
+              const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+              let randomCode = 'VT-';
+              for (let i = 0; i < 5; i++) {
+                randomCode += chars.charAt(Math.floor(Math.random() * chars.length));
+              }
               setNewStoreName('');
               setNewStoreSeller('');
               setNewStoreUsername('');
-              setNewStorePassword('1234');
+              setNewStorePassword(randomCode);
               setStoreFormError(null);
               setIsCreateStoreModalOpen(true);
             }}
@@ -1101,7 +1106,7 @@ export const DistributionView: React.FC = () => {
         </div>
       )}
 
-      {/* Modal Créer une Nouvelle Boutique */}
+      {/* Modal Créer une Nouvelle Boutique (Sécurisé Anti-Intrusion) */}
       {isCreateStoreModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden flex flex-col animate-in zoom-in-95 duration-150">
@@ -1111,8 +1116,8 @@ export const DistributionView: React.FC = () => {
                   <Store className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base">Créer une Boutique</h3>
-                  <p className="text-xs text-blue-200/80">Ajouter un nouveau point de vente ou caissier</p>
+                  <h3 className="font-bold text-base">Créer une Boutique Sécurisée</h3>
+                  <p className="text-xs text-blue-200/80">Ajouter un point de vente avec identifiants protégés</p>
                 </div>
               </div>
               <button
@@ -1131,12 +1136,20 @@ export const DistributionView: React.FC = () => {
                   setStoreFormError('Veuillez saisir le nom de la boutique.');
                   return;
                 }
-                if (!newStoreUsername.trim()) {
-                  setStoreFormError('Veuillez saisir un nom d’utilisateur / identifiant.');
+                if (!newStoreUsername.trim() || newStoreUsername.trim().length < 3) {
+                  setStoreFormError('Veuillez saisir un identifiant d’au moins 3 caractères.');
                   return;
                 }
-                if (!newStorePassword.trim()) {
-                  setStoreFormError('Veuillez définir un mot de passe.');
+                const cleanPass = newStorePassword.trim();
+                if (!cleanPass || cleanPass.length < 4) {
+                  setStoreFormError('Veuillez définir un mot de passe d’au moins 4 caractères.');
+                  return;
+                }
+                const forbiddenWeakPasswords = ['1234', '0000', '1111', 'admin', 'password', 'azerty'];
+                if (forbiddenWeakPasswords.includes(cleanPass.toLowerCase())) {
+                  setStoreFormError(
+                    'Sécurité SaaS : Ce mot de passe (ex: 1234 ou 0000) est trop facile à deviner. Utilisez le bouton "Générer un code fort" ou choisissez un code secret.'
+                  );
                   return;
                 }
 
@@ -1144,7 +1157,7 @@ export const DistributionView: React.FC = () => {
                   storeName: newStoreName.trim(),
                   fullName: newStoreSeller.trim() || newStoreUsername.trim(),
                   username: newStoreUsername.trim(),
-                  password: newStorePassword.trim(),
+                  password: cleanPass,
                   role: 'CASHIER',
                 });
 
@@ -1152,9 +1165,9 @@ export const DistributionView: React.FC = () => {
                   setIsCreateStoreModalOpen(false);
                   setToastMessage({
                     type: 'success',
-                    text: `La boutique "${newStoreName.trim()}" a été créée avec succès !`,
+                    text: `La boutique "${newStoreName.trim()}" (@${newStoreUsername.trim()}) a été créée avec succès et protégée !`,
                   });
-                  setTimeout(() => setToastMessage(null), 4000);
+                  setTimeout(() => setToastMessage(null), 5000);
                 } else {
                   setStoreFormError(res.message || 'Erreur lors de la création de la boutique.');
                 }
@@ -1203,24 +1216,43 @@ export const DistributionView: React.FC = () => {
                   type="text"
                   required
                   value={newStoreUsername}
-                  onChange={(e) => setNewStoreUsername(e.target.value)}
+                  onChange={(e) => setNewStoreUsername(e.target.value.replace(/\s+/g, '').toLowerCase())}
                   placeholder="Ex: moussavision2"
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Mot de passe de caisse *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-semibold text-slate-700">
+                    Mot de passe / Code secret de caisse *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+                      let code = 'VT-';
+                      for (let i = 0; i < 5; i++) {
+                        code += chars.charAt(Math.floor(Math.random() * chars.length));
+                      }
+                      setNewStorePassword(code);
+                    }}
+                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 underline"
+                  >
+                    🔑 Générer un code fort
+                  </button>
+                </div>
                 <input
-                  type="password"
+                  type="text"
                   required
                   value={newStorePassword}
                   onChange={(e) => setNewStorePassword(e.target.value)}
-                  placeholder="Ex: 1234"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                  placeholder="Ex: VT-8K4M9 (évitez 1234)"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
                 />
+                <span className="text-[10px] text-slate-500 block mt-1">
+                  🛡️ Sécurité SaaS : Les codes triviaux (1234, 0000) sont refusés pour protéger le stock de la boutique.
+                </span>
               </div>
 
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">

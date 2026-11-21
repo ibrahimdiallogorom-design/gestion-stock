@@ -52,7 +52,59 @@ export const CLOUD_FIREBASE_CONFIG = {
 };
 
 const APP_NAME = 'visiontech-cloud-store';
-const STORE_DOC_ID = 'visiontech-main';
+const DEFAULT_STORE_DOC_ID = 'visiontech-main';
+const SAAS_TENANT_STORAGE_KEY = 'stockflow_saas_tenant_id_v1';
+
+/**
+ * Récupère l'identifiant d'espace entreprise (Tenant SaaS).
+ * Par défaut : 'visiontech-main' pour préserver 100% des données actuelles.
+ * En déploiement SaaS, chaque entreprise cliente dispose de son propre identifiant non-énumérable.
+ */
+export function getActiveTenantId(): string {
+  try {
+    const saved = localStorage.getItem(SAAS_TENANT_STORAGE_KEY);
+    if (saved && saved.trim().length >= 3) {
+      return saved.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    }
+  } catch (e) {}
+  return DEFAULT_STORE_DOC_ID;
+}
+
+export function setActiveTenantId(tenantId: string): string {
+  const clean =
+    (tenantId || DEFAULT_STORE_DOC_ID)
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, '') || DEFAULT_STORE_DOC_ID;
+  try {
+    localStorage.setItem(SAAS_TENANT_STORAGE_KEY, clean);
+  } catch (e) {}
+  return clean;
+}
+
+/**
+ * Génère un code d'espace SaaS unique avec suffixe aléatoire anti-énumération (contre les scans).
+ */
+export function generateSaaSTenantId(companyName: string): string {
+  const slug = companyName
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 18) || 'boutique';
+  const randomBytes = new Uint8Array(4);
+  if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+    window.crypto.getRandomValues(randomBytes);
+  } else {
+    for (let i = 0; i < 4; i++) randomBytes[i] = Math.floor(Math.random() * 256);
+  }
+  const hex = Array.from(randomBytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  return `${slug}-${hex}`;
+}
+
 const CLOUD_CREDENTIALS = {
   email: 'admin@boutiquevisiontech.bf',
   password: 'admin1234',
@@ -313,7 +365,7 @@ export function initCloudSync(callbacks: {
         unsubSnapshot = null;
       }
 
-      const storeDocRef = doc(db, 'stores', STORE_DOC_ID);
+      const storeDocRef = doc(db, 'stores', getActiveTenantId());
 
       unsubSnapshot = onSnapshot(
         storeDocRef,
@@ -432,7 +484,7 @@ export async function flushOfflineQueue(): Promise<void> {
   try {
     const { auth, db } = getCloudServices();
     await ensureCloudAuth(auth);
-    const storeDocRef = doc(db, 'stores', STORE_DOC_ID);
+    const storeDocRef = doc(db, 'stores', getActiveTenantId());
 
     // Lire l'état distant actuel (avec timeout court) pour fusionner sans écraser les autres appareils
     let mergedPayload: Partial<CloudStoreData> = { ...queue };
@@ -524,7 +576,7 @@ export async function pushToCloud(partialData: Partial<CloudStoreData>): Promise
       try {
         const { auth, db } = getCloudServices();
         await ensureCloudAuth(auth);
-        const storeDocRef = doc(db, 'stores', STORE_DOC_ID);
+        const storeDocRef = doc(db, 'stores', getActiveTenantId());
         await withTimeout(setDoc(storeDocRef, dataToSave, { merge: true }), 8000, 'Push timeout');
         clearOfflineQueue();
         if (activeCallbacks) {
@@ -577,7 +629,7 @@ export async function forcePushToCloud(partialData: Partial<CloudStoreData>): Pr
   try {
     const { auth, db } = getCloudServices();
     await ensureCloudAuth(auth);
-    const storeDocRef = doc(db, 'stores', STORE_DOC_ID);
+    const storeDocRef = doc(db, 'stores', getActiveTenantId());
     await withTimeout(setDoc(storeDocRef, dataToSave, { merge: true }), 8000, 'ForcePush timeout');
     clearOfflineQueue();
     if (activeCallbacks) {
@@ -601,7 +653,7 @@ export async function pullFromCloud(): Promise<CloudStoreData | null> {
   try {
     const { auth, db } = getCloudServices();
     await ensureCloudAuth(auth);
-    const storeDocRef = doc(db, 'stores', STORE_DOC_ID);
+    const storeDocRef = doc(db, 'stores', getActiveTenantId());
     const snap = await withTimeout(getDoc(storeDocRef), 8000, 'pullFromCloud timeout');
     if (snap.exists()) {
       const data = snap.data() as CloudStoreData;

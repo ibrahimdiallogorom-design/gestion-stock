@@ -2191,36 +2191,28 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return { success: true, ticketNumber };
   };
 
-  // App User Authentication Methods
+  // App User Authentication Methods (Durci contre les accès non autorisés et backdoors)
   const loginAppUser = (username: string, password: string): { success: boolean; message?: string } => {
     const trimmedUser = username.trim().toLowerCase();
     const trimmedPass = password.trim();
 
+    if (!trimmedUser || !trimmedPass) {
+      return {
+        success: false,
+        message: 'Veuillez saisir votre identifiant et votre mot de passe.',
+      };
+    }
+
     const found = appUsers.find((u) => {
       const matchUser = u.username.trim().toLowerCase() === trimmedUser;
       const matchFull = u.fullName.trim().toLowerCase() === trimmedUser;
-      const matchCashierName =
-        cashierName &&
-        cashierName.trim().toLowerCase() === trimmedUser &&
-        u.role === 'CASHIER';
       const matchClean =
         u.username.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() ===
         trimmedUser.replace(/[^a-zA-Z0-9]/g, '');
 
-      // Aliases: 'admin' can match any ADMIN
-      const isAdminAlias =
-        (trimmedUser === 'admin' || trimmedUser === 'administrateur') && u.role === 'ADMIN';
-      // Aliases: 'caissier', 'moussa', 'moussavision' can match Moussa Vision or first CASHIER
-      const isMoussaAlias =
-        (trimmedUser === 'caissier' || trimmedUser === 'moussa' || trimmedUser === 'moussavision') &&
-        ((u.username || '').toLowerCase() === 'moussavision' || u.role === 'CASHIER');
-
-      const isNameMatched = matchUser || matchFull || matchCashierName || matchClean || isAdminAlias || isMoussaAlias;
-      const isPassMatched =
-        u.password.trim() === trimmedPass ||
-        (u.role === 'CASHIER' && trimmedPass === cashierPin.trim()) ||
-        (u.role === 'ADMIN' && (trimmedPass === 'amadoudany' || trimmedPass === 'admin')) ||
-        (u.role === 'CASHIER' && trimmedPass === '1234');
+      const isNameMatched = matchUser || matchFull || matchClean;
+      // Vérification stricte : uniquement le mot de passe réel configuré sur ce compte (aucun mot de passe universel en dur)
+      const isPassMatched = u.password.trim() === trimmedPass;
 
       return isNameMatched && isPassMatched;
     });
@@ -2232,8 +2224,9 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       };
     }
 
-    setActiveAppUser(found);
-    localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(found));
+    const sanitizedSessionUser: AppUser = { ...found, password: '***' };
+    setActiveAppUser(sanitizedSessionUser);
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(sanitizedSessionUser));
 
     // Role-based startup routing
     if (found.role === 'CASHIER') {
@@ -2254,12 +2247,18 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const updateAppUser = (id: string, updates: Partial<AppUser>): { success: boolean; message?: string } => {
+    if (activeAppUser && activeAppUser.role !== 'ADMIN' && activeAppUser.id !== id) {
+      return { success: false, message: 'Accès refusé : seul un administrateur peut modifier un autre compte.' };
+    }
     if (updates.username) {
       const lowerNew = updates.username.trim().toLowerCase();
       const existing = appUsers.find((u) => u.id !== id && u.username.toLowerCase() === lowerNew);
       if (existing) {
         return { success: false, message: 'Ce nom d’utilisateur est déjà utilisé par un autre compte.' };
       }
+    }
+    if (updates.password !== undefined && updates.password.trim().length < 4) {
+      return { success: false, message: 'Le mot de passe doit comporter au moins 4 caractères.' };
     }
 
     const updated = appUsers.map((u) => (u.id === id ? { ...u, ...updates } : u));
@@ -2268,7 +2267,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     pushToCloud({ appUsers: updated });
 
     if (activeAppUser && activeAppUser.id === id) {
-      const refreshed = { ...activeAppUser, ...updates };
+      const refreshed: AppUser = { ...activeAppUser, ...updates, password: '***' };
       setActiveAppUser(refreshed);
       localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(refreshed));
     }
@@ -2277,15 +2276,25 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const createAppUser = (userData: Omit<AppUser, 'id' | 'createdAt'>): { success: boolean; message?: string } => {
+    if (activeAppUser && activeAppUser.role !== 'ADMIN') {
+      return { success: false, message: 'Accès refusé : seul le Gérant / Administrateur peut créer une nouvelle boutique ou un compte.' };
+    }
     const lower = userData.username.trim().toLowerCase();
+    if (lower.length < 3) {
+      return { success: false, message: 'L’identifiant doit contenir au moins 3 caractères.' };
+    }
+    if (!userData.password || userData.password.trim().length < 4) {
+      return { success: false, message: 'Le mot de passe doit contenir au moins 4 caractères pour sécuriser la boutique.' };
+    }
     if (appUsers.some((u) => u.username.toLowerCase() === lower)) {
       return { success: false, message: 'Ce nom d’utilisateur existe déjà.' };
     }
 
     const newUser: AppUser = {
       ...userData,
-      id: `user-${Date.now()}`,
+      id: `user-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       username: userData.username.trim(),
+      password: userData.password.trim(),
       createdAt: new Date().toISOString(),
     };
 
@@ -2293,10 +2302,13 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setAppUsers(nextUsers);
     localStorage.setItem(STORAGE_KEYS.APP_USERS, JSON.stringify(nextUsers));
     pushToCloud({ appUsers: nextUsers });
-    return { success: true, message: 'Utilisateur créé avec succès.' };
+    return { success: true, message: 'Utilisateur et boutique créés avec succès.' };
   };
 
   const deleteAppUser = (id: string): { success: boolean; message?: string } => {
+    if (activeAppUser && activeAppUser.role !== 'ADMIN') {
+      return { success: false, message: 'Accès refusé : seul un administrateur peut supprimer un compte.' };
+    }
     if (appUsers.length <= 1) {
       return { success: false, message: 'Impossible de supprimer le dernier utilisateur restant.' };
     }
@@ -2321,11 +2333,15 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const switchAccountFast = (userId: string): { success: boolean; message?: string } => {
+    if (!activeAppUser || activeAppUser.role !== 'ADMIN') {
+      return { success: false, message: 'Accès refusé : mot de passe obligatoire.' };
+    }
     const target = appUsers.find((u) => u.id === userId);
     if (!target) return { success: false, message: 'Compte utilisateur introuvable.' };
 
-    setActiveAppUser(target);
-    localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(target));
+    const sanitizedTarget: AppUser = { ...target, password: '***' };
+    setActiveAppUser(sanitizedTarget);
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(sanitizedTarget));
 
     if (target.role === 'CASHIER') {
       const name = target.fullName || target.username;
